@@ -64,7 +64,7 @@ def test_register_agent_success(api_client, user_model):
 
 
 @pytest.mark.django_db
-def test_register_organisation_success(api_client, user_model):
+def test_register_collaborator_success(api_client, user_model):
     url = reverse('users:register')
     payload = {
         'email': 'org@example.com',
@@ -79,13 +79,8 @@ def test_register_organisation_success(api_client, user_model):
     assert response.status_code == 201
     user = user_model.objects.get(email='org@example.com')
     assert user.account_type == user_model.AccountType.COLLABORATOR
-    organisation = Organisation.objects.get(owner=user)
-    assert organisation.name == 'Org Example'
-    assert Collaborator.objects.filter(
-        user=user,
-        organisation=organisation,
-        role=Collaborator.Role.OWNER,
-    ).exists()
+    assert not Organisation.objects.filter(owner=user).exists()
+    assert not Collaborator.objects.filter(user=user).exists()
 
 
 @pytest.mark.django_db
