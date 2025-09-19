@@ -13,7 +13,7 @@ from athletes.models import Athlete, Sport
 
 @pytest.fixture
 def stats_sport():
-    return Sport.objects.create(name='Volley', discipline='Team Sport')
+    return Sport.objects.create(name="Volley", discipline="Team Sport")
 
 
 @pytest.fixture
@@ -21,9 +21,9 @@ def stats_athlete(agent_user, stats_sport):
     return Athlete.objects.create(
         sport=stats_sport,
         agent=agent_user.agent_profile,
-        full_name='Stat Athlete',
+        full_name="Stat Athlete",
         birth_date=date(1995, 5, 5),
-        nationality='FR',
+        nationality="FR",
     )
 
 
@@ -46,10 +46,10 @@ def test_agent_can_view_own_stats(agent_user, stats_athlete, athlete_stat):
 
     client = APIClient()
     client.force_authenticate(user=agent_user)
-    url = reverse('athlete-stats', kwargs={'athlete_id': stats_athlete.id})
+    url = reverse("athlete-stats", kwargs={"athlete_id": stats_athlete.id})
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
-    assert response.data[0]['metric'] == AthleteStat.Metric.FOLLOWERS
+    assert response.data[0]["metric"] == AthleteStat.Metric.FOLLOWERS
 
 
 @pytest.mark.django_db
@@ -65,16 +65,16 @@ def test_collaborator_without_subscription_denied(
 
     client = APIClient()
     client.force_authenticate(user=owner_user)
-    subscription = organisations_setup['organisation'].subscriptions.first()
+    subscription = organisations_setup["organisation"].subscriptions.first()
     plan = subscription.plan
-    plan.features['athlete_stats_scope'] = None
-    plan.save(update_fields=['features'])
-    url = reverse('athlete-stats', kwargs={'athlete_id': stats_athlete.id})
+    plan.features["athlete_stats_scope"] = None
+    plan.save(update_fields=["features"])
+    url = reverse("athlete-stats", kwargs={"athlete_id": stats_athlete.id})
     response = client.get(url)
     assert response.status_code == status.HTTP_403_FORBIDDEN
     payload = response.json()
-    assert payload['required_feature'] == 'athlete_stats_scope'
-    assert payload['recommended_plans']
+    assert payload["required_feature"] == "athlete_stats_scope"
+    assert payload["recommended_plans"]
 
 
 @pytest.mark.django_db
@@ -90,7 +90,7 @@ def test_collaborator_with_subscription_can_view(
 
     client = APIClient()
     client.force_authenticate(user=owner_user)
-    url = reverse('athlete-stats', kwargs={'athlete_id': stats_athlete.id})
+    url = reverse("athlete-stats", kwargs={"athlete_id": stats_athlete.id})
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
-    assert response.data[0]['metric'] == AthleteStat.Metric.FOLLOWERS
+    assert response.data[0]["metric"] == AthleteStat.Metric.FOLLOWERS

@@ -12,7 +12,11 @@ from core.permissions import (
     requirement_denied_payload,
 )
 from .models import Collaborator, Organisation
-from .permissions import IsAuthenticatedCollaborator, IsCollaboratorAccount, IsOrganisationOwner
+from .permissions import (
+    IsAuthenticatedCollaborator,
+    IsCollaboratorAccount,
+    IsOrganisationOwner,
+)
 from .serializers import (
     CollaboratorCreateSerializer,
     CollaboratorSerializer,
@@ -30,15 +34,16 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
     mixins.UpdateModelMixin,
 ):
     """Expose CRUD operations and collaborator management for organisations."""
+
     organisation = None
-    queryset = Organisation.objects.all().order_by('name')  # pylint: disable=no-member
+    queryset = Organisation.objects.all().order_by("name")  # pylint: disable=no-member
     serializer_class = OrganisationSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ('sector', 'size', 'country')
+    filterset_fields = ("sector", "size", "country")
 
     def get_serializer_class(self):
-        if self.action == 'create':
+        if self.action == "create":
             return OrganisationCreateSerializer
         return OrganisationSerializer
 
@@ -49,12 +54,12 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
     def get_permissions(self):
         """Return action-specific permission instances."""
         action_permissions = {
-            'update': self._owner_permissions,
-            'partial_update': self._owner_permissions,
-            'collaborators': self._collaborator_permissions,
-            'add_collaborator': self._collaborator_permissions,
-            'list': self._organisation_account_permissions,
-            'remove_collaborator': lambda: [permissions.IsAuthenticated()],
+            "update": self._owner_permissions,
+            "partial_update": self._owner_permissions,
+            "collaborators": self._collaborator_permissions,
+            "add_collaborator": self._collaborator_permissions,
+            "list": self._organisation_account_permissions,
+            "remove_collaborator": lambda: [permissions.IsAuthenticated()],
         }
         resolver = action_permissions.get(self.action)
         if resolver is not None:
@@ -79,15 +84,15 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'], url_path='collaborators')
+    @action(detail=True, methods=["get"], url_path="collaborators")
     def collaborators(self, _request, *_args, **_kwargs):
         """Return the collaborators associated with the organisation."""
         organisation = self._get_organisation()
-        collaborators = organisation.collaborators.select_related('user').all()  # pylint: disable=no-member
+        collaborators = organisation.collaborators.select_related("user").all()  # pylint: disable=no-member
         serializer = CollaboratorSerializer(collaborators, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'], url_path='collaborators/add')
+    @action(detail=True, methods=["post"], url_path="collaborators/add")
     def add_collaborator(self, request, *_args, **_kwargs):
         """Invite an existing user to collaborate with the organisation."""
         organisation = self._get_organisation()
@@ -97,26 +102,26 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
             role=Collaborator.Role.OWNER,
         ).exists():
             return Response(
-                {'detail': 'Only owners can add collaborators.'},
+                {"detail": "Only owners can add collaborators."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        requirement = COLLABORATOR_FEATURES['collaborator_invites']
+        requirement = COLLABORATOR_FEATURES["collaborator_invites"]
         if not collaborator_meets_requirement(request.user, requirement):
             payload = requirement_denied_payload(
                 requirement,
-                'Upgrade your organisation plan to invite additional collaborators.',
+                "Upgrade your organisation plan to invite additional collaborators.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         serializer = CollaboratorCreateSerializer(
             data=request.data,
-            context={'organisation': organisation},
+            context={"organisation": organisation},
         )
         serializer.is_valid(raise_exception=True)
 
         features = get_collaborator_plan_features(request.user, organisation)
-        max_collaborators = features.get('max_collaborators')
+        max_collaborators = features.get("max_collaborators")
         try:
             max_collaborators = int(max_collaborators)
         except (TypeError, ValueError):
@@ -124,12 +129,12 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
         if max_collaborators > 0:
             current_count = organisation.collaborators.count()  # pylint: disable=no-member
             if current_count >= max_collaborators:
-                requirement = COLLABORATOR_FEATURES['collaborator_slots']
+                requirement = COLLABORATOR_FEATURES["collaborator_slots"]
                 payload = requirement_denied_payload(
                     requirement,
                     (
-                        'Collaborator limit reached. Upgrade your organisation '
-                        'plan to add more teammates.'
+                        "Collaborator limit reached. Upgrade your organisation "
+                        "plan to add more teammates."
                     ),
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
@@ -139,15 +144,21 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
             status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=False, methods=['delete'], url_path='collaborators/(?P<collaborator_id>[^/.]+)')
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path="collaborators/(?P<collaborator_id>[^/.]+)",
+    )
     def remove_collaborator(self, request, collaborator_id=None):
         """Remove a collaborator if the requester is an organisation owner."""
         try:
-            collaborator = Collaborator.objects.select_related('organisation').get(  # pylint: disable=no-member
+            collaborator = Collaborator.objects.select_related("organisation").get(  # pylint: disable=no-member
                 id=collaborator_id
             )
         except Collaborator.DoesNotExist:  # pylint: disable=no-member
-            return Response({'detail': 'Collaborator not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Collaborator not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         if not Collaborator.objects.filter(  # pylint: disable=no-member
             organisation=collaborator.organisation,
@@ -155,15 +166,15 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
             role=Collaborator.Role.OWNER,
         ).exists():
             return Response(
-                {'detail': 'Only owners can remove collaborators.'},
+                {"detail": "Only owners can remove collaborators."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        requirement = COLLABORATOR_FEATURES['collaborator_invites']
+        requirement = COLLABORATOR_FEATURES["collaborator_invites"]
         if not collaborator_meets_requirement(request.user, requirement):
             payload = requirement_denied_payload(
                 requirement,
-                'Upgrade your organisation plan to manage collaborators.',
+                "Upgrade your organisation plan to manage collaborators.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
@@ -172,7 +183,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
 
     def _get_organisation(self):
         """Fetch and cache the organisation associated with the current action."""
-        if getattr(self, 'organisation', None) is not None:
+        if getattr(self, "organisation", None) is not None:
             return self.organisation
 
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field

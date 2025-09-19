@@ -37,7 +37,7 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_serializer_class(self):
         """Return serializer tailored to read or update operations."""
-        if self.request.method in ('PUT', 'PATCH'):
+        if self.request.method in ("PUT", "PATCH"):
             return MeUpdateSerializer
         return UserSerializer
 
@@ -69,7 +69,7 @@ class MeEntitlementsView(APIView):
         features = feature_status_for_user(user)
         return Response(
             {
-                'account_type': getattr(user, 'account_type', None),
-                'features': features,
+                "account_type": getattr(user, "account_type", None),
+                "features": features,
             }
         )

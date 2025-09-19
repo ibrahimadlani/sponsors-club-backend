@@ -12,7 +12,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -21,10 +20,10 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Notification',
+            name="Notification",
             fields=[
                 (
-                    'id',
+                    "id",
                     models.UUIDField(
                         default=uuid.uuid4,
                         editable=False,
@@ -32,38 +31,38 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
                 (
-                    'type',
+                    "type",
                     models.CharField(
                         choices=[
-                            ('NEW_MESSAGE', 'New Message'),
-                            ('CONTRACT_STATUS', 'Contract Status'),
-                            ('NEW_FOLLOW', 'New Follow'),
-                            ('STAT_UPDATE', 'Stat Update'),
-                            ('PAYMENT', 'Payment'),
+                            ("NEW_MESSAGE", "New Message"),
+                            ("CONTRACT_STATUS", "Contract Status"),
+                            ("NEW_FOLLOW", "New Follow"),
+                            ("STAT_UPDATE", "Stat Update"),
+                            ("PAYMENT", "Payment"),
                         ],
                         max_length=32,
                     ),
                 ),
-                ('payload', models.JSONField(blank=True, default=dict)),
-                ('is_read', models.BooleanField(default=False)),
+                ("payload", models.JSONField(blank=True, default=dict)),
+                ("is_read", models.BooleanField(default=False)),
                 (
-                    'user',
+                    "user",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name='notifications',
+                        related_name="notifications",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
             ],
             options={
-                'ordering': ('-created_at',),
-                'indexes': [
+                "ordering": ("-created_at",),
+                "indexes": [
                     models.Index(
-                        fields=['user', 'is_read', '-created_at'],
-                        name='notificatio_user_id_f2ad08_idx',
+                        fields=["user", "is_read", "-created_at"],
+                        name="notificatio_user_id_f2ad08_idx",
                     ),
                 ],
             },

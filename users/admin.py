@@ -12,74 +12,77 @@ class UserAdmin(BaseUserAdmin):
 
     model = User
     list_display = (
-        'email',
-        'first_name',
-        'last_name',
-        'account_type',
-        'is_staff',
-        'is_active',
+        "email",
+        "first_name",
+        "last_name",
+        "account_type",
+        "is_staff",
+        "is_active",
     )
-    list_filter = ('account_type', 'is_staff', 'is_active')
-    ordering = ('email',)
-    search_fields = ('email', 'first_name', 'last_name')
-    readonly_fields = ('password_hash', 'created_at', 'updated_at', 'last_login')
+    list_filter = ("account_type", "is_staff", "is_active")
+    ordering = ("email",)
+    search_fields = ("email", "first_name", "last_name")
+    readonly_fields = ("password_hash", "created_at", "updated_at", "last_login")
 
     fieldsets = (
         (
             None,
             {
-                'fields': (
-                    'email',
-                    'password',
-                    'password_hash',
-                    'account_type',
-                    'email_verified',
+                "fields": (
+                    "email",
+                    "password",
+                    "password_hash",
+                    "account_type",
+                    "email_verified",
                 )
             },
         ),
         (
-            'Personal info',
+            "Personal info",
             {
-                'fields': (
-                    'first_name',
-                    'last_name',
-                    'phone_number',
-                    'date_of_birth',
+                "fields": (
+                    "first_name",
+                    "last_name",
+                    "phone_number",
+                    "date_of_birth",
                 )
             },
         ),
         (
-            'Permissions',
+            "Permissions",
             {
-                'fields': (
-                    'is_active',
-                    'is_staff',
-                    'is_superuser',
-                    'groups',
-                    'user_permissions',
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
                 )
             },
         ),
-        ('Important dates', {'fields': ('last_login', 'created_at', 'updated_at')}),
+        ("Important dates", {"fields": ("last_login", "created_at", "updated_at")}),
     )
 
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': (
-                'email',
-                'first_name',
-                'last_name',
-                'phone_number',
-                'date_of_birth',
-                'account_type',
-                'email_verified',
-                'password1',
-                'password2',
-                'is_staff',
-                'is_active',
-            ),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "phone_number",
+                    "date_of_birth",
+                    "account_type",
+                    "email_verified",
+                    "password1",
+                    "password2",
+                    "is_staff",
+                    "is_active",
+                ),
+            },
+        ),
     )
 
 
@@ -87,5 +90,10 @@ class UserAdmin(BaseUserAdmin):
 class AgentProfileAdmin(admin.ModelAdmin):
     """Admin configuration for managing agent profiles."""
 
-    list_display = ('user', 'display_name')
-    search_fields = ('display_name', 'user__email', 'user__first_name', 'user__last_name')
+    list_display = ("user", "display_name")
+    search_fields = (
+        "display_name",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )

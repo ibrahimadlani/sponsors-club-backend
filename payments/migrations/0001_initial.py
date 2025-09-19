@@ -11,20 +11,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('organisations', '0001_initial'),
-        ('users', '0002_delete_collaborator_delete_organisation'),
+        ("organisations", "0001_initial"),
+        ("users", "0002_delete_collaborator_delete_organisation"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SubscriptionPlan',
+            name="SubscriptionPlan",
             fields=[
                 (
-                    'id',
+                    "id",
                     models.UUIDField(
                         default=uuid.uuid4,
                         editable=False,
@@ -32,26 +31,26 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('code', models.CharField(max_length=100, unique=True)),
-                ('name', models.CharField(max_length=255)),
-                ('price', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('currency', models.CharField(default='EUR', max_length=10)),
-                ('max_athletes', models.PositiveIntegerField(default=0)),
-                ('max_collaborators', models.PositiveIntegerField(default=0)),
-                ('features', models.JSONField(blank=True, default=dict)),
-                ('stripe_product_id', models.CharField(blank=True, max_length=255)),
-                ('stripe_price_id', models.CharField(blank=True, max_length=255)),
-                ('is_active', models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("code", models.CharField(max_length=100, unique=True)),
+                ("name", models.CharField(max_length=255)),
+                ("price", models.DecimalField(decimal_places=2, max_digits=10)),
+                ("currency", models.CharField(default="EUR", max_length=10)),
+                ("max_athletes", models.PositiveIntegerField(default=0)),
+                ("max_collaborators", models.PositiveIntegerField(default=0)),
+                ("features", models.JSONField(blank=True, default=dict)),
+                ("stripe_product_id", models.CharField(blank=True, max_length=255)),
+                ("stripe_price_id", models.CharField(blank=True, max_length=255)),
+                ("is_active", models.BooleanField(default=True)),
             ],
-            options={'abstract': False},
+            options={"abstract": False},
         ),
         migrations.CreateModel(
-            name='Subscription',
+            name="Subscription",
             fields=[
                 (
-                    'id',
+                    "id",
                     models.UUIDField(
                         default=uuid.uuid4,
                         editable=False,
@@ -59,63 +58,66 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
                 (
-                    'status',
+                    "status",
                     models.CharField(
                         choices=[
-                            ('active', 'Active'),
-                            ('past_due', 'Past Due'),
-                            ('canceled', 'Canceled'),
-                            ('incomplete', 'Incomplete'),
+                            ("active", "Active"),
+                            ("past_due", "Past Due"),
+                            ("canceled", "Canceled"),
+                            ("incomplete", "Incomplete"),
                         ],
-                        default='active',
+                        default="active",
                         max_length=20,
                     ),
                 ),
-                ('start_at', models.DateTimeField()),
-                ('current_period_end', models.DateTimeField()),
-                ('stripe_customer_id', models.CharField(blank=True, max_length=255)),
-                ('stripe_subscription_id', models.CharField(blank=True, max_length=255)),
+                ("start_at", models.DateTimeField()),
+                ("current_period_end", models.DateTimeField()),
+                ("stripe_customer_id", models.CharField(blank=True, max_length=255)),
                 (
-                    'agent',
+                    "stripe_subscription_id",
+                    models.CharField(blank=True, max_length=255),
+                ),
+                (
+                    "agent",
                     models.ForeignKey(
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name='subscriptions',
-                        to='users.agentprofile',
+                        related_name="subscriptions",
+                        to="users.agentprofile",
                     ),
                 ),
                 (
-                    'organisation',
+                    "organisation",
                     models.ForeignKey(
                         blank=True,
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name='subscriptions',
-                        to='organisations.organisation',
+                        related_name="subscriptions",
+                        to="organisations.organisation",
                     ),
                 ),
                 (
-                    'plan',
+                    "plan",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
-                        related_name='subscriptions',
-                        to='payments.subscriptionplan',
+                        related_name="subscriptions",
+                        to="payments.subscriptionplan",
                     ),
                 ),
             ],
             options={
-                'indexes': [
+                "indexes": [
                     models.Index(
-                        fields=['organisation'],
-                        name='payments_su_organis_bb7136_idx',
+                        fields=["organisation"],
+                        name="payments_su_organis_bb7136_idx",
                     ),
                     models.Index(
-                        fields=['agent'],
-                        name='payments_su_agent_i_e0d720_idx',
+                        fields=["agent"],
+                        name="payments_su_agent_i_e0d720_idx",
                     ),
                 ],
             },

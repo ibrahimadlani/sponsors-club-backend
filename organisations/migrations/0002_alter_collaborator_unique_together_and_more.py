@@ -5,18 +5,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organisations', '0001_initial'),
+        ("organisations", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='collaborator',
+            name="collaborator",
             unique_together=set(),
         ),
         migrations.AddConstraint(
-            model_name='collaborator',
-            constraint=models.UniqueConstraint(fields=('user', 'organisation'), name='unique_collaborator_per_organisation'),
+            model_name="collaborator",
+            constraint=models.UniqueConstraint(
+                fields=("user", "organisation"),
+                name="unique_collaborator_per_organisation",
+            ),
         ),
     ]

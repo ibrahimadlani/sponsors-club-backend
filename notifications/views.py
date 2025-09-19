@@ -19,7 +19,7 @@ class NotificationPagination(PageNumberPagination):
     """Pagination defaults for notification listing."""
 
     page_size = 25
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 100
 
 
@@ -33,11 +33,13 @@ class NotificationListView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         """Return notifications or a feature-requirement denial."""
 
-        requirement, granted = user_feature_requirement(request.user, 'notification_center')
+        requirement, granted = user_feature_requirement(
+            request.user, "notification_center"
+        )
         if requirement is not None and not granted:
             payload = requirement_denied_payload(
                 requirement,
-                'Upgrade required to access notifications.',
+                "Upgrade required to access notifications.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
         return super().list(request, *args, **kwargs)
@@ -45,13 +47,15 @@ class NotificationListView(generics.ListAPIView):
     def get_queryset(self):
         """Filter notifications for the requesting user with optional read flag."""
 
-        queryset = Notification.objects.filter(user=self.request.user).order_by('-created_at')
-        is_read = self.request.query_params.get('is_read')
+        queryset = Notification.objects.filter(user=self.request.user).order_by(
+            "-created_at"
+        )
+        is_read = self.request.query_params.get("is_read")
         if is_read is not None:
             lowered = is_read.lower()
-            if lowered in {'true', '1'}:
+            if lowered in {"true", "1"}:
                 queryset = queryset.filter(is_read=True)
-            elif lowered in {'false', '0'}:
+            elif lowered in {"false", "0"}:
                 queryset = queryset.filter(is_read=False)
         return queryset
 
@@ -64,23 +68,29 @@ class NotificationReadView(APIView):
     def patch(self, request, notification_id):
         """Mark the notification as read/unread when permitted."""
 
-        requirement, granted = user_feature_requirement(request.user, 'notification_center')
+        requirement, granted = user_feature_requirement(
+            request.user, "notification_center"
+        )
         if requirement is not None and not granted:
             payload = requirement_denied_payload(
                 requirement,
-                'Upgrade required to access notifications.',
+                "Upgrade required to access notifications.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            notification = Notification.objects.get(id=notification_id, user=request.user)
+            notification = Notification.objects.get(
+                id=notification_id, user=request.user
+            )
         except Notification.DoesNotExist:
             return Response(
-                {'detail': 'Notification not found.'},
+                {"detail": "Notification not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = NotificationReadSerializer(notification, data=request.data, partial=True)
+        serializer = NotificationReadSerializer(
+            notification, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(NotificationSerializer(notification).data)

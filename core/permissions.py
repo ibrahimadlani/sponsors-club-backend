@@ -24,7 +24,7 @@ def get_agent_profile(user: User) -> Optional[AgentProfile]:
 
 def user_is_agent(user: User) -> bool:
     """Check whether the user account is configured as an agent."""
-    return getattr(user, 'account_type', None) == User.AccountType.AGENT
+    return getattr(user, "account_type", None) == User.AccountType.AGENT
 
 
 def user_is_collaborator(user: User) -> bool:
@@ -34,7 +34,9 @@ def user_is_collaborator(user: User) -> bool:
     return Collaborator.objects.filter(user=user).exists()  # pylint: disable=no-member
 
 
-def user_is_collaborator_owner(user: User, organisation: Optional[Organisation] = None) -> bool:
+def user_is_collaborator_owner(
+    user: User, organisation: Optional[Organisation] = None
+) -> bool:
     """Return True when the user owns the provided organisation (or any organisation)."""
     filters = Q(user=user, role=Collaborator.Role.OWNER)
     if organisation is not None:
@@ -52,8 +54,8 @@ def get_active_agent_subscription(user: User) -> Optional[Subscription]:
             agent=agent_profile,
             status=Subscription.Status.ACTIVE,
         )
-        .select_related('plan')
-        .order_by('-current_period_end')
+        .select_related("plan")
+        .order_by("-current_period_end")
         .first()
     )
 
@@ -61,8 +63,7 @@ def get_active_agent_subscription(user: User) -> Optional[Subscription]:
 def get_active_organisation_subscriptions(user: User) -> list[Subscription]:
     """Return active organisation subscriptions linked to the user via collaborations."""
     organisation_ids = list(
-        Collaborator.objects.filter(user=user)  # pylint: disable=no-member
-        .values_list('organisation_id', flat=True)
+        Collaborator.objects.filter(user=user).values_list("organisation_id", flat=True)  # pylint: disable=no-member
     )
     if not organisation_ids:
         return []
@@ -71,8 +72,8 @@ def get_active_organisation_subscriptions(user: User) -> list[Subscription]:
             organisation_id__in=organisation_ids,
             status=Subscription.Status.ACTIVE,
         )
-        .select_related('plan')
-        .order_by('-current_period_end')
+        .select_related("plan")
+        .order_by("-current_period_end")
     )
 
 
@@ -101,10 +102,10 @@ def _subscription_has_feature(
 
     plan = subscription.plan
     if plan is not None:
-        if getattr(plan, 'max_athletes', None) is not None:
-            features.setdefault('max_athletes', plan.max_athletes)
-        if getattr(plan, 'max_collaborators', None) is not None:
-            features.setdefault('max_collaborators', plan.max_collaborators)
+        if getattr(plan, "max_athletes", None) is not None:
+            features.setdefault("max_athletes", plan.max_athletes)
+        if getattr(plan, "max_collaborators", None) is not None:
+            features.setdefault("max_collaborators", plan.max_collaborators)
 
     return _mapping_has_feature(features, feature_key, allowed_values)
 
@@ -119,7 +120,7 @@ def agent_has_feature(
     if subscription:
         return _subscription_has_feature(subscription, feature_key, allowed_values)
 
-    fallback_features = _load_plan_features('agent-free', DEFAULT_AGENT_FEATURES)
+    fallback_features = _load_plan_features("agent-free", DEFAULT_AGENT_FEATURES)
     return _mapping_has_feature(fallback_features, feature_key, allowed_values)
 
 
@@ -138,7 +139,7 @@ def collaborator_has_feature(
     if subscriptions:
         return False
 
-    fallback_features = _load_plan_features('org-starter', DEFAULT_ORG_FEATURES)
+    fallback_features = _load_plan_features("org-starter", DEFAULT_ORG_FEATURES)
     return _mapping_has_feature(fallback_features, feature_key, allowed_values)
 
 
@@ -155,31 +156,31 @@ def collaborator_meets_requirement(user: User, requirement: FeatureRequirement) 
 
 
 DEFAULT_AGENT_FEATURES = {
-    'max_athletes': 1,
-    'messaging_tier': 'none',
-    'max_messages_per_month': 0,
-    'search_visibility_pct': 50,
-    'stats_tier': 'basic',
-    'comparative_stats': False,
-    'agent_subscription_management': True,
-    'contract_tools': 'disabled',
-    'notification_center': False,
+    "max_athletes": 1,
+    "messaging_tier": "none",
+    "max_messages_per_month": 0,
+    "search_visibility_pct": 50,
+    "stats_tier": "basic",
+    "comparative_stats": False,
+    "agent_subscription_management": True,
+    "contract_tools": "disabled",
+    "notification_center": False,
 }
 
 DEFAULT_ORG_FEATURES = {
-    'max_follows': 10,
-    'max_collaborators': 3,
-    'collaborator_invites': True,
-    'organisation_subscription_management': True,
-    'athlete_stats_scope': 'engagement',
-    'data_access': ['follows', 'engagement'],
-    'contract_tools': 'disabled',
-    'notification_center': True,
+    "max_follows": 10,
+    "max_collaborators": 3,
+    "collaborator_invites": True,
+    "organisation_subscription_management": True,
+    "athlete_stats_scope": "engagement",
+    "data_access": ["follows", "engagement"],
+    "contract_tools": "disabled",
+    "notification_center": True,
 }
 
 
 def _load_plan_features(plan_code: str, fallback: dict) -> dict:
-    subscription_plan_model = apps.get_model('payments', 'SubscriptionPlan')
+    subscription_plan_model = apps.get_model("payments", "SubscriptionPlan")
     plan = subscription_plan_model.objects.filter(code=plan_code).first()
 
     features: dict = {}
@@ -187,10 +188,10 @@ def _load_plan_features(plan_code: str, fallback: dict) -> dict:
         features.update(plan.features)
 
     if plan is not None:
-        if getattr(plan, 'max_athletes', None) is not None:
-            features.setdefault('max_athletes', plan.max_athletes)
-        if getattr(plan, 'max_collaborators', None) is not None:
-            features.setdefault('max_collaborators', plan.max_collaborators)
+        if getattr(plan, "max_athletes", None) is not None:
+            features.setdefault("max_athletes", plan.max_athletes)
+        if getattr(plan, "max_collaborators", None) is not None:
+            features.setdefault("max_collaborators", plan.max_collaborators)
 
     if features:
         for key, value in fallback.items():
@@ -205,7 +206,7 @@ def get_agent_plan_features(user: User) -> dict:
     subscription = get_active_agent_subscription(user)
     if subscription and isinstance(subscription.plan.features, dict):
         return subscription.plan.features
-    return _load_plan_features('agent-free', DEFAULT_AGENT_FEATURES)
+    return _load_plan_features("agent-free", DEFAULT_AGENT_FEATURES)
 
 
 def get_collaborator_plan_features(
@@ -224,7 +225,7 @@ def get_collaborator_plan_features(
         selected = subscriptions[0] if subscriptions else None
     if selected and isinstance(selected.plan.features, dict):
         return selected.plan.features
-    return _load_plan_features('org-starter', DEFAULT_ORG_FEATURES)
+    return _load_plan_features("org-starter", DEFAULT_ORG_FEATURES)
 
 
 def user_feature_requirement(
@@ -236,17 +237,17 @@ def user_feature_requirement(
     if not user or not user.is_authenticated:
         return None, False
 
-    account_type = getattr(user, 'account_type', None)
+    account_type = getattr(user, "account_type", None)
     requirement: Optional[FeatureRequirement] = None
     granted = False
 
     if account_type == User.AccountType.AGENT:
-        requirement = FEATURE_MATRIX['agent'].get(feature_code)
+        requirement = FEATURE_MATRIX["agent"].get(feature_code)
         if requirement is None:
             return None, True
         granted = agent_meets_requirement(user, requirement)
     elif account_type == User.AccountType.COLLABORATOR:
-        requirement = FEATURE_MATRIX['collaborator'].get(feature_code)
+        requirement = FEATURE_MATRIX["collaborator"].get(feature_code)
         if requirement is None:
             return None, True
         granted = collaborator_meets_requirement(user, requirement)
@@ -263,44 +264,48 @@ def feature_status_for_user(user: User) -> list[dict]:
     if not user or not user.is_authenticated:
         return []
 
-    account_type = getattr(user, 'account_type', None)
+    account_type = getattr(user, "account_type", None)
     matrix_key = None
     if account_type == User.AccountType.AGENT:
-        matrix_key = 'agent'
+        matrix_key = "agent"
     elif account_type == User.AccountType.COLLABORATOR:
-        matrix_key = 'collaborator'
+        matrix_key = "collaborator"
 
     if matrix_key is None or matrix_key not in FEATURE_MATRIX:
         return []
 
     statuses: list[dict] = []
     for code, requirement in FEATURE_MATRIX[matrix_key].items():
-        if matrix_key == 'agent':
+        if matrix_key == "agent":
             granted = agent_meets_requirement(user, requirement)
         else:
             granted = collaborator_meets_requirement(user, requirement)
 
-        statuses.append({
-            'code': code,
-            'label': requirement.label or code.replace('_', ' ').title(),
-            'description': requirement.description,
-            'granted': granted,
-            'required_feature': requirement.key,
-            'allowed_values': requirement.allowed_values,
-            'upgrade_url': requirement.upgrade_url,
-            'recommended_plans': list(requirement.recommended_plans),
-        })
+        statuses.append(
+            {
+                "code": code,
+                "label": requirement.label or code.replace("_", " ").title(),
+                "description": requirement.description,
+                "granted": granted,
+                "required_feature": requirement.key,
+                "allowed_values": requirement.allowed_values,
+                "upgrade_url": requirement.upgrade_url,
+                "recommended_plans": list(requirement.recommended_plans),
+            }
+        )
 
     return statuses
 
 
-def requirement_denied_payload(requirement: FeatureRequirement, default_detail: str) -> dict:
+def requirement_denied_payload(
+    requirement: FeatureRequirement, default_detail: str
+) -> dict:
     """Build a standardised denial payload for unmet feature requirements."""
 
     return {
-        'detail': requirement.denied_message or default_detail,
-        'required_feature': requirement.key,
-        'allowed_values': requirement.allowed_values,
-        'upgrade_url': requirement.upgrade_url,
-        'recommended_plans': list(requirement.recommended_plans),
+        "detail": requirement.denied_message or default_detail,
+        "required_feature": requirement.key,
+        "allowed_values": requirement.allowed_values,
+        "upgrade_url": requirement.upgrade_url,
+        "recommended_plans": list(requirement.recommended_plans),
     }

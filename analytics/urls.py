@@ -6,18 +6,18 @@ from .views import AthleteStatsBatchView, AthleteStatsTimeseriesView, AthleteSta
 
 urlpatterns = [
     path(
-        'athletes/<uuid:athlete_id>/stats/',
+        "athletes/<uuid:athlete_id>/stats/",
         AthleteStatsView.as_view(),
-        name='athlete-stats',
+        name="athlete-stats",
     ),
     path(
-        'athletes/<uuid:athlete_id>/stats/timeseries/',
+        "athletes/<uuid:athlete_id>/stats/timeseries/",
         AthleteStatsTimeseriesView.as_view(),
-        name='athlete-stats-timeseries',
+        name="athlete-stats-timeseries",
     ),
     path(
-        'analytics/athletes/batch/',
+        "analytics/athletes/batch/",
         AthleteStatsBatchView.as_view(),
-        name='analytics-athletes-batch',
+        name="analytics-athletes-batch",
     ),
 ]

@@ -31,7 +31,7 @@ class SubscriptionPlan(BaseModel):
     code = models.CharField(max_length=100, unique=True)
     name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    currency = models.CharField(max_length=10, default='EUR')
+    currency = models.CharField(max_length=10, default="EUR")
     max_athletes = models.PositiveIntegerField(default=0)
     max_collaborators = models.PositiveIntegerField(default=0)
     features = models.JSONField(default=dict, blank=True)
@@ -51,29 +51,29 @@ class Subscription(BaseModel):
 
         # pylint: disable=too-few-public-methods
 
-        ACTIVE = 'active', 'Active'
-        PAST_DUE = 'past_due', 'Past Due'
-        CANCELED = 'canceled', 'Canceled'
-        INCOMPLETE = 'incomplete', 'Incomplete'
+        ACTIVE = "active", "Active"
+        PAST_DUE = "past_due", "Past Due"
+        CANCELED = "canceled", "Canceled"
+        INCOMPLETE = "incomplete", "Incomplete"
 
     organisation = models.ForeignKey(
         Organisation,
         on_delete=models.CASCADE,
-        related_name='subscriptions',
+        related_name="subscriptions",
         blank=True,
         null=True,
     )
     agent = models.ForeignKey(
         AgentProfile,
         on_delete=models.CASCADE,
-        related_name='subscriptions',
+        related_name="subscriptions",
         blank=True,
         null=True,
     )
     plan = models.ForeignKey(
         SubscriptionPlan,
         on_delete=models.PROTECT,
-        related_name='subscriptions',
+        related_name="subscriptions",
     )
     status = models.CharField(
         max_length=20,
@@ -91,8 +91,10 @@ class Subscription(BaseModel):
         # pylint: disable=too-few-public-methods
 
         indexes = [
-            models.Index(fields=('organisation',), name='subscription_organisation_idx'),
-            models.Index(fields=('agent',), name='subscription_agent_idx'),
+            models.Index(
+                fields=("organisation",), name="subscription_organisation_idx"
+            ),
+            models.Index(fields=("agent",), name="subscription_agent_idx"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -100,7 +102,7 @@ class Subscription(BaseModel):
                     Q(organisation__isnull=False, agent__isnull=True)
                     | Q(organisation__isnull=True, agent__isnull=False)
                 ),
-                name='subscription_scope_xor',
+                name="subscription_scope_xor",
             ),
         ]
 
@@ -108,7 +110,7 @@ class Subscription(BaseModel):
         super().clean()
         if bool(self.organisation) == bool(self.agent):
             raise ValidationError(
-                'Subscription must be scoped to either an organisation or an agent, not both.'
+                "Subscription must be scoped to either an organisation or an agent, not both."
             )
 
     def save(self, *args, **kwargs):
@@ -117,5 +119,5 @@ class Subscription(BaseModel):
 
     def __str__(self):
         scope = self.organisation or self.agent
-        plan_code = getattr(self.plan, 'code', '')
+        plan_code = getattr(self.plan, "code", "")
         return f"Subscription for {scope} ({plan_code})"

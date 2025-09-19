@@ -25,7 +25,13 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = SubscriptionPlan
-        fields = ('id', *PLAN_CORE_FIELDS, 'features', 'stripe_product_id', 'stripe_price_id')
+        fields = (
+            "id",
+            *PLAN_CORE_FIELDS,
+            "features",
+            "stripe_product_id",
+            "stripe_price_id",
+        )
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -39,17 +45,17 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
         model = Subscription
         fields = (
-            'id',
-            'organisation',
-            'agent',
-            'plan',
-            'status',
-            'start_at',
-            'current_period_end',
-            'stripe_customer_id',
-            'stripe_subscription_id',
-            'created_at',
-            'updated_at',
+            "id",
+            "organisation",
+            "agent",
+            "plan",
+            "status",
+            "start_at",
+            "current_period_end",
+            "stripe_customer_id",
+            "stripe_subscription_id",
+            "created_at",
+            "updated_at",
         )
         read_only_fields = fields
 
@@ -66,67 +72,91 @@ class SubscriptionCreateSerializer(serializers.Serializer):
     def _get_plan(self, plan_id):
         plan = SubscriptionPlan.objects.filter(id=plan_id, is_active=True).first()
         if plan is None:
-            raise serializers.ValidationError({'plan_id': 'Plan not found or inactive.'})
+            raise serializers.ValidationError(
+                {"plan_id": "Plan not found or inactive."}
+            )
         return plan
 
     def _validate_organisation_scope(self, organisation_id, user):
         organisation = Organisation.objects.filter(id=organisation_id).first()
         if organisation is None:
-            raise serializers.ValidationError({'organisation_id': 'Organisation not found.'})
+            raise serializers.ValidationError(
+                {"organisation_id": "Organisation not found."}
+            )
 
         collaborator = Collaborator.objects.filter(
             organisation=organisation,
             user=user,
         ).first()
         if not collaborator or collaborator.role != Collaborator.Role.OWNER:
-            raise serializers.ValidationError('Only organisation owners can manage subscriptions.')
+            raise serializers.ValidationError(
+                "Only organisation owners can manage subscriptions."
+            )
 
-        requirement = COLLABORATOR_FEATURES['organisation_subscription_management']
+        requirement = COLLABORATOR_FEATURES["organisation_subscription_management"]
         if not collaborator_meets_requirement(user, requirement):
             payload = requirement_denied_payload(
                 requirement,
-                'Upgrade required to manage organisation subscriptions.',
+                "Upgrade required to manage organisation subscriptions.",
             )
             raise PermissionDenied(payload)
 
-        has_active = Subscription.objects.filter(organisation=organisation).exclude(
-            status=Subscription.Status.CANCELED,
-        ).exists()
+        has_active = (
+            Subscription.objects.filter(organisation=organisation)
+            .exclude(
+                status=Subscription.Status.CANCELED,
+            )
+            .exists()
+        )
         if has_active:
-            raise serializers.ValidationError('Organisation already has an active subscription.')
+            raise serializers.ValidationError(
+                "Organisation already has an active subscription."
+            )
         return organisation
 
     def _validate_agent_scope(self, agent_id, user):
-        agent_profile = AgentProfile.objects.filter(id=agent_id).select_related('user').first()
+        agent_profile = (
+            AgentProfile.objects.filter(id=agent_id).select_related("user").first()
+        )
         if agent_profile is None:
-            raise serializers.ValidationError({'agent_id': 'Agent not found.'})
+            raise serializers.ValidationError({"agent_id": "Agent not found."})
         if agent_profile.user_id != user.id and not user.is_staff:
-            raise serializers.ValidationError('You can only subscribe for your own agent profile.')
+            raise serializers.ValidationError(
+                "You can only subscribe for your own agent profile."
+            )
 
-        has_active = Subscription.objects.filter(agent=agent_profile).exclude(
-            status=Subscription.Status.CANCELED,
-        ).exists()
+        has_active = (
+            Subscription.objects.filter(agent=agent_profile)
+            .exclude(
+                status=Subscription.Status.CANCELED,
+            )
+            .exists()
+        )
         if has_active:
-            raise serializers.ValidationError('Agent already has an active subscription.')
+            raise serializers.ValidationError(
+                "Agent already has an active subscription."
+            )
         return agent_profile
 
     def validate(self, attrs):
         """Ensure provided identifiers are valid and consistent."""
 
-        request = self.context['request']
+        request = self.context["request"]
         user = request.user
 
-        plan = self._get_plan(attrs['plan_id'])
+        plan = self._get_plan(attrs["plan_id"])
 
-        organisation_id = attrs.get('organisation_id')
-        agent_id = attrs.get('agent_id')
+        organisation_id = attrs.get("organisation_id")
+        agent_id = attrs.get("agent_id")
 
         if organisation_id and agent_id:
             raise serializers.ValidationError(
-                'Provide either organisation_id or agent_id, not both.'
+                "Provide either organisation_id or agent_id, not both."
             )
         if not organisation_id and not agent_id:
-            raise serializers.ValidationError('An organisation_id or agent_id is required.')
+            raise serializers.ValidationError(
+                "An organisation_id or agent_id is required."
+            )
 
         organisation = None
         agent_profile = None
@@ -136,24 +166,26 @@ class SubscriptionCreateSerializer(serializers.Serializer):
         else:
             agent_profile = self._validate_agent_scope(agent_id, user)
 
-        attrs['plan'] = plan
-        attrs['organisation'] = organisation
-        attrs['agent_profile'] = agent_profile
+        attrs["plan"] = plan
+        attrs["organisation"] = organisation
+        attrs["agent_profile"] = agent_profile
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         """Create the subscription record using validated scope."""
 
-        plan = validated_data['plan']
-        organisation = validated_data.get('organisation')
-        agent_profile = validated_data.get('agent_profile')
-        stripe_customer_id = validated_data.get('stripe_customer_id', '')
-        stripe_subscription_id = validated_data.get('stripe_subscription_id', '')
+        plan = validated_data["plan"]
+        organisation = validated_data.get("organisation")
+        agent_profile = validated_data.get("agent_profile")
+        stripe_customer_id = validated_data.get("stripe_customer_id", "")
+        stripe_subscription_id = validated_data.get("stripe_subscription_id", "")
 
-        request_data = self.context['request'].data
-        start_at_raw = request_data.get('start_at') or request_data.get('current_period_start')
-        current_period_end_raw = request_data.get('current_period_end')
+        request_data = self.context["request"].data
+        start_at_raw = request_data.get("start_at") or request_data.get(
+            "current_period_start"
+        )
+        current_period_end_raw = request_data.get("current_period_end")
 
         start_at = parse_datetime(start_at_raw) if start_at_raw else None
         if start_at and start_at.tzinfo is None:
@@ -180,4 +212,4 @@ class SubscriptionCreateSerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         """Updates are not supported for this serializer."""
 
-        raise NotImplementedError('Subscription updates are not supported.')
+        raise NotImplementedError("Subscription updates are not supported.")
