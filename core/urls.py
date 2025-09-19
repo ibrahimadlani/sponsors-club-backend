@@ -17,43 +17,7 @@ urlpatterns = [
     path('api/', include('analytics.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/notifications/', include('notifications.urls')),
-    path('poc/', TemplateView.as_view(template_name='poc/index.html'), name='poc-home'),
     path('poc/login/', TemplateView.as_view(template_name='poc/login.html'), name='poc-login'),
-    path('poc/register/', TemplateView.as_view(template_name='poc/register.html'), name='poc-register'),
-    path(
-        'poc/onboarding/agent/athlete/',
-        TemplateView.as_view(template_name='poc/onboarding_agent.html'),
-        name='poc-onboarding-agent',
-    ),
-    path(
-        'poc/onboarding/collaborateur/organisation/',
-        TemplateView.as_view(
-            template_name='poc/onboarding_collaborator_create_org.html'
-        ),
-        name='poc-onboarding-collaborator-org',
-    ),
-    path(
-        'poc/onboarding/collaborateur/rejoindre/',
-        TemplateView.as_view(
-            template_name='poc/onboarding_collaborator_join_org.html'
-        ),
-        name='poc-onboarding-collaborator-join',
-    ),
-    path(
-        'poc/collaborateurs/explorer/',
-        TemplateView.as_view(template_name='poc/collaborator_explorer.html'),
-        name='poc-collaborator-explorer',
-    ),
-    path(
-        'poc/collaborateurs/athlete/',
-        TemplateView.as_view(template_name='poc/collaborator_athlete.html'),
-        name='poc-collaborator-athlete',
-    ),
-    path(
-        'poc/messages/',
-        TemplateView.as_view(template_name='poc/messages.html'),
-        name='poc-messages',
-    ),
 ]
 
 if getattr(settings, 'DRF_YASG_ENABLED', False):
