@@ -325,6 +325,12 @@
             previewRefresh.textContent = tokens.refresh || '(none)';
         }
 
+        function resetTokens() {
+            tokens.access = null;
+            tokens.refresh = null;
+            updateTokenPreview();
+        }
+
         function setStatus(id, text) {
             const node = document.getElementById(id);
             if (node) node.textContent = text;
@@ -349,7 +355,10 @@
         function requireAccessToken(statusId) {
             if (!tokens.access) {
                 setStatus(statusId, 'Missing access token');
-                renderOutput({ error: 'Authenticate first to obtain an access token.' });
+                renderOutput({
+                    error: 'Authenticate with the correct account before continuing.',
+                    hint: 'After registering a new user, sign in with that account to refresh the JWT tokens.',
+                });
                 return false;
             }
             return true;
@@ -374,8 +383,11 @@
                     tokens.access = data.access || null;
                     tokens.refresh = data.refresh || null;
                     updateTokenPreview();
+                    setStatus('loginStatus', 'Authenticated');
+                } else {
+                    resetTokens();
+                    setStatus('loginStatus', `Error ${response.status}`);
                 }
-                setStatus('loginStatus', response.ok ? 'Authenticated' : `Error ${response.status}`);
                 renderOutput(data);
             } catch (error) {
                 setStatus('loginStatus', 'Network error');
@@ -402,6 +414,7 @@
                     updateTokenPreview();
                     setStatus('loginStatus', 'Access token refreshed');
                 } else {
+                    resetTokens();
                     setStatus('loginStatus', `Error ${response.status}`);
                 }
                 renderOutput(data);
@@ -430,7 +443,12 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
-                setStatus('agentRegisterStatus', response.ok ? 'Agent registered' : `Error ${response.status}`);
+                if (response.ok) {
+                    resetTokens();
+                    setStatus('agentRegisterStatus', 'Agent registered (login required)');
+                } else {
+                    setStatus('agentRegisterStatus', `Error ${response.status}`);
+                }
                 renderOutput(data);
             } catch (error) {
                 setStatus('agentRegisterStatus', 'Network error');
@@ -458,7 +476,12 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
-                setStatus('orgRegisterStatus', response.ok ? 'Collaborator registered' : `Error ${response.status}`);
+                if (response.ok) {
+                    resetTokens();
+                    setStatus('orgRegisterStatus', 'Collaborator registered (login required)');
+                } else {
+                    setStatus('orgRegisterStatus', `Error ${response.status}`);
+                }
                 renderOutput(data);
             } catch (error) {
                 setStatus('orgRegisterStatus', 'Network error');
@@ -492,8 +515,20 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'This action is reserved for agent accounts. After creating an agent user, sign in with that account to refresh the tokens.',
+                    };
+                }
                 setStatus('athleteStatus', response.ok ? 'Athlete created' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('athleteStatus', 'Network error');
                 renderOutput({ error: error.message });
@@ -524,8 +559,20 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'Only collaborator owner accounts can create organisations. Sign in with the owner account you just registered to continue.',
+                    };
+                }
                 setStatus('organisationStatus', response.ok ? 'Organisation created' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('organisationStatus', 'Network error');
                 renderOutput({ error: error.message });
@@ -552,8 +599,20 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'Collaborator invitations require the organisation owner account. Sign in with the owner credentials before trying again.',
+                    };
+                }
                 setStatus('collaboratorStatus', response.ok ? 'Collaborator added' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('collaboratorStatus', 'Network error');
                 renderOutput({ error: error.message });

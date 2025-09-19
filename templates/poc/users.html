@@ -125,6 +125,12 @@
             refreshTokenPreview.textContent = tokens.refresh ? tokens.refresh : '(none)';
         }
 
+        function resetTokens() {
+            tokens.access = null;
+            tokens.refresh = null;
+            updateTokenPreview();
+        }
+
         async function handleJsonResponse(response) {
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
@@ -160,8 +166,13 @@
                     body: JSON.stringify(payload),
                 });
                 const data = await handleJsonResponse(response);
+                if (response.ok) {
+                    resetTokens();
+                    setStatus('registerStatus', 'Created (login required)');
+                } else {
+                    setStatus('registerStatus', 'Error');
+                }
                 printResult(data);
-                setStatus('registerStatus', response.ok ? 'Success' : 'Error');
             } catch (error) {
                 printResult({ error: error.message });
                 setStatus('registerStatus', 'Network error');
@@ -190,9 +201,12 @@
                     tokens.access = data.access || null;
                     tokens.refresh = data.refresh || null;
                     updateTokenPreview();
+                    setStatus('loginStatus', 'Success');
+                } else {
+                    resetTokens();
+                    setStatus('loginStatus', `Error ${response.status}`);
                 }
                 printResult(data);
-                setStatus('loginStatus', response.ok ? 'Success' : 'Error');
             } catch (error) {
                 printResult({ error: error.message });
                 setStatus('loginStatus', 'Network error');
@@ -219,9 +233,12 @@
                 if (response.ok) {
                     tokens.access = data.access || tokens.access;
                     updateTokenPreview();
+                    setStatus('refreshStatus', 'Success');
+                } else {
+                    resetTokens();
+                    setStatus('refreshStatus', `Error ${response.status}`);
                 }
                 printResult(data);
-                setStatus('refreshStatus', response.ok ? 'Success' : 'Error');
             } catch (error) {
                 printResult({ error: error.message });
                 setStatus('refreshStatus', 'Network error');
