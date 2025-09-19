@@ -108,6 +108,14 @@
             refresh: null,
         };
 
+        function getCSRFToken() {
+            const cookieString = document.cookie;
+            if (!cookieString) return null;
+            const cookies = cookieString.split(';').map((cookie) => cookie.trim());
+            const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+            return csrfCookie ? csrfCookie.substring('csrftoken='.length) : null;
+        }
+
         function setStatus(id, text) {
             document.getElementById(id).textContent = text;
         }
@@ -145,7 +153,10 @@
             try {
                 const response = await fetch(REGISTER_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
                     body: JSON.stringify(payload),
                 });
                 const data = await handleJsonResponse(response);
@@ -168,7 +179,10 @@
             try {
                 const response = await fetch(LOGIN_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
                     body: JSON.stringify(authPayload),
                 });
                 const data = await handleJsonResponse(response);
@@ -195,7 +209,10 @@
             try {
                 const response = await fetch(REFRESH_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
                     body: JSON.stringify({ refresh: tokens.refresh }),
                 });
                 const data = await handleJsonResponse(response);
