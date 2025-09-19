@@ -84,7 +84,6 @@ class Command(BaseCommand):
             organisations_created = self._create_organisations(
                 faker,
                 organisations,
-                agent_profiles,
             )
             athletes_created = self._create_athletes(
                 faker,
@@ -141,17 +140,25 @@ class Command(BaseCommand):
         self,
         faker: Faker,
         count: int,
-        agent_profiles: list[AgentProfile],
     ) -> list[Organisation]:
-        """Create organisations and assign a random owner from the agent pool."""
+        """Create organisations with dedicated collaborator owners."""
         organisations: list[Organisation] = []
-        if not agent_profiles:
+        if count <= 0:
             return organisations
 
         for _ in range(count):
-            owner = random.choice(agent_profiles)
+            email = faker.unique.email()
+            full_name = faker.name()
+            first_name, _, last_name = full_name.partition(' ')
+            owner = User.objects.create_user(
+                email=email,
+                password=DEFAULT_PASSWORD,
+                first_name=first_name,
+                last_name=last_name,
+                account_type=User.AccountType.COLLABORATOR,
+            )
             organisation = Organisation.objects.create(
-                owner=owner.user,
+                owner=owner,
                 name=faker.unique.company(),
                 sector=faker.job().title(),
                 size=random.choice([choice[0] for choice in Organisation.Size.choices]),
@@ -162,13 +169,11 @@ class Command(BaseCommand):
                 website=faker.url(),
             )
             Collaborator.objects.create(
-                user=owner.user,
+                user=owner,
                 organisation=organisation,
                 role=Collaborator.Role.OWNER,
-                job_title='Owner',
+                job_title=faker.job().title(),
             )
-            owner.user.account_type = User.AccountType.COLLABORATOR
-            owner.user.save(update_fields=['account_type'])
             organisations.append(organisation)
         return organisations
 
