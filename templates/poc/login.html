@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Connexion • Sandbox Sponsors Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0f172a;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        main {
+            width: min(960px, 100%);
+            display: grid;
+            gap: 24px;
+            padding: 32px;
+            border-radius: 24px;
+            background: #f8fafc;
+            box-shadow: 0 32px 80px rgba(15, 23, 42, 0.35);
+        }
+        header h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+            color: #111827;
+        }
+        header p {
+            margin: 0;
+            color: #4b5563;
+            line-height: 1.5;
+        }
+        section {
+            background: white;
+            border-radius: 18px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #0f172a;
+        }
+        .hint {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+        form {
+            display: grid;
+            gap: 16px;
+        }
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font: inherit;
+            color: inherit;
+        }
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            justify-self: start;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 24px rgba(37, 99, 235, 0.25);
+        }
+        button.secondary {
+            background: #6b7280;
+        }
+        .status {
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #9ca3af;
+        }
+        .status.success {
+            color: #047857;
+        }
+        .status.error {
+            color: #b91c1c;
+        }
+        pre {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.45;
+            max-height: 320px;
+            overflow: auto;
+        }
+        .token-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        @media (max-width: 640px) {
+            main {
+                padding: 24px;
+            }
+            section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Sandbox de connexion</h1>
+        <p>Utilisez cette page pour récupérer des tokens JWT avant d'appeler les endpoints protégés (Swagger, tests manuels, etc.).</p>
+    </header>
+
+    <section>
+        <div class="status" id="loginStatus">En attente</div>
+        <h2>Se connecter</h2>
+        <p class="hint">Renseignez les identifiants du compte (agent ou collaborateur). Les tokens sont stockés localement.</p>
+        <form id="loginForm">
+            <label>
+                Email
+                <input type="email" name="email" required placeholder="jeanne.dupont@example.com">
+            </label>
+            <label>
+                Mot de passe
+                <input type="password" name="password" required>
+            </label>
+            <button type="submit">Connexion</button>
+        </form>
+        <pre id="loginOutput">Aucun appel effectué.</pre>
+    </section>
+
+    <section>
+        <div class="status" id="refreshStatus">Refresh token prêt</div>
+        <h2>Rafraîchir l'access token</h2>
+        <p class="hint">Utilisez le refresh token stocké ou collez-en un pour obtenir un nouvel access token.</p>
+        <form id="refreshForm">
+            <label>
+                Refresh token (optionnel)
+                <textarea name="refresh_token" placeholder="Laisser vide pour utiliser le token enregistré"></textarea>
+            </label>
+            <div class="token-actions">
+                <button type="submit">Rafraîchir</button>
+                <button type="button" class="secondary" id="loadStoredRefresh">Charger le token enregistré</button>
+                <button type="button" class="secondary" id="clearTokens">Supprimer les tokens</button>
+            </div>
+        </form>
+        <pre id="refreshOutput">Aucun appel effectué.</pre>
+    </section>
+
+    <section>
+        <div class="status" id="meStatus">En attente</div>
+        <h2>Vérifier mon profil</h2>
+        <p class="hint">Une fois authentifié, vérifiez les informations du compte via <code>GET /api/users/me/</code>.</p>
+        <div class="token-actions">
+            <button type="button" id="fetchMe">Interroger /me</button>
+            <button type="button" class="secondary" id="copyAccessToken">Copier l'access token</button>
+        </div>
+        <pre id="meOutput">Aucun appel effectué.</pre>
+    </section>
+</main>
+
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null, includeAuth = false }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = {
+            method,
+            credentials: 'same-origin',
+            headers,
+        };
+
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        if (includeAuth) {
+            const token = window.localStorage.getItem(ACCESS_KEY);
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
+
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let dataPayload = null;
+        if (text) {
+            try {
+                dataPayload = JSON.parse(text);
+            } catch (error) {
+                dataPayload = text;
+            }
+        }
+
+        return {
+            ok: response.ok,
+            status: response.status,
+            data: dataPayload,
+        };
+    }
+
+    function setStatus(element, message, variant) {
+        element.textContent = message;
+        element.classList.remove('success', 'error');
+        if (variant) {
+            element.classList.add(variant);
+        }
+    }
+
+    function renderJSON(target, payload) {
+        if (payload === null || payload === undefined) {
+            target.textContent = 'Réponse vide';
+            return;
+        }
+        try {
+            target.textContent = JSON.stringify(payload, null, 2);
+        } catch (error) {
+            target.textContent = String(payload);
+        }
+    }
+
+    function storeTokens({ access, refresh }) {
+        if (access) {
+            window.localStorage.setItem(ACCESS_KEY, access);
+        }
+        if (refresh) {
+            window.localStorage.setItem(REFRESH_KEY, refresh);
+        }
+    }
+
+    function clearTokens() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        alert('Tokens supprimés.');
+    }
+
+    async function copyAccessToken() {
+        const token = window.localStorage.getItem(ACCESS_KEY);
+        if (!token) {
+            alert("Aucun access token enregistré.");
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(token);
+            alert('Access token copié.');
+        } catch (error) {
+            alert('Impossible de copier automatiquement.');
+        }
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const loginStatus = document.getElementById('loginStatus');
+    const loginOutput = document.getElementById('loginOutput');
+    const refreshForm = document.getElementById('refreshForm');
+    const refreshStatus = document.getElementById('refreshStatus');
+    const refreshOutput = document.getElementById('refreshOutput');
+    const loadStoredRefresh = document.getElementById('loadStoredRefresh');
+    const clearTokensBtn = document.getElementById('clearTokens');
+    const meStatus = document.getElementById('meStatus');
+    const meOutput = document.getElementById('meOutput');
+    const fetchMeBtn = document.getElementById('fetchMe');
+    const copyTokenBtn = document.getElementById('copyAccessToken');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus(loginStatus, 'Envoi…', null);
+            renderJSON(loginOutput, '');
+            const formData = new FormData(loginForm);
+            const payload = {
+                email: formData.get('email'),
+                password: formData.get('password'),
+            };
+            try {
+                const response = await apiRequest({
+                    url: '/api/users/login/',
+                    method: 'POST',
+                    data: payload,
+                });
+                renderJSON(loginOutput, response.data);
+                if (response.ok && response.data) {
+                    setStatus(loginStatus, `Connecté • statut ${response.status}`, 'success');
+                    if (typeof response.data === 'object') {
+                        storeTokens(response.data);
+                    }
+                } else {
+                    setStatus(loginStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                setStatus(loginStatus, 'Erreur réseau', 'error');
+                renderJSON(loginOutput, error.message || error);
+            }
+        });
+    }
+
+    if (refreshForm) {
+        refreshForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus(refreshStatus, 'Envoi…', null);
+            renderJSON(refreshOutput, '');
+            const formData = new FormData(refreshForm);
+            const provided = formData.get('refresh_token');
+            const payload = {
+                refresh: provided || window.localStorage.getItem(REFRESH_KEY) || '',
+            };
+            if (!payload.refresh) {
+                setStatus(refreshStatus, 'Aucun refresh token disponible', 'error');
+                renderJSON(refreshOutput, '');
+                return;
+            }
+            try {
+                const response = await apiRequest({
+                    url: '/api/users/login/refresh/',
+                    method: 'POST',
+                    data: payload,
+                });
+                renderJSON(refreshOutput, response.data);
+                if (response.ok && response.data) {
+                    setStatus(refreshStatus, `Tokens mis à jour • statut ${response.status}`, 'success');
+                    if (typeof response.data === 'object') {
+                        storeTokens(response.data);
+                    }
+                } else {
+                    setStatus(refreshStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                setStatus(refreshStatus, 'Erreur réseau', 'error');
+                renderJSON(refreshOutput, error.message || error);
+            }
+        });
+    }
+
+    if (loadStoredRefresh) {
+        loadStoredRefresh.addEventListener('click', () => {
+            refreshForm.refresh_token.value = window.localStorage.getItem(REFRESH_KEY) || '';
+            if (!refreshForm.refresh_token.value) {
+                alert('Aucun refresh token enregistré.');
+            }
+        });
+    }
+
+    if (clearTokensBtn) {
+        clearTokensBtn.addEventListener('click', clearTokens);
+    }
+
+    if (fetchMeBtn) {
+        fetchMeBtn.addEventListener('click', async () => {
+            setStatus(meStatus, 'Chargement…', null);
+            renderJSON(meOutput, '');
+            try {
+                const response = await apiRequest({
+                    url: '/api/users/me/',
+                    method: 'GET',
+                    includeAuth: true,
+                });
+                renderJSON(meOutput, response.data);
+                if (response.ok) {
+                    setStatus(meStatus, `Réponse ${response.status}`, 'success');
+                } else {
+                    setStatus(meStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                setStatus(meStatus, 'Erreur réseau', 'error');
+                renderJSON(meOutput, error.message || error);
+            }
+        });
+    }
+
+    if (copyTokenBtn) {
+        copyTokenBtn.addEventListener('click', copyAccessToken);
+    }
+})();
+</script>
+</body>
+</html>

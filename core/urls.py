@@ -17,16 +17,7 @@ urlpatterns = [
     path('api/', include('analytics.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/notifications/', include('notifications.urls')),
-    path(
-        'poc/users/',
-        TemplateView.as_view(template_name='poc/users.html'),
-        name='poc-users',
-    ),
-    path(
-        'poc/onboarding/',
-        TemplateView.as_view(template_name='poc/onboarding.html'),
-        name='poc-onboarding',
-    ),
+    path('poc/login/', TemplateView.as_view(template_name='poc/login.html'), name='poc-login'),
 ]
 
 if getattr(settings, 'DRF_YASG_ENABLED', False):
