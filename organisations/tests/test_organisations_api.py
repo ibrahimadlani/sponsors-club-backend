@@ -39,15 +39,14 @@ def owner_client(owner_user):
 
 @pytest.fixture
 def collaborator_user(user_model):
-    """Create and return an agent user who can become a collaborator."""
+    """Create and return a collaborator account for membership tests."""
     user = user_model.objects.create_user(
         email='collab@test.com',
         password='pass1234',
         first_name='Collab',
         last_name='User',
-        account_type=user_model.AccountType.AGENT,
+        account_type=user_model.AccountType.COLLABORATOR,
     )
-    AgentProfile.objects.create(user=user, display_name='Collaborator Agent')
     return user
 
 
@@ -332,8 +331,8 @@ def test_organisation_retrieve(owner_client, organisation):
 
 
 @pytest.mark.django_db
-def test_organisation_create_view(user_model):
-    """API view creates an organisation and promotes the requester."""
+def test_organisation_create_forbidden_for_agent(user_model):
+    """Agents cannot create organisations through the API endpoint."""
     user = user_model.objects.create_user(
         email='maker@test.com',
         password='pass1234',
@@ -353,12 +352,42 @@ def test_organisation_create_view(user_model):
         'country': 'FR',
     }
     response = client.post(list_url, payload, format='json')
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not Organisation.objects.filter(name=payload['name']).exists()
+
+
+@pytest.mark.django_db
+def test_organisation_create_view_collaborator_success(user_model):
+    """Collaborator accounts can create organisations and become owners."""
+    user = user_model.objects.create_user(
+        email='collab-maker@test.com',
+        password='pass1234',
+        first_name='CollabMaker',
+        last_name='User',
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+    client = APIClient()
+    client.force_authenticate(user=user)
+    list_url = reverse('organisation-list')
+    payload = {
+        'name': 'Collaborator Org',
+        'sector': 'Media',
+        'size': Organisation.Size.MEDIUM,
+        'budget_min': 300,
+        'budget_max': 900,
+        'country': 'FR',
+    }
+    response = client.post(list_url, payload, format='json')
     assert response.status_code == status.HTTP_201_CREATED
-    user.refresh_from_db()
-    assert user.account_type == user_model.AccountType.COLLABORATOR
     organisation = Organisation.objects.get(name=payload['name'])
     assert organisation.owner == user
-    assert Collaborator.objects.filter(user=user, organisation__name='API Org', role=Collaborator.Role.OWNER).exists()
+    user.refresh_from_db()
+    assert user.account_type == user_model.AccountType.COLLABORATOR
+    assert Collaborator.objects.filter(
+        user=user,
+        organisation=organisation,
+        role=Collaborator.Role.OWNER,
+    ).exists()
 
 
 @pytest.mark.django_db
