@@ -53,6 +53,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
             'partial_update': self._owner_permissions,
             'collaborators': self._collaborator_permissions,
             'add_collaborator': self._collaborator_permissions,
+            'create': self._organisation_account_permissions,
             'list': self._organisation_account_permissions,
             'remove_collaborator': lambda: [permissions.IsAuthenticated()],
         }
