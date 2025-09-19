@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Onboarding POC • Sponsors Club</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
     <style>
         :root {
             color-scheme: light;
@@ -300,13 +301,48 @@
         };
 
         const tokens = { access: null, refresh: null };
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfFromMeta = csrfMeta ? csrfMeta.getAttribute('content') : null;
         const previewAccess = document.getElementById('previewAccess');
         const previewRefresh = document.getElementById('previewRefresh');
         const sharedOutput = document.getElementById('sharedOutput');
 
+        function getCSRFToken() {
+            const cookieString = document.cookie;
+            if (cookieString) {
+                const cookies = cookieString.split(';').map((cookie) => cookie.trim());
+                const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+                if (csrfCookie) {
+                    return csrfCookie.substring('csrftoken='.length);
+                }
+            }
+            if (csrfFromMeta && csrfFromMeta !== 'NOTPROVIDED') {
+                return csrfFromMeta;
+            }
+            return null;
+        }
+
+        function buildJsonHeaders(extra = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...extra,
+            };
+            const csrfToken = getCSRFToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+            return headers;
+        }
+
         function updateTokenPreview() {
             previewAccess.textContent = tokens.access || '(none)';
             previewRefresh.textContent = tokens.refresh || '(none)';
+        }
+
+        function resetTokens() {
+            tokens.access = null;
+            tokens.refresh = null;
+            updateTokenPreview();
         }
 
         function setStatus(id, text) {
@@ -333,7 +369,10 @@
         function requireAccessToken(statusId) {
             if (!tokens.access) {
                 setStatus(statusId, 'Missing access token');
-                renderOutput({ error: 'Authenticate first to obtain an access token.' });
+                renderOutput({
+                    error: 'Authenticate with the correct account before continuing.',
+                    hint: 'After registering a new user, sign in with that account to refresh the JWT tokens.',
+                });
                 return false;
             }
             return true;
@@ -350,16 +389,20 @@
             try {
                 const response = await fetch(ENDPOINTS.login, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
                     tokens.access = data.access || null;
                     tokens.refresh = data.refresh || null;
                     updateTokenPreview();
+                    setStatus('loginStatus', 'Authenticated');
+                } else {
+                    resetTokens();
+                    setStatus('loginStatus', `Error ${response.status}`);
                 }
-                setStatus('loginStatus', response.ok ? 'Authenticated' : `Error ${response.status}`);
                 renderOutput(data);
             } catch (error) {
                 setStatus('loginStatus', 'Network error');
@@ -377,8 +420,9 @@
             try {
                 const response = await fetch(ENDPOINTS.refresh, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify({ refresh: tokens.refresh }),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
@@ -386,6 +430,7 @@
                     updateTokenPreview();
                     setStatus('loginStatus', 'Access token refreshed');
                 } else {
+                    resetTokens();
                     setStatus('loginStatus', `Error ${response.status}`);
                 }
                 renderOutput(data);
@@ -410,11 +455,17 @@
             try {
                 const response = await fetch(ENDPOINTS.register, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
-                setStatus('agentRegisterStatus', response.ok ? 'Agent registered' : `Error ${response.status}`);
+                if (response.ok) {
+                    resetTokens();
+                    setStatus('agentRegisterStatus', 'Agent registered (login required)');
+                } else {
+                    setStatus('agentRegisterStatus', `Error ${response.status}`);
+                }
                 renderOutput(data);
             } catch (error) {
                 setStatus('agentRegisterStatus', 'Network error');
@@ -438,11 +489,17 @@
             try {
                 const response = await fetch(ENDPOINTS.register, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
-                setStatus('orgRegisterStatus', response.ok ? 'Collaborator registered' : `Error ${response.status}`);
+                if (response.ok) {
+                    resetTokens();
+                    setStatus('orgRegisterStatus', 'Collaborator registered (login required)');
+                } else {
+                    setStatus('orgRegisterStatus', `Error ${response.status}`);
+                }
                 renderOutput(data);
             } catch (error) {
                 setStatus('orgRegisterStatus', 'Network error');
@@ -470,15 +527,27 @@
             try {
                 const response = await fetch(ENDPOINTS.athletes, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'This action is reserved for agent accounts. After creating an agent user, sign in with that account to refresh the tokens.',
+                    };
+                }
                 setStatus('athleteStatus', response.ok ? 'Athlete created' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('athleteStatus', 'Network error');
                 renderOutput({ error: error.message });
@@ -503,15 +572,27 @@
             try {
                 const response = await fetch(ENDPOINTS.organisations, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'Only collaborator owner accounts can create organisations. Sign in with the owner account you just registered to continue.',
+                    };
+                }
                 setStatus('organisationStatus', response.ok ? 'Organisation created' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('organisationStatus', 'Network error');
                 renderOutput({ error: error.message });
@@ -532,15 +613,27 @@
             try {
                 const response = await fetch(ENDPOINTS.collaborators(organisationId), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
+                let output = data;
+                if (
+                    response.status === 403 &&
+                    output &&
+                    typeof output === 'object' &&
+                    output.detail === 'You do not have permission to perform this action.'
+                ) {
+                    output = {
+                        ...output,
+                        hint: 'Collaborator invitations require the organisation owner account. Sign in with the owner credentials before trying again.',
+                    };
+                }
                 setStatus('collaboratorStatus', response.ok ? 'Collaborator added' : `Error ${response.status}`);
-                renderOutput(data);
+                renderOutput(output);
             } catch (error) {
                 setStatus('collaboratorStatus', 'Network error');
                 renderOutput({ error: error.message });
@@ -549,7 +642,7 @@
 
         async function fetchSports() {
             try {
-                const response = await fetch(ENDPOINTS.sports);
+                const response = await fetch(ENDPOINTS.sports, { credentials: 'same-origin' });
                 const data = await handleResponse(response);
                 if (!response.ok) {
                     renderOutput(data);
