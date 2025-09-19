@@ -1,0 +1,104 @@
+{% extends 'poc/base.html' %}
+{% block title %}Collaborateurs • Explorer les athlètes{% endblock %}
+{% block content %}
+<header>
+    <h2>Explorer les athlètes</h2>
+    <p class="hint">Parcourez la base d'athlètes accessible aux organisations collaboratrices.</p>
+</header>
+<section class="stack">
+    <div class="status" id="exploreStatus">En attente</div>
+    <h3>Rechercher</h3>
+    <p class="hint">Le listing nécessite un compte collaborateur. Ajustez la pagination au besoin.</p>
+    <form id="exploreForm" class="grid-two" style="align-items:end;">
+        <label>
+            Page
+            <input type="number" name="page" min="1" value="1">
+        </label>
+        <label>
+            Taille de page
+            <input type="number" name="page_size" min="1" value="10">
+        </label>
+        <button type="submit" class="btn">Charger les athlètes</button>
+    </form>
+    <div id="athletesTable" style="overflow:auto;"></div>
+    <pre id="exploreOutput">Aucun appel effectué.</pre>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    (function() {
+        const sandbox = window.scbSandbox;
+        const form = document.getElementById('exploreForm');
+        const statusEl = document.getElementById('exploreStatus');
+        const outputEl = document.getElementById('exploreOutput');
+        const tableContainer = document.getElementById('athletesTable');
+
+        function renderTable(payload) {
+            if (!tableContainer) {
+                return;
+            }
+            const rows = Array.isArray(payload)
+                ? payload
+                : Array.isArray(payload?.results)
+                    ? payload.results
+                    : [];
+            if (!rows.length) {
+                tableContainer.innerHTML = '<p class="hint">Aucun athlète à afficher.</p>';
+                return;
+            }
+            const headers = ['Nom', 'Sport', 'Discipline', 'Nationalité', 'Followers'];
+            const html = [`<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>`];
+            rows.forEach((row) => {
+                const sport = row.sport || {};
+                html.push('<tr>' +
+                    `<td>${row.full_name || '—'}</td>` +
+                    `<td>${sport.name || '—'}</td>` +
+                    `<td>${sport.discipline || '—'}</td>` +
+                    `<td>${row.nationality || '—'}</td>` +
+                    `<td>${row.followers_count_cached ?? '—'}</td>` +
+                '</tr>');
+            });
+            html.push('</tbody></table>');
+            tableContainer.innerHTML = html.join('');
+        }
+
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                sandbox.setStatus(statusEl, 'Chargement…', null);
+                sandbox.attachJSONOutput(outputEl, '');
+                tableContainer.innerHTML = '';
+                const formData = new FormData(form);
+                const params = new URLSearchParams();
+                const page = formData.get('page');
+                const pageSize = formData.get('page_size');
+                if (page) {
+                    params.set('page', page);
+                }
+                if (pageSize) {
+                    params.set('page_size', pageSize);
+                }
+                const url = params.toString() ? `/api/athletes/?${params.toString()}` : '/api/athletes/';
+                try {
+                    const response = await sandbox.apiRequest({ url });
+                    sandbox.attachJSONOutput(outputEl, response.data);
+                    if (response.ok) {
+                        renderTable(response.data);
+                        const count = Array.isArray(response.data?.results)
+                            ? response.data.results.length
+                            : Array.isArray(response.data)
+                                ? response.data.length
+                                : '—';
+                        sandbox.setStatus(statusEl, `Succès • ${count} éléments`, 'success');
+                    } else {
+                        sandbox.setStatus(statusEl, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(statusEl, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(outputEl, error.message || error);
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}

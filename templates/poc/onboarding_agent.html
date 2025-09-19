@@ -1,0 +1,201 @@
+{% extends 'poc/base.html' %}
+{% block title %}Onboarding agent • Sponsors Club Sandbox{% endblock %}
+{% block content %}
+<header>
+    <h2>Onboarding agent</h2>
+    <p class="hint">Créez rapidement un athlète pour un agent authentifié.</p>
+</header>
+<section class="stack">
+    <div class="status" id="sportsStatus">En attente</div>
+    <h3>1. Explorer les sports disponibles</h3>
+    <p class="hint">Chargez la liste depuis <code>GET /api/athletes/sports/</code> pour alimenter le formulaire.</p>
+    <div class="token-actions">
+        <button type="button" class="btn" id="loadSports">Charger les sports</button>
+    </div>
+    <pre id="sportsOutput">Aucun appel effectué.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="createStatus">En attente</div>
+    <h3>2. Créer un athlète</h3>
+    <p class="hint">Cette requête nécessite un compte agent connecté. Seuls les champs essentiels sont requis.</p>
+    <form id="athleteForm" class="stack">
+        <div class="grid-two">
+            <label>
+                Nom complet
+                <input type="text" name="full_name" required placeholder="Alex Martin">
+            </label>
+            <label>
+                Sport
+                <select name="sport_id" id="sportId" required>
+                    <option value="" disabled selected>Choisir un sport…</option>
+                </select>
+            </label>
+        </div>
+        <div class="grid-two">
+            <label>
+                Date de naissance
+                <input type="date" name="birth_date" required>
+            </label>
+            <label>
+                Nationalité
+                <input type="text" name="nationality" required placeholder="France">
+            </label>
+        </div>
+        <label>
+            Biographie
+            <textarea name="bio" placeholder="Court résumé, résultats, ambitions…"></textarea>
+        </label>
+        <label>
+            Liens sociaux (JSON optionnel)
+            <textarea name="social_links" placeholder='{"instagram": "https://instagram.com/..."}'></textarea>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" name="is_self_represented" value="true">
+            Athlète auto-représenté
+        </label>
+        <button type="submit" class="btn">Créer l'athlète</button>
+    </form>
+    <pre id="createOutput">La réponse apparaîtra ici.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="athleteStatus">En attente</div>
+    <h3>3. Consulter un athlète</h3>
+    <p class="hint">Utilisez l'identifiant renvoyé pour vérifier le profil via <code>GET /api/athletes/&lt;id&gt;/</code>.</p>
+    <form id="athleteLookupForm" class="stack" style="max-width:420px;">
+        <label>
+            Identifiant de l'athlète
+            <input type="text" name="athlete_id" placeholder="UUID de l'athlète">
+        </label>
+        <button type="submit" class="btn secondary">Consulter</button>
+    </form>
+    <pre id="athleteOutput">Aucun appel effectué.</pre>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    (function() {
+        const sandbox = window.scbSandbox;
+        const sportsBtn = document.getElementById('loadSports');
+        const sportsStatus = document.getElementById('sportsStatus');
+        const sportsOutput = document.getElementById('sportsOutput');
+        const sportSelect = document.getElementById('sportId');
+
+        async function loadSports() {
+            sandbox.setStatus(sportsStatus, 'Chargement…', null);
+            sandbox.attachJSONOutput(sportsOutput, '');
+            try {
+                const response = await sandbox.apiRequest({
+                    url: '/api/athletes/sports/',
+                    auth: false,
+                });
+                sandbox.attachJSONOutput(sportsOutput, response.data);
+                if (response.ok && Array.isArray(response.data)) {
+                    sandbox.setStatus(sportsStatus, `Succès • ${response.data.length} sports`, 'success');
+                    if (sportSelect) {
+                        sportSelect.innerHTML = '<option value="" disabled selected>Choisir un sport…</option>';
+                        response.data.forEach((sport) => {
+                            const option = document.createElement('option');
+                            option.value = sport.id;
+                            option.textContent = `${sport.name} (${sport.discipline})`;
+                            sportSelect.appendChild(option);
+                        });
+                    }
+                } else {
+                    sandbox.setStatus(sportsStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                sandbox.setStatus(sportsStatus, 'Erreur réseau', 'error');
+                sandbox.attachJSONOutput(sportsOutput, error.message || error);
+            }
+        }
+
+        if (sportsBtn) {
+            sportsBtn.addEventListener('click', loadSports);
+        }
+
+        const form = document.getElementById('athleteForm');
+        const createStatus = document.getElementById('createStatus');
+        const createOutput = document.getElementById('createOutput');
+
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                sandbox.setStatus(createStatus, 'Envoi…', null);
+                sandbox.attachJSONOutput(createOutput, '');
+                const formData = new FormData(form);
+                const payload = {
+                    full_name: formData.get('full_name'),
+                    sport_id: formData.get('sport_id'),
+                    birth_date: formData.get('birth_date'),
+                    nationality: formData.get('nationality'),
+                    bio: formData.get('bio') || '',
+                };
+                const socialLinksRaw = formData.get('social_links');
+                if (socialLinksRaw) {
+                    try {
+                        payload.social_links = JSON.parse(socialLinksRaw);
+                    } catch (error) {
+                        sandbox.setStatus(createStatus, 'JSON des liens invalide', 'error');
+                        sandbox.attachJSONOutput(createOutput, 'Corrigez le champ Liens sociaux.');
+                        return;
+                    }
+                }
+                if (formData.get('is_self_represented')) {
+                    payload.is_self_represented = true;
+                }
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/athletes/',
+                        method: 'POST',
+                        data: payload,
+                    });
+                    sandbox.attachJSONOutput(createOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(createStatus, `Athlète créé • statut ${response.status}`, 'success');
+                        form.reset();
+                        if (sportSelect && sportSelect.options.length > 0) {
+                            sportSelect.selectedIndex = 0;
+                        }
+                    } else {
+                        sandbox.setStatus(createStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(createStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(createOutput, error.message || error);
+                }
+            });
+        }
+
+        const lookupForm = document.getElementById('athleteLookupForm');
+        const athleteStatus = document.getElementById('athleteStatus');
+        const athleteOutput = document.getElementById('athleteOutput');
+
+        if (lookupForm) {
+            lookupForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const athleteId = lookupForm.athlete_id.value.trim();
+                if (!athleteId) {
+                    sandbox.setStatus(athleteStatus, 'Renseignez un identifiant valide', 'error');
+                    return;
+                }
+                sandbox.setStatus(athleteStatus, 'Chargement…', null);
+                sandbox.attachJSONOutput(athleteOutput, '');
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: `/api/athletes/${athleteId}/`,
+                    });
+                    sandbox.attachJSONOutput(athleteOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(athleteStatus, `Succès • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(athleteStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(athleteStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(athleteOutput, error.message || error);
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}

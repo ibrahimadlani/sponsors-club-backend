@@ -1,0 +1,174 @@
+{% extends 'poc/base.html' %}
+{% block title %}Connexion • Sponsors Club Sandbox{% endblock %}
+{% block content %}
+<header>
+    <h2>Connexion</h2>
+    <p class="hint">Générez des tokens JWT pour interagir avec les autres scénarios.</p>
+</header>
+<section class="stack">
+    <div class="status" id="loginStatus">En attente</div>
+    <h3>Se connecter</h3>
+    <p class="hint">Renseignez les identifiants du compte (agent ou collaborateur). Les tokens seront stockés dans le navigateur.</p>
+    <form id="loginForm" class="stack">
+        <div class="grid-two">
+            <label>
+                Email
+                <input type="email" name="email" required placeholder="jeanne.dupont@example.com">
+            </label>
+            <label>
+                Mot de passe
+                <input type="password" name="password" required>
+            </label>
+        </div>
+        <button type="submit" class="btn">Connexion</button>
+    </form>
+    <pre id="loginOutput">La réponse apparaîtra ici.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="refreshStatus">Refresh token prêt</div>
+    <h3>Rafraîchir l'access token</h3>
+    <p class="hint">Utilisez le refresh token stocké ou collez-en un pour obtenir un nouvel access token.</p>
+    <form id="refreshForm" class="stack">
+        <label>
+            Refresh token (optionnel)
+            <textarea name="refresh_token" rows="3" placeholder="Laisser vide pour utiliser le token enregistré"></textarea>
+        </label>
+        <div class="token-actions" style="padding-top:8px;">
+            <button type="submit" class="btn">Rafraîchir</button>
+            <button type="button" class="btn secondary" id="loadStoredRefresh">Utiliser le token enregistré</button>
+        </div>
+    </form>
+    <pre id="refreshOutput">Aucun appel effectué.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="meStatus">En attente</div>
+    <h3>Vérifier mon profil</h3>
+    <p class="hint">Une fois authentifié, vérifiez les informations du compte via <code>GET /api/users/me/</code>.</p>
+    <div class="token-actions">
+        <button type="button" class="btn" id="fetchMe">Interroger /me</button>
+    </div>
+    <pre id="meOutput">Aucun appel effectué.</pre>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    (function() {
+        const sandbox = window.scbSandbox;
+        const loginForm = document.getElementById('loginForm');
+        const loginStatus = document.getElementById('loginStatus');
+        const loginOutput = document.getElementById('loginOutput');
+
+        const refreshForm = document.getElementById('refreshForm');
+        const refreshStatus = document.getElementById('refreshStatus');
+        const refreshOutput = document.getElementById('refreshOutput');
+        const loadStoredRefresh = document.getElementById('loadStoredRefresh');
+
+        const meStatus = document.getElementById('meStatus');
+        const meOutput = document.getElementById('meOutput');
+        const fetchMeBtn = document.getElementById('fetchMe');
+
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                sandbox.setStatus(loginStatus, 'Envoi…', null);
+                sandbox.attachJSONOutput(loginOutput, '');
+                const formData = new FormData(loginForm);
+                const payload = {
+                    email: formData.get('email'),
+                    password: formData.get('password'),
+                };
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/login/',
+                        method: 'POST',
+                        data: payload,
+                        auth: false,
+                    });
+                    sandbox.attachJSONOutput(loginOutput, response.data);
+                    if (response.ok && response.data) {
+                        sandbox.setStatus(loginStatus, `Connecté • statut ${response.status}`, 'success');
+                        if (response.data.access) {
+                            sandbox.setToken('access', response.data.access);
+                        }
+                        if (response.data.refresh) {
+                            sandbox.setToken('refresh', response.data.refresh);
+                        }
+                    } else {
+                        sandbox.setStatus(loginStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(loginStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(loginOutput, error.message || error);
+                }
+            });
+        }
+
+        if (loadStoredRefresh) {
+            loadStoredRefresh.addEventListener('click', () => {
+                const stored = window.localStorage.getItem('scbRefreshToken');
+                refreshForm.refresh_token.value = stored || '';
+                if (!stored) {
+                    alert('Aucun refresh token enregistré.');
+                }
+            });
+        }
+
+        if (refreshForm) {
+            refreshForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                sandbox.setStatus(refreshStatus, 'Envoi…', null);
+                sandbox.attachJSONOutput(refreshOutput, '');
+                const formData = new FormData(refreshForm);
+                let refreshToken = formData.get('refresh_token');
+                if (!refreshToken) {
+                    refreshToken = window.localStorage.getItem('scbRefreshToken');
+                }
+                if (!refreshToken) {
+                    sandbox.setStatus(refreshStatus, 'Aucun refresh token disponible', 'error');
+                    sandbox.attachJSONOutput(refreshOutput, '');
+                    return;
+                }
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/refresh/',
+                        method: 'POST',
+                        data: { refresh: refreshToken },
+                        auth: false,
+                    });
+                    sandbox.attachJSONOutput(refreshOutput, response.data);
+                    if (response.ok && response.data && response.data.access) {
+                        sandbox.setStatus(refreshStatus, `Access token mis à jour • statut ${response.status}`, 'success');
+                        sandbox.setToken('access', response.data.access);
+                    } else {
+                        sandbox.setStatus(refreshStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(refreshStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(refreshOutput, error.message || error);
+                }
+            });
+        }
+
+        if (fetchMeBtn) {
+            fetchMeBtn.addEventListener('click', async () => {
+                sandbox.setStatus(meStatus, 'Chargement…', null);
+                sandbox.attachJSONOutput(meOutput, '');
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/me/',
+                    });
+                    sandbox.attachJSONOutput(meOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(meStatus, `Succès • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(meStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(meStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(meOutput, error.message || error);
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}

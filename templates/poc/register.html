@@ -1,0 +1,163 @@
+{% extends 'poc/base.html' %}
+{% block title %}Inscription • Sponsors Club Sandbox{% endblock %}
+{% block content %}
+<header>
+    <h2>Inscription</h2>
+    <p class="hint">Créez rapidement un compte agent ou collaborateur.</p>
+</header>
+<section class="stack">
+    <div class="status" id="registerStatus">En attente</div>
+    <h3>Créer un compte</h3>
+    <form id="registerForm" class="stack">
+        <div class="grid-two">
+            <label>
+                Type de compte
+                <select name="account_type" id="accountType">
+                    <option value="AGENT">Agent</option>
+                    <option value="COLLABORATOR">Collaborateur</option>
+                </select>
+            </label>
+            <label>
+                Email
+                <input type="email" name="email" required placeholder="contact@exemple.com">
+            </label>
+        </div>
+        <div class="grid-two">
+            <label>
+                Mot de passe
+                <input type="password" name="password" required>
+            </label>
+            <label>
+                Téléphone (optionnel)
+                <input type="tel" name="phone_number" placeholder="+33 6 00 00 00 00">
+            </label>
+        </div>
+        <div class="grid-two">
+            <label>
+                Prénom
+                <input type="text" name="first_name" placeholder="Jeanne">
+            </label>
+            <label>
+                Nom
+                <input type="text" name="last_name" placeholder="Dupont">
+            </label>
+        </div>
+        <div class="grid-two">
+            <label>
+                Date de naissance
+                <input type="date" name="date_of_birth">
+            </label>
+            <label data-agent-only>
+                Nom d'affichage (agents uniquement)
+                <input type="text" name="display_name" placeholder="Agence Dupont">
+            </label>
+        </div>
+        <div class="grid-two" data-collaborator-only>
+            <label>
+                Nom d'organisation (optionnel)
+                <input type="text" name="organisation_name" placeholder="Startup Marketing">
+            </label>
+            <label>
+                Intitulé de poste (optionnel)
+                <input type="text" name="job_title" placeholder="Directeur Marketing">
+            </label>
+        </div>
+        <button type="submit" class="btn">Créer le compte</button>
+    </form>
+    <pre id="registerOutput">La réponse apparaîtra ici.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="rolesStatus">En attente</div>
+    <h3>Vérifier les rôles du compte</h3>
+    <p class="hint">Utilisez le compte fraîchement créé pour interroger <code>GET /api/users/me/roles/</code> et vérifier l'agent ou les collaborations.</p>
+    <div class="token-actions">
+        <button type="button" class="btn" id="fetchRoles">Interroger /me/roles</button>
+    </div>
+    <pre id="rolesOutput">Aucun appel effectué.</pre>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    (function() {
+        const sandbox = window.scbSandbox;
+        const form = document.getElementById('registerForm');
+        const statusEl = document.getElementById('registerStatus');
+        const outputEl = document.getElementById('registerOutput');
+        const accountType = document.getElementById('accountType');
+        const collaboratorRows = document.querySelectorAll('[data-collaborator-only]');
+        const agentRows = document.querySelectorAll('[data-agent-only]');
+
+        function toggleFields() {
+            const value = accountType.value;
+            collaboratorRows.forEach((row) => {
+                row.style.display = value === 'COLLABORATOR' ? 'grid' : 'none';
+            });
+            agentRows.forEach((row) => {
+                row.style.display = value === 'AGENT' ? 'grid' : 'none';
+            });
+        }
+
+        if (accountType) {
+            accountType.addEventListener('change', toggleFields);
+            toggleFields();
+        }
+
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                sandbox.setStatus(statusEl, 'Envoi…', null);
+                sandbox.attachJSONOutput(outputEl, '');
+                const formData = new FormData(form);
+                const payload = {};
+                formData.forEach((value, key) => {
+                    if (value !== '') {
+                        payload[key] = value;
+                    }
+                });
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/register/',
+                        method: 'POST',
+                        data: payload,
+                        auth: false,
+                    });
+                    sandbox.attachJSONOutput(outputEl, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(statusEl, `Compte créé • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(statusEl, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(statusEl, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(outputEl, error.message || error);
+                }
+            });
+        }
+
+        const rolesBtn = document.getElementById('fetchRoles');
+        const rolesStatus = document.getElementById('rolesStatus');
+        const rolesOutput = document.getElementById('rolesOutput');
+
+        if (rolesBtn) {
+            rolesBtn.addEventListener('click', async () => {
+                sandbox.setStatus(rolesStatus, 'Chargement…', null);
+                sandbox.attachJSONOutput(rolesOutput, '');
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/me/roles/',
+                    });
+                    sandbox.attachJSONOutput(rolesOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(rolesStatus, `Succès • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(rolesStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(rolesStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(rolesOutput, error.message || error);
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}

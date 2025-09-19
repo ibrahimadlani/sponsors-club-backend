@@ -1,0 +1,153 @@
+{% extends 'poc/base.html' %}
+{% block title %}Collaborateur • Rejoindre une organisation{% endblock %}
+{% block content %}
+<header>
+    <h2>Rejoindre une organisation</h2>
+    <p class="hint">Invitez un collaborateur par email et vérifiez les rôles associés.</p>
+</header>
+<section class="stack">
+    <div class="status" id="inviteStatus">En attente</div>
+    <h3>1. Inviter un collaborateur</h3>
+    <p class="hint">Seul un propriétaire d'organisation peut inviter un collaborateur via <code>POST /api/organisations/&lt;id&gt;/collaborators/add/</code>.</p>
+    <form id="inviteForm" class="stack">
+        <div class="grid-two">
+            <label>
+                Organisation ID
+                <input type="text" name="organisation_id" required placeholder="UUID de l'organisation">
+            </label>
+            <label>
+                Email du collaborateur
+                <input type="email" name="email" required placeholder="marie@example.com">
+            </label>
+        </div>
+        <div class="grid-two">
+            <label>
+                Rôle
+                <select name="role">
+                    <option value="MEMBER">Member</option>
+                </select>
+            </label>
+            <label>
+                Intitulé de poste
+                <input type="text" name="job_title" placeholder="Responsable partenariats">
+            </label>
+        </div>
+        <button type="submit" class="btn">Envoyer l'invitation</button>
+    </form>
+    <pre id="inviteOutput">La réponse apparaîtra ici.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="rolesStatus">En attente</div>
+    <h3>2. Vérifier mes rôles</h3>
+    <p class="hint">Le collaborateur invité peut se connecter et vérifier ses collaborations via <code>GET /api/users/me/roles/</code>.</p>
+    <div class="token-actions">
+        <button type="button" class="btn" id="refreshRoles">Charger /me/roles</button>
+    </div>
+    <pre id="rolesOutput">Aucun appel effectué.</pre>
+</section>
+<section class="stack">
+    <div class="status" id="followsStatus">En attente</div>
+    <h3>3. Lister mes athlètes suivis</h3>
+    <p class="hint">Après avoir rejoint une organisation, utilisez <code>GET /api/follows/me/follows/</code> pour voir les suivis partagés.</p>
+    <div class="token-actions">
+        <button type="button" class="btn secondary" id="loadFollows">Charger</button>
+    </div>
+    <pre id="followsOutput">Aucun appel effectué.</pre>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+    (function() {
+        const sandbox = window.scbSandbox;
+        const inviteForm = document.getElementById('inviteForm');
+        const inviteStatus = document.getElementById('inviteStatus');
+        const inviteOutput = document.getElementById('inviteOutput');
+
+        if (inviteForm) {
+            inviteForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const organisationId = inviteForm.organisation_id.value.trim();
+                if (!organisationId) {
+                    sandbox.setStatus(inviteStatus, 'Organisation ID requis', 'error');
+                    return;
+                }
+                sandbox.setStatus(inviteStatus, 'Envoi…', null);
+                sandbox.attachJSONOutput(inviteOutput, '');
+                const formData = new FormData(inviteForm);
+                const payload = {
+                    email: formData.get('email'),
+                    role: formData.get('role') || 'MEMBER',
+                    job_title: formData.get('job_title') || '',
+                };
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: `/api/organisations/${organisationId}/collaborators/add/`,
+                        method: 'POST',
+                        data: payload,
+                    });
+                    sandbox.attachJSONOutput(inviteOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(inviteStatus, `Invitation créée • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(inviteStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(inviteStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(inviteOutput, error.message || error);
+                }
+            });
+        }
+
+        const rolesBtn = document.getElementById('refreshRoles');
+        const rolesStatus = document.getElementById('rolesStatus');
+        const rolesOutput = document.getElementById('rolesOutput');
+
+        if (rolesBtn) {
+            rolesBtn.addEventListener('click', async () => {
+                sandbox.setStatus(rolesStatus, 'Chargement…', null);
+                sandbox.attachJSONOutput(rolesOutput, '');
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/users/me/roles/',
+                    });
+                    sandbox.attachJSONOutput(rolesOutput, response.data);
+                    if (response.ok) {
+                        sandbox.setStatus(rolesStatus, `Succès • statut ${response.status}`, 'success');
+                    } else {
+                        sandbox.setStatus(rolesStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(rolesStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(rolesOutput, error.message || error);
+                }
+            });
+        }
+
+        const followsBtn = document.getElementById('loadFollows');
+        const followsStatus = document.getElementById('followsStatus');
+        const followsOutput = document.getElementById('followsOutput');
+
+        if (followsBtn) {
+            followsBtn.addEventListener('click', async () => {
+                sandbox.setStatus(followsStatus, 'Chargement…', null);
+                sandbox.attachJSONOutput(followsOutput, '');
+                try {
+                    const response = await sandbox.apiRequest({
+                        url: '/api/follows/me/follows/',
+                    });
+                    sandbox.attachJSONOutput(followsOutput, response.data);
+                    if (response.ok) {
+                        const count = Array.isArray(response.data) ? response.data.length : '—';
+                        sandbox.setStatus(followsStatus, `Succès • ${count} suivis`, 'success');
+                    } else {
+                        sandbox.setStatus(followsStatus, `Erreur • statut ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    sandbox.setStatus(followsStatus, 'Erreur réseau', 'error');
+                    sandbox.attachJSONOutput(followsOutput, error.message || error);
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}
