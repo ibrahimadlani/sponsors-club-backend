@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Users API POC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
     <style>
         body { margin: 0; font-family: Arial, sans-serif; display: flex; min-height: 100vh; }
         aside { width: 260px; background: #231127; color: #f9fafb; padding: 24px; box-sizing: border-box; }
@@ -107,13 +108,34 @@
             access: null,
             refresh: null,
         };
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfFromMeta = csrfMeta ? csrfMeta.getAttribute('content') : null;
 
         function getCSRFToken() {
             const cookieString = document.cookie;
-            if (!cookieString) return null;
-            const cookies = cookieString.split(';').map((cookie) => cookie.trim());
-            const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
-            return csrfCookie ? csrfCookie.substring('csrftoken='.length) : null;
+            if (cookieString) {
+                const cookies = cookieString.split(';').map((cookie) => cookie.trim());
+                const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+                if (csrfCookie) {
+                    return csrfCookie.substring('csrftoken='.length);
+                }
+            }
+            if (csrfFromMeta && csrfFromMeta !== 'NOTPROVIDED') {
+                return csrfFromMeta;
+            }
+            return null;
+        }
+
+        function buildJsonHeaders(extra = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...extra,
+            };
+            const csrfToken = getCSRFToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+            return headers;
         }
 
         function setStatus(id, text) {
@@ -159,11 +181,9 @@
             try {
                 const response = await fetch(REGISTER_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken(),
-                    },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleJsonResponse(response);
                 if (response.ok) {
@@ -190,11 +210,9 @@
             try {
                 const response = await fetch(LOGIN_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken(),
-                    },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(authPayload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleJsonResponse(response);
                 if (response.ok) {
@@ -223,11 +241,9 @@
             try {
                 const response = await fetch(REFRESH_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken(),
-                    },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify({ refresh: tokens.refresh }),
+                    credentials: 'same-origin',
                 });
                 const data = await handleJsonResponse(response);
                 if (response.ok) {
@@ -260,6 +276,7 @@
                         headers: {
                             Authorization: `Bearer ${tokens.access}`,
                         },
+                        credentials: 'same-origin',
                     });
                     const data = await handleJsonResponse(response);
                     printResult(data);

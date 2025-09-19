@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Onboarding POC • Sponsors Club</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
     <style>
         :root {
             color-scheme: light;
@@ -300,24 +301,37 @@
         };
 
         const tokens = { access: null, refresh: null };
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfFromMeta = csrfMeta ? csrfMeta.getAttribute('content') : null;
         const previewAccess = document.getElementById('previewAccess');
         const previewRefresh = document.getElementById('previewRefresh');
         const sharedOutput = document.getElementById('sharedOutput');
 
         function getCSRFToken() {
             const cookieString = document.cookie;
-            if (!cookieString) return null;
-            const cookies = cookieString.split(';').map((cookie) => cookie.trim());
-            const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
-            return csrfCookie ? csrfCookie.substring('csrftoken='.length) : null;
+            if (cookieString) {
+                const cookies = cookieString.split(';').map((cookie) => cookie.trim());
+                const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+                if (csrfCookie) {
+                    return csrfCookie.substring('csrftoken='.length);
+                }
+            }
+            if (csrfFromMeta && csrfFromMeta !== 'NOTPROVIDED') {
+                return csrfFromMeta;
+            }
+            return null;
         }
 
         function buildJsonHeaders(extra = {}) {
-            return {
+            const headers = {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken(),
                 ...extra,
             };
+            const csrfToken = getCSRFToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+            return headers;
         }
 
         function updateTokenPreview() {
@@ -377,6 +391,7 @@
                     method: 'POST',
                     headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
@@ -407,6 +422,7 @@
                     method: 'POST',
                     headers: buildJsonHeaders(),
                     body: JSON.stringify({ refresh: tokens.refresh }),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
@@ -441,6 +457,7 @@
                     method: 'POST',
                     headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
@@ -474,6 +491,7 @@
                     method: 'POST',
                     headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 if (response.ok) {
@@ -513,6 +531,7 @@
                         Authorization: `Bearer ${tokens.access}`,
                     }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 let output = data;
@@ -557,6 +576,7 @@
                         Authorization: `Bearer ${tokens.access}`,
                     }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 let output = data;
@@ -597,6 +617,7 @@
                         Authorization: `Bearer ${tokens.access}`,
                     }),
                     body: JSON.stringify(payload),
+                    credentials: 'same-origin',
                 });
                 const data = await handleResponse(response);
                 let output = data;
@@ -621,7 +642,7 @@
 
         async function fetchSports() {
             try {
-                const response = await fetch(ENDPOINTS.sports);
+                const response = await fetch(ENDPOINTS.sports, { credentials: 'same-origin' });
                 const data = await handleResponse(response);
                 if (!response.ok) {
                     renderOutput(data);
