@@ -8,7 +8,7 @@
 <section class="stack">
     <div class="status" id="sportsStatus">En attente</div>
     <h3>1. Explorer les sports disponibles</h3>
-    <p class="hint">Chargez la liste depuis <code>GET /api/athletes/sports/</code> pour alimenter le formulaire.</p>
+    <p class="hint">Chargez la liste depuis <code>GET /api/sports/</code> pour alimenter le formulaire.</p>
     <div class="token-actions">
         <button type="button" class="btn" id="loadSports">Charger les sports</button>
     </div>
@@ -85,7 +85,7 @@
             sandbox.attachJSONOutput(sportsOutput, '');
             try {
                 const response = await sandbox.apiRequest({
-                    url: '/api/athletes/sports/',
+                    url: '/api/sports/',
                     auth: false,
                 });
                 sandbox.attachJSONOutput(sportsOutput, response.data);
