@@ -70,6 +70,10 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create the organisation and ensure the requester becomes the owner."""
         user = self.context['request'].user
+        if getattr(user, 'account_type', None) != User.AccountType.COLLABORATOR and not user.is_staff:
+            raise serializers.ValidationError(
+                {'non_field_errors': ['Only collaborator accounts may create organisations.']}
+            )
         organisation = Organisation.objects.create(  # pylint: disable=no-member
             owner=user,
             **validated_data,
@@ -80,8 +84,6 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
             role=Collaborator.Role.OWNER,
             job_title='Owner',
         )
-        user.account_type = User.AccountType.COLLABORATOR
-        user.save(update_fields=['account_type'])
         return organisation
 
 
@@ -155,6 +157,11 @@ class CollaboratorCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'email': 'No user found with this email address.'}
             ) from exc
+
+        if getattr(user, 'account_type', None) != User.AccountType.COLLABORATOR and not user.is_staff:
+            raise serializers.ValidationError(
+                {'email': 'Only collaborator accounts may join organisations.'}
+            )
 
         collaborator = Collaborator.objects.create(  # pylint: disable=no-member
             user=user,

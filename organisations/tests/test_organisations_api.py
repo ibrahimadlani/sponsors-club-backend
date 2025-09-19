@@ -110,13 +110,13 @@ def test_organisation_serializer_owner_field(organisations_setup):
 
 @pytest.mark.django_db
 def test_organisation_create_serializer(factory, user_model):
-    """Creating an organisation promotes the creator to owner."""
+    """Creating an organisation persists owner collaborator membership."""
     user = user_model.objects.create_user(
         email='creator@test.com',
         password='pass1234',
         first_name='Creator',
         last_name='User',
-        account_type=user_model.AccountType.AGENT,
+        account_type=user_model.AccountType.COLLABORATOR,
     )
     request = factory.post('/api/organisations/')
     request.user = user
@@ -139,6 +139,32 @@ def test_organisation_create_serializer(factory, user_model):
     assert user.account_type == user_model.AccountType.COLLABORATOR
     assert organisation.owner == user
     assert Collaborator.objects.filter(user=user, organisation=organisation, role=Collaborator.Role.OWNER).exists()
+
+
+@pytest.mark.django_db
+def test_organisation_create_serializer_rejects_agent(factory, user_model):
+    """Serializer validation fails for agent accounts."""
+    user = user_model.objects.create_user(
+        email='agent-creator@test.com',
+        password='pass1234',
+        account_type=user_model.AccountType.AGENT,
+    )
+    request = factory.post('/api/organisations/')
+    request.user = user
+    serializer = OrganisationCreateSerializer(
+        data={
+            'name': 'Blocked Org',
+            'sector': 'Tech',
+            'size': Organisation.Size.SMALL,
+            'budget_min': 1000,
+            'budget_max': 2000,
+            'country': 'FR',
+        },
+        context={'request': request},
+    )
+    assert serializer.is_valid(), serializer.errors
+    with pytest.raises(serializers.ValidationError):
+        serializer.save()
 
 
 @pytest.mark.django_db
@@ -198,8 +224,12 @@ def test_collaborator_create_serializer_missing_user(organisation):
 
 @pytest.mark.django_db
 def test_collaborator_create_serializer_success(organisation, user_model):
-    """Successfully add an existing user as a collaborator."""
-    invitee = user_model.objects.create_user(email='invitee@test.com', password='pass1234')
+    """Successfully add an existing collaborator account to the organisation."""
+    invitee = user_model.objects.create_user(
+        email='invitee@test.com',
+        password='pass1234',
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
     serializer = CollaboratorCreateSerializer(
         data={'email': invitee.email, 'role': Collaborator.Role.MEMBER, 'job_title': 'Analyst'},
         context={'organisation': organisation},
@@ -208,6 +238,23 @@ def test_collaborator_create_serializer_success(organisation, user_model):
     collaborator = serializer.save()
     assert collaborator.user == invitee
     assert collaborator.organisation == organisation
+
+
+@pytest.mark.django_db
+def test_collaborator_create_serializer_rejects_agent_accounts(organisation, user_model):
+    """Agent accounts cannot be invited to collaborate with an organisation."""
+    invitee = user_model.objects.create_user(
+        email='agent-invite@test.com',
+        password='pass1234',
+        account_type=user_model.AccountType.AGENT,
+    )
+    serializer = CollaboratorCreateSerializer(
+        data={'email': invitee.email, 'role': Collaborator.Role.MEMBER, 'job_title': 'Analyst'},
+        context={'organisation': organisation},
+    )
+    assert serializer.is_valid(), serializer.errors
+    with pytest.raises(serializers.ValidationError):
+        serializer.save()
 
 
 @pytest.mark.django_db
@@ -422,7 +469,11 @@ def test_collaborator_list_action(owner_client, organisation):
 @pytest.mark.django_db
 def test_add_collaborator_success(owner_client, organisation, user_model):
     """Owners can invite existing users as collaborators."""
-    invitee = user_model.objects.create_user(email='invite2@test.com', password='pass1234')
+    invitee = user_model.objects.create_user(
+        email='invite2@test.com',
+        password='pass1234',
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
     url = reverse('organisation-add-collaborator', kwargs={'pk': organisation.id})
     response = owner_client.post(url, {
         'email': invitee.email,
@@ -431,6 +482,24 @@ def test_add_collaborator_success(owner_client, organisation, user_model):
     }, format='json')
     assert response.status_code == status.HTTP_201_CREATED
     assert Collaborator.objects.filter(user=invitee, organisation=organisation).exists()
+
+
+@pytest.mark.django_db
+def test_add_collaborator_rejects_agent(owner_client, organisation, user_model):
+    """Inviting an agent account as collaborator returns a validation error."""
+    invitee = user_model.objects.create_user(
+        email='agent-collab@test.com',
+        password='pass1234',
+        account_type=user_model.AccountType.AGENT,
+    )
+    url = reverse('organisation-add-collaborator', kwargs={'pk': organisation.id})
+    response = owner_client.post(url, {
+        'email': invitee.email,
+        'role': Collaborator.Role.MEMBER,
+        'job_title': 'Analyst',
+    }, format='json')
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert 'email' in response.data
 
 
 @pytest.mark.django_db
