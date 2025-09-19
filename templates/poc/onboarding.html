@@ -304,6 +304,22 @@
         const previewRefresh = document.getElementById('previewRefresh');
         const sharedOutput = document.getElementById('sharedOutput');
 
+        function getCSRFToken() {
+            const cookieString = document.cookie;
+            if (!cookieString) return null;
+            const cookies = cookieString.split(';').map((cookie) => cookie.trim());
+            const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+            return csrfCookie ? csrfCookie.substring('csrftoken='.length) : null;
+        }
+
+        function buildJsonHeaders(extra = {}) {
+            return {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(),
+                ...extra,
+            };
+        }
+
         function updateTokenPreview() {
             previewAccess.textContent = tokens.access || '(none)';
             previewRefresh.textContent = tokens.refresh || '(none)';
@@ -350,7 +366,7 @@
             try {
                 const response = await fetch(ENDPOINTS.login, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
@@ -377,7 +393,7 @@
             try {
                 const response = await fetch(ENDPOINTS.refresh, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify({ refresh: tokens.refresh }),
                 });
                 const data = await handleResponse(response);
@@ -410,7 +426,7 @@
             try {
                 const response = await fetch(ENDPOINTS.register, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
@@ -438,7 +454,7 @@
             try {
                 const response = await fetch(ENDPOINTS.register, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildJsonHeaders(),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
@@ -470,10 +486,9 @@
             try {
                 const response = await fetch(ENDPOINTS.athletes, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
@@ -503,10 +518,9 @@
             try {
                 const response = await fetch(ENDPOINTS.organisations, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
@@ -532,10 +546,9 @@
             try {
                 const response = await fetch(ENDPOINTS.collaborators(organisationId), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: buildJsonHeaders({
                         Authorization: `Bearer ${tokens.access}`,
-                    },
+                    }),
                     body: JSON.stringify(payload),
                 });
                 const data = await handleResponse(response);
