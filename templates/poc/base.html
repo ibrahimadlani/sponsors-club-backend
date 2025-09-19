@@ -327,6 +327,19 @@
                 return localStorage.getItem(STORAGE_KEYS.access);
             }
 
+            const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+
+            function getCSRFCookie(name = 'csrftoken') {
+                const cookies = document.cookie ? document.cookie.split(';') : [];
+                for (let i = 0; i < cookies.length; i += 1) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.startsWith(`${name}=`)) {
+                        return decodeURIComponent(cookie.substring(name.length + 1));
+                    }
+                }
+                return null;
+            }
+
             async function apiRequest(config) {
                 const {
                     url,
@@ -337,6 +350,8 @@
                 } = config;
 
                 const requestHeaders = new Headers(headers);
+                const upperMethod = method.toUpperCase();
+
                 if (auth) {
                     const token = getAccessToken();
                     if (token) {
@@ -356,10 +371,18 @@
                     requestHeaders.set('Accept', 'application/json');
                 }
 
+                if (!SAFE_METHODS.has(upperMethod) && !requestHeaders.has('X-CSRFToken')) {
+                    const csrfToken = getCSRFCookie();
+                    if (csrfToken) {
+                        requestHeaders.set('X-CSRFToken', csrfToken);
+                    }
+                }
+
                 const response = await fetch(url, {
                     method,
                     headers: requestHeaders,
                     body,
+                    credentials: 'same-origin',
                 });
 
                 const text = await response.text();
