@@ -2,12 +2,10 @@
 
 # pylint: disable=missing-class-docstring,too-few-public-methods,duplicate-code
 
-from decimal import Decimal
-
 from django.db import transaction
 from rest_framework import serializers
 
-from organisations.models import Collaborator, Organisation
+from organisations.models import Collaborator
 
 from .models import AgentProfile, User
 
@@ -92,8 +90,8 @@ class RegisterSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
     def create(self, validated_data):
         """Create a user and any related agent or collaborator records."""
         display_name = validated_data.pop('display_name', None)
-        organisation_name = validated_data.pop('organisation_name', None)
-        job_title = validated_data.pop('job_title', None)
+        validated_data.pop('organisation_name', None)
+        validated_data.pop('job_title', None)
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:
@@ -101,26 +99,6 @@ class RegisterSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
             AgentProfile.objects.create(  # pylint: disable=no-member
                 user=user,
                 display_name=display_name or default_display_name,
-            )
-        else:
-            default_org_name = (
-                organisation_name
-                or f"Organisation {user.first_name or user.last_name or user.email.split('@')[0]}"
-            )
-            organisation = Organisation.objects.create(  # pylint: disable=no-member
-                name=default_org_name,
-                owner=user,
-                sector='Unknown',
-                size=Organisation.Size.SMALL,
-                budget_min=Decimal('0'),
-                budget_max=Decimal('0'),
-                country='Unknown',
-            )
-            Collaborator.objects.create(  # pylint: disable=no-member
-                user=user,
-                organisation=organisation,
-                role=Collaborator.Role.OWNER,
-                job_title=job_title or 'Owner',
             )
         return user
 
