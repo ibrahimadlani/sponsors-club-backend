@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Users API POC</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; display: flex; min-height: 100vh; }
+        aside { width: 260px; background: #231127; color: #f9fafb; padding: 24px; box-sizing: border-box; }
+        main { flex: 1; padding: 24px; box-sizing: border-box; }
+        h1 { margin-bottom: 24px; }
+        section { margin-bottom: 32px; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; position: relative; }
+        section h2 { margin-top: 0; }
+        label { display: block; margin-bottom: 4px; font-size: 0.9rem; }
+        input { width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #d1d5db; border-radius: 4px; }
+        button { padding: 8px 16px; background: #8a1e86; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        pre { background: #231127; color: #f9fafb; padding: 16px; border-radius: 8px; overflow-x: auto; }
+        .status { position: absolute; top: 16px; right: 16px; font-size: 0.85rem; color: #6b7280; }
+        .token-box { word-break: break-all; font-size: 0.85rem; background: #eef2ff; color: #8a1e86; padding: 12px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <aside>
+        <h1>Users API POC</h1>
+        <p>This lightweight dashboard helps you exercise the <code>/api/users/</code> endpoints.</p>
+        <p>Workflow suggestion:</p>
+        <ol>
+            <li>Register a user (optional if you already have credentials).</li>
+            <li>Authenticate to retrieve JWT tokens.</li>
+            <li>Call profile/roles/entitlements endpoints.</li>
+            <li>Refresh the access token when it expires.</li>
+        </ol>
+        <p class="token-box">
+            <strong>Access token:</strong>
+            <span id="accessTokenPreview">(none)</span>
+        </p>
+        <p class="token-box">
+            <strong>Refresh token:</strong>
+            <span id="refreshTokenPreview">(none)</span>
+        </p>
+    </aside>
+    <main>
+        <section>
+            <div class="status" id="registerStatus">Idle</div>
+            <h2>Register</h2>
+            <form id="registerForm">
+                <label for="registerEmail">Email</label>
+                <input id="registerEmail" name="email" type="email" required />
+
+                <label for="registerPassword">Password</label>
+                <input id="registerPassword" name="password" type="password" required />
+
+                <label for="registerFirstName">First name</label>
+                <input id="registerFirstName" name="first_name" type="text" />
+
+                <label for="registerLastName">Last name</label>
+                <input id="registerLastName" name="last_name" type="text" />
+
+                <button type="submit">Create account</button>
+            </form>
+        </section>
+
+        <section>
+            <div class="status" id="loginStatus">Idle</div>
+            <h2>Login</h2>
+            <form id="loginForm">
+                <label for="loginEmail">Email</label>
+                <input id="loginEmail" name="email" type="email" required />
+
+                <label for="loginPassword">Password</label>
+                <input id="loginPassword" name="password" type="password" required />
+
+                <button type="submit">Authenticate</button>
+            </form>
+        </section>
+
+        <section>
+            <div class="status" id="refreshStatus">Idle</div>
+            <h2>Refresh token</h2>
+            <button id="refreshButton">Refresh access token</button>
+        </section>
+
+        <section>
+            <div class="status" id="meStatus">Idle</div>
+            <h2>Profile</h2>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <button data-endpoint="me" class="callEndpoint">GET /me/</button>
+                <button data-endpoint="me/roles" class="callEndpoint">GET /me/roles/</button>
+                <button data-endpoint="me/entitlements" class="callEndpoint">GET /me/entitlements/</button>
+            </div>
+            <pre id="responseOutput">No response yet.</pre>
+        </section>
+    </main>
+
+    <script>
+        const REGISTER_URL = '/api/users/register/';
+        const LOGIN_URL = '/api/users/login/';
+        const REFRESH_URL = '/api/users/refresh/';
+        const PROFILE_BASE = '/api/users/';
+
+        const accessTokenPreview = document.getElementById('accessTokenPreview');
+        const refreshTokenPreview = document.getElementById('refreshTokenPreview');
+        const responseOutput = document.getElementById('responseOutput');
+
+        const tokens = {
+            access: null,
+            refresh: null,
+        };
+
+        function setStatus(id, text) {
+            document.getElementById(id).textContent = text;
+        }
+
+        function updateTokenPreview() {
+            accessTokenPreview.textContent = tokens.access ? tokens.access : '(none)';
+            refreshTokenPreview.textContent = tokens.refresh ? tokens.refresh : '(none)';
+        }
+
+        async function handleJsonResponse(response) {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            }
+            return response.text();
+        }
+
+        function printResult(data) {
+            if (typeof data === 'string') {
+                responseOutput.textContent = data;
+            } else {
+                responseOutput.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        function buildPayload(formElement) {
+            const formData = new FormData(formElement);
+            return Object.fromEntries(formData.entries());
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus('registerStatus', 'Sending…');
+            const payload = buildPayload(event.currentTarget);
+            try {
+                const response = await fetch(REGISTER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleJsonResponse(response);
+                printResult(data);
+                setStatus('registerStatus', response.ok ? 'Success' : 'Error');
+            } catch (error) {
+                printResult({ error: error.message });
+                setStatus('registerStatus', 'Network error');
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus('loginStatus', 'Sending…');
+            const payload = buildPayload(event.currentTarget);
+            const authPayload = {
+                email: payload.email,
+                password: payload.password,
+            };
+            try {
+                const response = await fetch(LOGIN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(authPayload),
+                });
+                const data = await handleJsonResponse(response);
+                if (response.ok) {
+                    tokens.access = data.access || null;
+                    tokens.refresh = data.refresh || null;
+                    updateTokenPreview();
+                }
+                printResult(data);
+                setStatus('loginStatus', response.ok ? 'Success' : 'Error');
+            } catch (error) {
+                printResult({ error: error.message });
+                setStatus('loginStatus', 'Network error');
+            }
+        });
+
+        document.getElementById('refreshButton').addEventListener('click', async () => {
+            if (!tokens.refresh) {
+                printResult({ error: 'Refresh token missing. Authenticate first.' });
+                setStatus('refreshStatus', 'No token');
+                return;
+            }
+            setStatus('refreshStatus', 'Sending…');
+            try {
+                const response = await fetch(REFRESH_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh: tokens.refresh }),
+                });
+                const data = await handleJsonResponse(response);
+                if (response.ok) {
+                    tokens.access = data.access || tokens.access;
+                    updateTokenPreview();
+                }
+                printResult(data);
+                setStatus('refreshStatus', response.ok ? 'Success' : 'Error');
+            } catch (error) {
+                printResult({ error: error.message });
+                setStatus('refreshStatus', 'Network error');
+            }
+        });
+
+        document.querySelectorAll('.callEndpoint').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const endpoint = button.dataset.endpoint;
+                if (!tokens.access) {
+                    printResult({ error: 'Access token missing. Authenticate first.' });
+                    setStatus('meStatus', 'No token');
+                    return;
+                }
+                setStatus('meStatus', `Calling ${endpoint}…`);
+                try {
+                    const response = await fetch(`${PROFILE_BASE}${endpoint}/`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${tokens.access}`,
+                        },
+                    });
+                    const data = await handleJsonResponse(response);
+                    printResult(data);
+                    setStatus('meStatus', response.ok ? 'Success' : 'Error');
+                } catch (error) {
+                    printResult({ error: error.message });
+                    setStatus('meStatus', 'Network error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

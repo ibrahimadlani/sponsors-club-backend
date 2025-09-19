@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Onboarding POC • Sponsors Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            display: flex;
+            min-height: 100vh;
+        }
+        aside {
+            width: 280px;
+            background: #111827;
+            color: #f9fafb;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        main {
+            flex: 1;
+            padding: 24px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        h1 { margin-top: 0; }
+        section {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+            position: relative;
+        }
+        section h2 { margin-top: 0; color: #111827; }
+        form { display: grid; gap: 12px; }
+        label { font-size: 0.9rem; color: #374151; }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        textarea { min-height: 80px; }
+        button {
+            justify-self: start;
+            padding: 8px 16px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button.secondary { background: #6b7280; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .status {
+            position: absolute;
+            top: 18px;
+            right: 20px;
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+        .stack { display: flex; flex-direction: column; gap: 16px; }
+        .split { display: flex; gap: 16px; flex-wrap: wrap; }
+        .split section { flex: 1 1 360px; }
+        pre {
+            background: #111827;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0;
+        }
+        .token-box {
+            background: rgba(37, 99, 235, 0.15);
+            color: #dbeafe;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        .hint {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <aside>
+        <h1>Onboarding POC</h1>
+        <p class="hint">Use this page to walkthrough the initial setup for either an agent or an organisation account. The forms talk directly to the JSON API—make sure you're running the Django server (no CORS required when served via <code>/poc/onboarding/</code>).</p>
+        <div class="token-box">
+            <strong>Access token</strong>
+            <div id="previewAccess">(none)</div>
+        </div>
+        <div class="token-box" style="margin-top:12px;">
+            <strong>Refresh token</strong>
+            <div id="previewRefresh">(none)</div>
+        </div>
+        <p class="hint" style="margin-top:16px;">Workflow tips:</p>
+        <ol class="hint" style="padding-left:18px;">
+            <li>Register the desired account type.</li>
+            <li>Login to obtain JWT tokens.</li>
+            <li>Perform the follow-up actions (create athlete or organisation/collaborator).</li>
+        </ol>
+    </aside>
+    <main>
+        <section>
+            <div class="status" id="loginStatus">Idle</div>
+            <h2>Authentication</h2>
+            <form id="loginForm">
+                <div class="split" style="gap:12px;">
+                    <div style="flex:1 1 220px;">
+                        <label for="loginEmail">Email</label>
+                        <input id="loginEmail" name="email" type="email" required />
+                    </div>
+                    <div style="flex:1 1 180px;">
+                        <label for="loginPassword">Password</label>
+                        <input id="loginPassword" name="password" type="password" required />
+                    </div>
+                </div>
+                <div class="split" style="gap:12px;">
+                    <button type="submit">Login</button>
+                    <button type="button" class="secondary" id="refreshTokenBtn">Refresh access token</button>
+                </div>
+            </form>
+            <pre id="authOutput">Responses will appear here.</pre>
+        </section>
+
+        <div class="split">
+            <section>
+                <div class="status" id="agentRegisterStatus">Idle</div>
+                <h2>Agent onboarding</h2>
+                <div class="stack">
+                    <form id="agentRegisterForm">
+                        <h3 style="margin:0;">1. Register agent user</h3>
+                        <label for="agentEmail">Email</label>
+                        <input id="agentEmail" name="email" type="email" required />
+
+                        <label for="agentPassword">Password</label>
+                        <input id="agentPassword" name="password" type="password" required />
+
+                        <label for="agentDisplayName">Display name</label>
+                        <input id="agentDisplayName" name="display_name" type="text" placeholder="e.g. Jane Smith Agency" required />
+
+                        <label for="agentFirstName">First name</label>
+                        <input id="agentFirstName" name="first_name" type="text" />
+
+                        <label for="agentLastName">Last name</label>
+                        <input id="agentLastName" name="last_name" type="text" />
+
+                        <button type="submit">Register agent</button>
+                    </form>
+
+                    <form id="athleteCreateForm">
+                        <div class="status" id="athleteStatus">Idle</div>
+                        <h3 style="margin:0;">2. Create first athlete</h3>
+                        <label for="athleteSport">Sport</label>
+                        <select id="athleteSport" name="sport_id" required>
+                            <option value="">Loading…</option>
+                        </select>
+
+                        <label for="athleteFullName">Full name</label>
+                        <input id="athleteFullName" name="full_name" type="text" required />
+
+                        <label for="athleteBirthDate">Birth date</label>
+                        <input id="athleteBirthDate" name="birth_date" type="date" required />
+
+                        <label for="athleteNationality">Nationality</label>
+                        <input id="athleteNationality" name="nationality" type="text" placeholder="ISO code, e.g. FR" required />
+
+                        <label for="athleteBio">Short bio</label>
+                        <textarea id="athleteBio" name="bio" placeholder="Optional biography"></textarea>
+
+                        <label for="athleteInstagram">Instagram handle</label>
+                        <input id="athleteInstagram" name="instagram" type="text" placeholder="Optional" />
+
+                        <label for="athleteTwitter">Twitter handle</label>
+                        <input id="athleteTwitter" name="twitter" type="text" placeholder="Optional" />
+
+                        <label style="display:flex; align-items:center; gap:8px;">
+                            <input id="athleteSelfRep" type="checkbox" />
+                            Self represented
+                        </label>
+
+                        <button type="submit">Create athlete</button>
+                    </form>
+                </div>
+            </section>
+
+            <section>
+                <div class="status" id="orgRegisterStatus">Idle</div>
+                <h2>Organisation onboarding</h2>
+                <div class="stack">
+                    <form id="collabRegisterForm">
+                        <h3 style="margin:0;">1. Register organisation owner</h3>
+                        <label for="collabEmail">Email</label>
+                        <input id="collabEmail" name="email" type="email" required />
+
+                        <label for="collabPassword">Password</label>
+                        <input id="collabPassword" name="password" type="password" required />
+
+                        <label for="collabFirst">First name</label>
+                        <input id="collabFirst" name="first_name" type="text" />
+
+                        <label for="collabLast">Last name</label>
+                        <input id="collabLast" name="last_name" type="text" />
+
+                        <label for="collabOrgName">Organisation name</label>
+                        <input id="collabOrgName" name="organisation_name" type="text" placeholder="Required" required />
+
+                        <label for="collabJobTitle">Job title</label>
+                        <input id="collabJobTitle" name="job_title" type="text" placeholder="Owner" />
+
+                        <button type="submit">Register collaborator</button>
+                    </form>
+
+                    <form id="organisationCreateForm">
+                        <div class="status" id="organisationStatus">Idle</div>
+                        <h3 style="margin:0;">2. Create organisation</h3>
+                        <label for="orgName">Name</label>
+                        <input id="orgName" name="name" type="text" required />
+
+                        <label for="orgSector">Sector</label>
+                        <input id="orgSector" name="sector" type="text" placeholder="e.g. Sports Marketing" required />
+
+                        <label for="orgSize">Size</label>
+                        <select id="orgSize" name="size" required>
+                            <option value="SMALL">Small</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="LARGE">Large</option>
+                            <option value="ENTERPRISE">Enterprise</option>
+                        </select>
+
+                        <label for="orgBudgetMin">Budget min (EUR)</label>
+                        <input id="orgBudgetMin" name="budget_min" type="number" min="0" step="0.01" required />
+
+                        <label for="orgBudgetMax">Budget max (EUR)</label>
+                        <input id="orgBudgetMax" name="budget_max" type="number" min="0" step="0.01" required />
+
+                        <label for="orgCountry">Country</label>
+                        <input id="orgCountry" name="country" type="text" placeholder="ISO code, e.g. FR" required />
+
+                        <label for="orgDescription">Description</label>
+                        <textarea id="orgDescription" name="description" placeholder="Optional description"></textarea>
+
+                        <label for="orgWebsite">Website</label>
+                        <input id="orgWebsite" name="website" type="url" placeholder="https://" />
+
+                        <button type="submit">Create organisation</button>
+                    </form>
+
+                    <form id="collaboratorAddForm">
+                        <div class="status" id="collaboratorStatus">Idle</div>
+                        <h3 style="margin:0;">3. Invite collaborator</h3>
+                        <label for="collabOrgId">Organisation ID</label>
+                        <input id="collabOrgId" name="organisation_id" type="text" placeholder="Paste organisation UUID" required />
+
+                        <label for="collabInviteEmail">Collaborator email</label>
+                        <input id="collabInviteEmail" name="email" type="email" required />
+
+                        <label for="collabInviteRole">Role</label>
+                        <select id="collabInviteRole" name="role">
+                            <option value="MEMBER">Member</option>
+                        </select>
+
+                        <label for="collabInviteJobTitle">Job title</label>
+                        <input id="collabInviteJobTitle" name="job_title" type="text" placeholder="e.g. Marketing Manager" />
+
+                        <button type="submit">Add collaborator</button>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <section>
+            <h2>Latest response</h2>
+            <pre id="sharedOutput">Waiting for interaction…</pre>
+        </section>
+    </main>
+
+    <script>
+        const ENDPOINTS = {
+            register: '/api/users/register/',
+            login: '/api/users/login/',
+            refresh: '/api/users/refresh/',
+            sports: '/api/sports/',
+            athletes: '/api/athletes/',
+            organisations: '/api/organisations/',
+            collaborators: (id) => `/api/organisations/${id}/collaborators/add/`,
+        };
+
+        const tokens = { access: null, refresh: null };
+        const previewAccess = document.getElementById('previewAccess');
+        const previewRefresh = document.getElementById('previewRefresh');
+        const sharedOutput = document.getElementById('sharedOutput');
+
+        function updateTokenPreview() {
+            previewAccess.textContent = tokens.access || '(none)';
+            previewRefresh.textContent = tokens.refresh || '(none)';
+        }
+
+        function setStatus(id, text) {
+            const node = document.getElementById(id);
+            if (node) node.textContent = text;
+        }
+
+        function renderOutput(data) {
+            if (typeof data === 'string') {
+                sharedOutput.textContent = data;
+            } else {
+                sharedOutput.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        async function handleResponse(response) {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                return response.json();
+            }
+            return response.text();
+        }
+
+        function requireAccessToken(statusId) {
+            if (!tokens.access) {
+                setStatus(statusId, 'Missing access token');
+                renderOutput({ error: 'Authenticate first to obtain an access token.' });
+                return false;
+            }
+            return true;
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus('loginStatus', 'Sending…');
+            const form = event.currentTarget;
+            const payload = {
+                email: form.email.value.trim(),
+                password: form.password.value,
+            };
+            try {
+                const response = await fetch(ENDPOINTS.login, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                if (response.ok) {
+                    tokens.access = data.access || null;
+                    tokens.refresh = data.refresh || null;
+                    updateTokenPreview();
+                }
+                setStatus('loginStatus', response.ok ? 'Authenticated' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('loginStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('refreshTokenBtn').addEventListener('click', async () => {
+            if (!tokens.refresh) {
+                setStatus('loginStatus', 'No refresh token');
+                renderOutput({ error: 'Refresh token missing. Authenticate first.' });
+                return;
+            }
+            setStatus('loginStatus', 'Refreshing…');
+            try {
+                const response = await fetch(ENDPOINTS.refresh, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh: tokens.refresh }),
+                });
+                const data = await handleResponse(response);
+                if (response.ok) {
+                    tokens.access = data.access || tokens.access;
+                    updateTokenPreview();
+                    setStatus('loginStatus', 'Access token refreshed');
+                } else {
+                    setStatus('loginStatus', `Error ${response.status}`);
+                }
+                renderOutput(data);
+            } catch (error) {
+                setStatus('loginStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('agentRegisterForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus('agentRegisterStatus', 'Sending…');
+            const form = event.currentTarget;
+            const payload = {
+                email: form.email.value.trim(),
+                password: form.password.value,
+                account_type: 'AGENT',
+                display_name: form.display_name.value.trim(),
+                first_name: form.first_name.value.trim(),
+                last_name: form.last_name.value.trim(),
+            };
+            try {
+                const response = await fetch(ENDPOINTS.register, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                setStatus('agentRegisterStatus', response.ok ? 'Agent registered' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('agentRegisterStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('collabRegisterForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus('orgRegisterStatus', 'Sending…');
+            const form = event.currentTarget;
+            const payload = {
+                email: form.email.value.trim(),
+                password: form.password.value,
+                first_name: form.first_name.value.trim(),
+                last_name: form.last_name.value.trim(),
+                organisation_name: form.organisation_name.value.trim(),
+                job_title: form.job_title.value.trim(),
+                account_type: 'COLLABORATOR',
+            };
+            try {
+                const response = await fetch(ENDPOINTS.register, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                setStatus('orgRegisterStatus', response.ok ? 'Collaborator registered' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('orgRegisterStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('athleteCreateForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!requireAccessToken('athleteStatus')) return;
+            setStatus('athleteStatus', 'Sending…');
+            const form = event.currentTarget;
+            const social = {};
+            if (form.instagram.value.trim()) social.instagram = form.instagram.value.trim();
+            if (form.twitter.value.trim()) social.twitter = form.twitter.value.trim();
+            const payload = {
+                sport_id: form.sport_id.value,
+                full_name: form.full_name.value.trim(),
+                birth_date: form.birth_date.value,
+                nationality: form.nationality.value.trim(),
+                bio: form.bio.value.trim(),
+                is_self_represented: form.querySelector('#athleteSelfRep').checked,
+                social_links: social,
+            };
+            try {
+                const response = await fetch(ENDPOINTS.athletes, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${tokens.access}`,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                setStatus('athleteStatus', response.ok ? 'Athlete created' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('athleteStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('organisationCreateForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!requireAccessToken('organisationStatus')) return;
+            setStatus('organisationStatus', 'Sending…');
+            const form = event.currentTarget;
+            const payload = {
+                name: form.name.value.trim(),
+                sector: form.sector.value.trim(),
+                size: form.size.value,
+                budget_min: Number(form.budget_min.value || 0).toFixed(2),
+                budget_max: Number(form.budget_max.value || 0).toFixed(2),
+                country: form.country.value.trim(),
+            };
+            if (form.description.value.trim()) payload.description = form.description.value.trim();
+            if (form.website.value.trim()) payload.website = form.website.value.trim();
+            try {
+                const response = await fetch(ENDPOINTS.organisations, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${tokens.access}`,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                setStatus('organisationStatus', response.ok ? 'Organisation created' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('organisationStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        document.getElementById('collaboratorAddForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!requireAccessToken('collaboratorStatus')) return;
+            setStatus('collaboratorStatus', 'Sending…');
+            const form = event.currentTarget;
+            const organisationId = form.organisation_id.value.trim();
+            const payload = {
+                email: form.email.value.trim(),
+                role: form.role.value,
+                job_title: form.job_title.value.trim() || 'Collaborator',
+            };
+            try {
+                const response = await fetch(ENDPOINTS.collaborators(organisationId), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${tokens.access}`,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await handleResponse(response);
+                setStatus('collaboratorStatus', response.ok ? 'Collaborator added' : `Error ${response.status}`);
+                renderOutput(data);
+            } catch (error) {
+                setStatus('collaboratorStatus', 'Network error');
+                renderOutput({ error: error.message });
+            }
+        });
+
+        async function fetchSports() {
+            try {
+                const response = await fetch(ENDPOINTS.sports);
+                const data = await handleResponse(response);
+                if (!response.ok) {
+                    renderOutput(data);
+                    setStatus('athleteStatus', `Sports load failed (${response.status})`);
+                    return;
+                }
+                const select = document.getElementById('athleteSport');
+                select.innerHTML = '';
+                data.forEach((sport) => {
+                    const option = document.createElement('option');
+                    option.value = sport.id;
+                    option.textContent = `${sport.name} (${sport.discipline})`;
+                    select.appendChild(option);
+                });
+                if (!data.length) {
+                    const empty = document.createElement('option');
+                    empty.value = '';
+                    empty.textContent = 'No sports available';
+                    select.appendChild(empty);
+                }
+            } catch (error) {
+                setStatus('athleteStatus', 'Failed to load sports');
+                renderOutput({ error: error.message });
+            }
+        }
+
+        fetchSports();
+        updateTokenPreview();
+    </script>
+</body>
+</html>
