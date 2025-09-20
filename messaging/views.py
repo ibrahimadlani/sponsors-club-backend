@@ -199,6 +199,12 @@ class MessageReadView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if message.sender_id == request.user.id:
+            return Response(
+                {"detail": "Only the message recipient may update read status."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = MessageReadSerializer(message, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
