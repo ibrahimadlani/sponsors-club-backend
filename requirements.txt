@@ -20,3 +20,4 @@ pillow==11.3.0  # Image processing for ImageField support
 gunicorn==23.0.0  # Production WSGI server used by the Docker entrypoint
 PyYAML==6.0.2  # YAML parsing for configuration-driven utilities
 stripe==10.9.0  # Stripe Python SDK for subscription billing workflows
+python-dotenv==1.0.1  # Loads environment variables from .env files in local setups
