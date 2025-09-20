@@ -1,40 +1,33 @@
-"""View layer for contract management endpoints."""
+"""Views powering the contract management API."""
 
-from decimal import Decimal
+from __future__ import annotations
 
-from django.db import transaction
-from django.db.models import Q
+from django.db import models, transaction
+from django.db.models import Prefetch, Q
+from django.http import FileResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
 
 from organisations.models import Collaborator
 from users.models import AgentProfile
 
-from core.feature_matrix import COLLABORATOR_FEATURES
-from core.permissions import collaborator_meets_requirement, requirement_denied_payload
-
-from .models import (
-    ClauseTemplate,
-    Contract,
-    ContractClause,
-    ContractStatusHistory,
-    ContractVersion,
-)
+from .models import Contract, ContractClause, ContractRevision
 from .serializers import (
+    ContractClauseCreateSerializer,
     ContractClauseSerializer,
-    ContractClauseUpsertSerializer,
+    ContractClauseUpdateSerializer,
     ContractCreateSerializer,
+    ContractRevisionCreateSerializer,
+    ContractRevisionSerializer,
     ContractSerializer,
     ContractStatusUpdateSerializer,
-    ContractVersionSerializer,
 )
 
 
 class ContractPagination(PageNumberPagination):
-    """Default pagination for contract listings."""
+    """Pagination used for contract listings."""
 
     page_size = 20
     page_size_query_param = "page_size"
@@ -42,51 +35,49 @@ class ContractPagination(PageNumberPagination):
 
 
 class ContractsViewSet(viewsets.GenericViewSet):
-    """Expose contract CRUD operations and clause management endpoints."""
+    """Expose REST endpoints for contract management."""
 
     serializer_class = ContractSerializer
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = ContractPagination
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("status", "organisation", "athlete")
 
     def get_queryset(self):
-        """Return contracts accessible to the current user."""
-
         if getattr(self, "swagger_fake_view", False):  # pragma: no cover
             return Contract.objects.none()
 
         user = self.request.user
-        base_qs = Contract.objects.select_related(
-            "organisation",
-            "athlete__sport",
-            "created_by__user",
-        ).prefetch_related("clauses__template", "status_history")
+        clauses_qs = ContractClause.objects.select_related("template").order_by("position", "created_at")
+        revisions_qs = ContractRevision.objects.prefetch_related("clauses_changed__template")
+        queryset = (
+            Contract.objects.select_related(
+                "organisation",
+                "agent__user",
+                "initiated_by__user",
+            )
+            .prefetch_related(
+                Prefetch("clauses", queryset=clauses_qs),
+                Prefetch("revisions", queryset=revisions_qs),
+            )
+            .order_by("-created_at")
+        )
 
         if user.is_staff or user.is_superuser:
-            return base_qs
+            return queryset
 
         filters = Q()
         collaborator_org_ids = list(
-            Collaborator.objects.filter(user=user).values_list(
-                "organisation_id", flat=True
-            )
+            Collaborator.objects.filter(user=user).values_list("organisation_id", flat=True)
         )
         if collaborator_org_ids:
             filters |= Q(organisation_id__in=collaborator_org_ids)
-        try:
-            agent_profile = user.agent_profile
-        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
-            agent_profile = None
+        agent_profile = getattr(getattr(user, "agent_profile", None), "id", None)
         if agent_profile:
-            filters |= Q(athlete__agent=agent_profile)
+            filters |= Q(agent_id=agent_profile)
         if not filters:
-            return base_qs.none()
-        return base_qs.filter(filters)
+            return queryset.none()
+        return queryset.filter(filters).distinct()
 
-    def list(self, _request, *_args, **_kwargs):
-        """Return paginated contracts for the requesting user."""
-
+    def list(self, request, *_args, **_kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         serializer = ContractSerializer(page, many=True)
@@ -94,228 +85,216 @@ class ContractsViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create(self, request, *_args, **_kwargs):
-        """Create a new contract and snapshot its initial version."""
-
-        serializer = ContractCreateSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = ContractCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         contract = serializer.save()
-        self._create_version(contract)
         output = ContractSerializer(contract)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, _request, *_args, **_kwargs):
-        """Return a single contract instance."""
-
+    def retrieve(self, request, *_args, **_kwargs):
         contract = self.get_object()
         serializer = ContractSerializer(contract)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["patch"], url_path="status")
-    def update_status(self, request, *_args, **_kwargs):
-        """Update a contract's status while recording the change history."""
-
+    @action(detail=True, methods=["post"], url_path="clauses", url_name="add-clause")
+    @transaction.atomic
+    def add_clause(self, request, pk=None):
         contract = self.get_object()
-        if not self._user_is_owner(request.user, contract.organisation_id):
-            detail = "Only organisation owners can update contract status."
-            return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
+        collaborator = self._require_collaborator(request.user, contract)
+        if not collaborator:
+            return self._forbidden_response("Only collaborators may modify clauses.")
+        if contract.status not in {Contract.Status.DRAFT, Contract.Status.NEGOTIATION}:
+            return self._forbidden_response("Clauses can only be changed during draft or negotiation.")
 
-        requirement = COLLABORATOR_FEATURES["contract_management"]
-        if not collaborator_meets_requirement(request.user, requirement):
-            payload = requirement_denied_payload(
-                requirement,
-                "Upgrade required to access the contract workspace.",
-            )
-            return Response(payload, status=status.HTTP_403_FORBIDDEN)
+        serializer = ContractClauseCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        template = data.get("template")
+        position = data.get("position")
+        if position is None:
+            position = contract.clauses.aggregate(models.Max("position")).get("position__max") or -1
+            position += 1
+
+        clause = ContractClause.objects.create(
+            contract=contract,
+            template=template,
+            title=data["title"],
+            content=data["content"],
+            is_mandatory=template.is_mandatory if template else False,
+            is_modified=bool(template and data["content"] != template.content),
+            position=position,
+        )
+        output = ContractClauseSerializer(clause)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"clauses/(?P<clause_id>[^/.]+)",
+        url_name="update-clause",
+    )
+    @transaction.atomic
+    def update_clause(self, request, pk=None, clause_id: str | None = None):
+        contract = self.get_object()
+        collaborator = self._require_collaborator(request.user, contract)
+        if not collaborator:
+            return self._forbidden_response("Only collaborators may modify clauses.")
+        if contract.status not in {Contract.Status.DRAFT, Contract.Status.NEGOTIATION}:
+            return self._forbidden_response("Clauses can only be changed during draft or negotiation.")
+
+        clause = contract.clauses.filter(id=clause_id).first()
+        if not clause:
+            return Response({"detail": "Clause not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ContractClauseUpdateSerializer(clause, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated_clause: ContractClause = serializer.save()
+        if clause.template and (
+            updated_clause.title != clause.template.title
+            or updated_clause.content != clause.template.content
+        ):
+            updated_clause.is_modified = True
+        updated_clause.save(update_fields=["title", "content", "position", "is_modified", "updated_at"])
+        return Response(ContractClauseSerializer(updated_clause).data)
+
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path=r"clauses/(?P<clause_id>[^/.]+)",
+        url_name="delete-clause",
+    )
+    @transaction.atomic
+    def delete_clause(self, request, pk=None, clause_id: str | None = None):
+        contract = self.get_object()
+        collaborator = self._require_collaborator(request.user, contract)
+        if not collaborator:
+            return self._forbidden_response("Only collaborators may modify clauses.")
+        if contract.status not in {Contract.Status.DRAFT, Contract.Status.NEGOTIATION}:
+            return self._forbidden_response("Clauses can only be changed during draft or negotiation.")
+
+        clause = contract.clauses.filter(id=clause_id).first()
+        if not clause:
+            return Response({"detail": "Clause not found."}, status=status.HTTP_404_NOT_FOUND)
+        if clause.is_mandatory:
+            return self._forbidden_response("Mandatory clauses cannot be removed from the contract.")
+        clause.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get", "post"], url_path="revisions", url_name="revisions")
+    @transaction.atomic
+    def revisions(self, request, pk=None):
+        contract = self.get_object()
+        if request.method == "GET":
+            serializer = ContractRevisionSerializer(contract.revisions.all(), many=True)
+            return Response(serializer.data)
+
+        if not (
+            self._require_collaborator(request.user, contract)
+            or self._is_contract_agent(request.user, contract)
+        ):
+            return self._forbidden_response("Only collaborators or the assigned agent can propose revisions.")
+
+        serializer = ContractRevisionCreateSerializer(
+            data=request.data, context={"contract": contract}
+        )
+        serializer.is_valid(raise_exception=True)
+        clause_ids = serializer.validated_data.get("clause_ids", [])
+        comment = serializer.validated_data.get("comment", "")
+
+        revision = ContractRevision.objects.create(
+            contract=contract,
+            proposed_by=request.user,
+            comment=comment,
+        )
+        if clause_ids:
+            clauses = list(contract.clauses.filter(id__in=clause_ids))
+            revision.clauses_changed.set(clauses)
+        if contract.status == Contract.Status.DRAFT:
+            contract.status = Contract.Status.NEGOTIATION
+            contract.save(update_fields=["status", "updated_at"])
+        return Response(ContractRevisionSerializer(revision).data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"revisions/(?P<revision_id>[^/.]+)/accept",
+        url_name="accept-revision",
+    )
+    @transaction.atomic
+    def accept_revision(self, request, pk=None, revision_id: str | None = None):
+        contract = self.get_object()
+        collaborator = self._require_collaborator(request.user, contract)
+        if not collaborator:
+            return self._forbidden_response("Only collaborators may accept revisions.")
+        revision = contract.revisions.filter(id=revision_id).first()
+        if not revision:
+            return Response({"detail": "Revision not found."}, status=status.HTTP_404_NOT_FOUND)
+        revision.accepted = True
+        revision.save(update_fields=["accepted", "updated_at"])
+        return Response(ContractRevisionSerializer(revision).data)
+
+    @action(detail=True, methods=["patch"], url_path="status", url_name="update-status")
+    @transaction.atomic
+    def update_status(self, request, pk=None):
+        contract = self.get_object()
+        collaborator = self._require_collaborator(request.user, contract)
+        if not collaborator or collaborator.role != Collaborator.Role.OWNER:
+            return self._forbidden_response("Only organisation owners can change the contract status.")
 
         serializer = ContractStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         new_status = serializer.validated_data["status"]
-        reason = serializer.validated_data.get("reason", "")
-
         if not self._is_valid_transition(contract.status, new_status):
-            detail = (
-                f"Invalid status transition from {contract.status} to {new_status}."
-            )
+            detail = f"Invalid status transition from {contract.status} to {new_status}."
             return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
-
-        previous_status = contract.status
-        if previous_status == new_status:
-            return Response(ContractSerializer(contract).data)
-
-        contract.status = new_status
-        contract.save(update_fields=["status", "updated_at"])
-        ContractStatusHistory.objects.create(
-            contract=contract,
-            from_status=previous_status,
-            to_status=new_status,
-            changed_by=request.user,
-            reason=reason,
-        )
-        self._create_version(contract)
+        if contract.status != new_status:
+            contract.status = new_status
+            contract.save(update_fields=["status", "updated_at"])
         return Response(ContractSerializer(contract).data)
 
-    @action(detail=True, methods=["get"], url_path="versions")
-    def versions(self, _request, *_args, **_kwargs):
-        """Return the ordered list of contract versions."""
-
+    @action(detail=True, methods=["get"], url_path="export", url_name="export")
+    def export(self, request, pk=None):
         contract = self.get_object()
-        versions_qs = contract.versions.order_by("-version_number")
-        serializer = ContractVersionSerializer(versions_qs, many=True)
-        return Response(serializer.data)
+        if not (
+            self._require_collaborator(request.user, contract)
+            or self._is_contract_agent(request.user, contract)
+        ):
+            return self._forbidden_response("You do not have access to this contract export.")
+        try:
+            contract_file = contract.file
+        except Contract.file.RelatedObjectDoesNotExist:  # type: ignore[attr-defined]
+            return Response({"detail": "Contract file not available."}, status=status.HTTP_404_NOT_FOUND)
+        file_handle = contract_file.pdf.open("rb")
+        filename = contract_file.pdf.name.rsplit("/", maxsplit=1)[-1]
+        return FileResponse(file_handle, as_attachment=True, filename=filename)
 
-    @action(detail=True, methods=["post"], url_path="clauses")
-    @transaction.atomic
-    def upsert_clause(self, request, *_args, **_kwargs):
-        """Create or update a clause on the contract."""
-
-        contract = self.get_object()
-        if not self._user_is_owner(request.user, contract.organisation_id):
-            detail = "Only organisation owners can modify clauses."
-            return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
-
-        requirement = COLLABORATOR_FEATURES["contract_management"]
-        if not collaborator_meets_requirement(request.user, requirement):
-            payload = requirement_denied_payload(
-                requirement,
-                "Upgrade required to access the contract workspace.",
-            )
-            return Response(payload, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = ContractClauseUpsertSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        template_id = serializer.validated_data["template_id"]
-        order_index = serializer.validated_data.get("order_index", 0)
-        values = serializer.validated_data.get("values", {})
-
-        template = ClauseTemplate.objects.filter(id=template_id).first()
-        if not template:
-            detail = "Clause template not found."
-            return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
-
-        clause, created = ContractClause.objects.get_or_create(
-            contract=contract,
-            template=template,
-            order_index=order_index,
-            defaults={"values": values},
-        )
-        if not created:
-            clause.values = values
-            clause.save(update_fields=["values", "updated_at"])
-
-        self._create_version(contract)
-        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-        return Response(ContractClauseSerializer(clause).data, status=status_code)
-
-    @action(detail=True, methods=["post"], url_path="render")
-    def render_contract(self, _request, *_args, **_kwargs):
-        """Return the rendered contract text with placeholder substitution."""
-
-        contract = self.get_object()
-        payload = {
-            "contract_id": str(contract.id),
-            "rendered_text": self._render_contract_text(contract),
-        }
-        return Response(payload)
-
-    def _user_is_owner(self, user, organisation_id):
-        """Return True when the user owns the organisation or is superuser."""
-
-        is_owner = Collaborator.objects.filter(
+    def _require_collaborator(self, user, contract: Contract) -> Collaborator | None:
+        return Collaborator.objects.filter(
+            organisation=contract.organisation,
             user=user,
-            organisation_id=organisation_id,
-            role=Collaborator.Role.OWNER,
-        ).exists()
-        return is_owner or user.is_superuser
+        ).first()
 
-    def _is_valid_transition(self, current_status, new_status):
-        """Check whether the status transition is allowed by the workflow."""
+    def _is_contract_agent(self, user, contract: Contract) -> bool:
+        try:
+            return user.agent_profile == contract.agent
+        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
+            return False
 
-        workflow = {
-            Contract.Status.DRAFT: {
-                Contract.Status.AGREEMENT,
-                Contract.Status.VERIFICATION,
-            },
-            Contract.Status.AGREEMENT: {
-                Contract.Status.VERIFICATION,
-                Contract.Status.DRAFT,
-            },
-            Contract.Status.VERIFICATION: {
-                Contract.Status.ACTIVE,
-                Contract.Status.AGREEMENT,
-            },
-            Contract.Status.ACTIVE: {Contract.Status.TERMINATED},
-            Contract.Status.TERMINATED: set(),
-        }
-        allowed = workflow.get(current_status, set())
-        return new_status in allowed
+    def _forbidden_response(self, detail: str) -> Response:
+        return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
 
-    def _create_version(self, contract):
-        """Persist a snapshot of the current contract state."""
-
-        snapshot = self._build_snapshot(contract)
-        ContractVersion.objects.create(
-            contract=contract,
-            snapshot=snapshot,
-            version_number=0,
-        )
-
-    def _build_snapshot(self, contract):
-        """Return a dictionary representing the current contract state."""
-
-        contract.refresh_from_db()
-        clauses = contract.clauses.select_related("template").order_by("order_index")
-        amount = contract.amount
-        amount_value = str(amount) if isinstance(amount, Decimal) else amount
-        return {
-            "contract": {
-                "id": str(contract.id),
-                "organisation_id": str(contract.organisation_id),
-                "athlete_id": str(contract.athlete_id),
-                "status": contract.status,
-                "start_date": contract.start_date.isoformat()
-                if contract.start_date
-                else None,
-                "end_date": contract.end_date.isoformat()
-                if contract.end_date
-                else None,
-                "amount": amount_value,
-                "currency": contract.currency,
-                "updated_at": contract.updated_at.isoformat()
-                if contract.updated_at
-                else None,
-            },
-            "clauses": [
-                {
-                    "id": str(clause.id),
-                    "template_id": str(clause.template_id),
-                    "template_identifier": clause.template.identifier,
-                    "values": clause.values,
-                    "order_index": clause.order_index,
-                }
-                for clause in clauses
-            ],
-        }
-
-    def _render_contract_text(self, contract):
-        """Render contract text by substituting placeholder values."""
-
-        outputs = []
-        clauses = contract.clauses.select_related("template").order_by("order_index")
-        for clause in clauses:
-            template = clause.template
-            text = template.content
-            placeholders = set(template.placeholders or []) | set(
-                (clause.values or {}).keys()
-            )
-            for placeholder in placeholders:
-                default = f"[{placeholder}]"
-                value = (
-                    clause.values.get(placeholder, default)
-                    if clause.values
-                    else default
-                )
-                text = text.replace(f"[{placeholder}]", str(value))
-            outputs.append(text.strip())
-        return "\n\n".join(filter(None, outputs))
+    def _is_valid_transition(self, current_status: str, new_status: str) -> bool:
+        if current_status == new_status:
+            return True
+        flow = [
+            Contract.Status.DRAFT,
+            Contract.Status.NEGOTIATION,
+            Contract.Status.AGREEMENT,
+            Contract.Status.ACTIVE,
+            Contract.Status.TERMINATED,
+        ]
+        try:
+            current_index = flow.index(current_status)
+            new_index = flow.index(new_status)
+        except ValueError:
+            return False
+        return new_index == current_index + 1
