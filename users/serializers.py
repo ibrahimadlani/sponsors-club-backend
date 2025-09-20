@@ -1,6 +1,5 @@
 """Serializers supporting the users API endpoints."""
 
-
 from django.db import transaction
 from rest_framework import serializers
 
@@ -15,26 +14,26 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'id',
-            'email',
-            'first_name',
-            'last_name',
-            'phone_number',
-            'date_of_birth',
-            'email_verified',
-            'account_type',
-            'is_active',
-            'is_staff',
-            'created_at',
-            'updated_at',
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "date_of_birth",
+            "email_verified",
+            "account_type",
+            "is_active",
+            "is_staff",
+            "created_at",
+            "updated_at",
         )
         read_only_fields = (
-            'id',
-            'account_type',
-            'is_active',
-            'is_staff',
-            'created_at',
-            'updated_at',
+            "id",
+            "account_type",
+            "is_active",
+            "is_staff",
+            "created_at",
+            "updated_at",
         )
 
 
@@ -61,40 +60,42 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'id',
-            'email',
-            'password',
-            'account_type',
-            'display_name',
-            'first_name',
-            'last_name',
-            'phone_number',
-            'date_of_birth',
-            'organisation_name',
-            'job_title',
+            "id",
+            "email",
+            "password",
+            "account_type",
+            "display_name",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "date_of_birth",
+            "organisation_name",
+            "job_title",
         )
-        read_only_fields = ('id',)
+        read_only_fields = ("id",)
 
     def validate(self, attrs):
         """Ensure required companion fields are provided per account type."""
-        account_type = attrs.get('account_type', User.AccountType.AGENT)
-        display_name = attrs.get('display_name')
+        account_type = attrs.get("account_type", User.AccountType.AGENT)
+        display_name = attrs.get("display_name")
         if account_type == User.AccountType.AGENT and not display_name:
             raise serializers.ValidationError(
-                {'display_name': 'This field is required for agent accounts.'}
+                {"display_name": "This field is required for agent accounts."}
             )
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         """Create a user and any related agent or collaborator records."""
-        display_name = validated_data.pop('display_name', None)
-        validated_data.pop('organisation_name', None)
-        validated_data.pop('job_title', None)
-        password = validated_data.pop('password')
+        display_name = validated_data.pop("display_name", None)
+        validated_data.pop("organisation_name", None)
+        validated_data.pop("job_title", None)
+        password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:
-            default_display_name = f"{user.first_name} {user.last_name}".strip() or user.email
+            default_display_name = (
+                f"{user.first_name} {user.last_name}".strip() or user.email
+            )
             AgentProfile.objects.create(
                 user=user,
                 display_name=display_name or default_display_name,
@@ -114,23 +115,23 @@ class MeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'email',
-            'first_name',
-            'last_name',
-            'phone_number',
-            'date_of_birth',
-            'display_name',
+            "email",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "date_of_birth",
+            "display_name",
         )
 
     def update(self, instance, validated_data):
         """Update the user object and related agent profile when needed."""
-        display_name = validated_data.pop('display_name', None)
+        display_name = validated_data.pop("display_name", None)
         update_fields = []
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
             update_fields.append(attr)
         if update_fields:
-            update_fields.append('updated_at')
+            update_fields.append("updated_at")
             instance.save(update_fields=update_fields)
         else:
             instance.save()
@@ -140,7 +141,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
                 user=instance,
             )
             agent_profile.display_name = display_name
-            agent_profile.save(update_fields=['display_name'])
+            agent_profile.save(update_fields=["display_name"])
 
         return instance
 
@@ -153,9 +154,9 @@ class MeUpdateSerializer(serializers.ModelSerializer):
             except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
                 agent_profile = None
             if agent_profile is not None:
-                data['agent_profile'] = {
-                    'id': str(agent_profile.id),
-                    'display_name': agent_profile.display_name,
+                data["agent_profile"] = {
+                    "id": str(agent_profile.id),
+                    "display_name": agent_profile.display_name,
                 }
         return data
 
@@ -169,11 +170,11 @@ class RolesSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         """Disallow creation via this read-only serializer."""
-        raise NotImplementedError('RolesSerializer is read-only.')
+        raise NotImplementedError("RolesSerializer is read-only.")
 
     def update(self, instance, validated_data):
         """Disallow updates via this read-only serializer."""
-        raise NotImplementedError('RolesSerializer is read-only.')
+        raise NotImplementedError("RolesSerializer is read-only.")
 
 
 class RolesDataBuilder:
@@ -192,24 +193,24 @@ class RolesDataBuilder:
             agent_profile = None
         if agent_profile is not None:
             agent_info = {
-                'id': str(agent_profile.id),
-                'display_name': agent_profile.display_name,
+                "id": str(agent_profile.id),
+                "display_name": agent_profile.display_name,
             }
 
         collaborations = [
             {
-                'id': str(collaboration.id),
-                'organisation_id': str(collaboration.organisation_id),
-                'organisation_name': collaboration.organisation.name,
-                'role': collaboration.role,
+                "id": str(collaboration.id),
+                "organisation_id": str(collaboration.organisation_id),
+                "organisation_name": collaboration.organisation.name,
+                "role": collaboration.role,
             }
             for collaboration in Collaborator.objects.filter(
                 user=self.user
-            ).select_related('organisation')
+            ).select_related("organisation")
         ]
 
         return {
-            'is_agent': agent_info is not None,
-            'agent_profile': agent_info,
-            'collaborations': collaborations,
+            "is_agent": agent_info is not None,
+            "agent_profile": agent_info,
+            "collaborations": collaborations,
         }

@@ -13,7 +13,6 @@ from users.models import AgentProfile
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -27,23 +26,22 @@ class BaseModel(models.Model):
 class Thread(BaseModel):
     """Two-way conversation between a collaborator and an agent, optionally about an athlete."""
 
-
     collaborator = models.ForeignKey(
         Collaborator,
         on_delete=models.CASCADE,
-        related_name='threads',
+        related_name="threads",
     )
     agent = models.ForeignKey(
         AgentProfile,
         on_delete=models.CASCADE,
-        related_name='threads',
+        related_name="threads",
     )
     athlete = models.ForeignKey(
         Athlete,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name='threads',
+        related_name="threads",
     )
     last_message_at = models.DateTimeField(blank=True, null=True)
 
@@ -52,14 +50,16 @@ class Thread(BaseModel):
 
         constraints = [
             models.UniqueConstraint(
-                fields=('collaborator', 'agent', 'athlete'),
-                name='unique_thread_collaborator_agent_athlete',
+                fields=("collaborator", "agent", "athlete"),
+                name="unique_thread_collaborator_agent_athlete",
             ),
         ]
         indexes = [
-            models.Index(fields=('collaborator',), name='thread_collaborator_idx'),
-            models.Index(fields=('agent',), name='thread_agent_idx'),
-            models.Index(fields=('-last_message_at',), name='thread_last_message_desc_idx'),
+            models.Index(fields=("collaborator",), name="thread_collaborator_idx"),
+            models.Index(fields=("agent",), name="thread_agent_idx"),
+            models.Index(
+                fields=("-last_message_at",), name="thread_last_message_desc_idx"
+            ),
         ]
 
     def __str__(self):
@@ -72,20 +72,19 @@ class Thread(BaseModel):
 class Message(BaseModel):
     """Individual message sent within a thread."""
 
-
     thread = models.ForeignKey(
         Thread,
         on_delete=models.CASCADE,
-        related_name='messages',
+        related_name="messages",
     )
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='sent_messages',
+        related_name="sent_messages",
     )
     content = models.TextField()
     attachment = models.FileField(
-        upload_to='message_attachments/',
+        upload_to="message_attachments/",
         blank=True,
         null=True,
     )
@@ -95,10 +94,12 @@ class Message(BaseModel):
         """Django model configuration metadata."""
 
         indexes = [
-            models.Index(fields=('thread', 'created_at'), name='message_thread_created_idx'),
-            models.Index(fields=('is_read',), name='message_is_read_idx'),
+            models.Index(
+                fields=("thread", "created_at"), name="message_thread_created_idx"
+            ),
+            models.Index(fields=("is_read",), name="message_is_read_idx"),
         ]
-        ordering = ('created_at',)
+        ordering = ("created_at",)
 
     def __str__(self):
         return f"Message from {self.sender} in {self.thread}"

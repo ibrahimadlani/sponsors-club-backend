@@ -1,6 +1,5 @@
 """Custom permission classes for the follows API."""
 
-
 from rest_framework import permissions
 
 from organisations.models import Collaborator

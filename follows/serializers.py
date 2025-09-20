@@ -10,7 +10,6 @@ from .models import Follow
 class FollowSerializer(serializers.ModelSerializer):
     """Serialize the follower relationship along with athlete details."""
 
-
     athlete = AthletePublicSerializer(read_only=True)
 
     class Meta:
@@ -18,11 +17,11 @@ class FollowSerializer(serializers.ModelSerializer):
 
         model = Follow
         fields = (
-            'id',
-            'athlete',
-            'notify_news',
-            'notify_stats',
-            'notify_contracts',
-            'created_at',
+            "id",
+            "athlete",
+            "notify_news",
+            "notify_stats",
+            "notify_contracts",
+            "created_at",
         )
         read_only_fields = fields

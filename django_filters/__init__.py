@@ -2,4 +2,4 @@
 
 from . import rest_framework
 
-__all__ = ['rest_framework']
+__all__ = ["rest_framework"]

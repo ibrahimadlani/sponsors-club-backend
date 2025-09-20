@@ -1,7 +1,6 @@
 """Minimal stub implementation for Django REST Framework integration."""
 
 
-
 class DjangoFilterBackend:
     """No-op backend to satisfy DRF integration during tests."""
 

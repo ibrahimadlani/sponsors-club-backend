@@ -7,7 +7,6 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -16,36 +15,88 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Organisation',
+            name="Organisation",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('name', models.CharField(max_length=255)),
-                ('sector', models.CharField(max_length=255)),
-                ('size', models.CharField(choices=[('SMALL', 'Small'), ('MEDIUM', 'Medium'), ('LARGE', 'Large'), ('ENTERPRISE', 'Enterprise')], max_length=20)),
-                ('budget_min', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('budget_max', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('logo', models.ImageField(blank=True, null=True, upload_to='organisation_logos/')),
-                ('country', models.CharField(max_length=100)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("name", models.CharField(max_length=255)),
+                ("sector", models.CharField(max_length=255)),
+                (
+                    "size",
+                    models.CharField(
+                        choices=[
+                            ("SMALL", "Small"),
+                            ("MEDIUM", "Medium"),
+                            ("LARGE", "Large"),
+                            ("ENTERPRISE", "Enterprise"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("budget_min", models.DecimalField(decimal_places=2, max_digits=12)),
+                ("budget_max", models.DecimalField(decimal_places=2, max_digits=12)),
+                (
+                    "logo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="organisation_logos/"
+                    ),
+                ),
+                ("country", models.CharField(max_length=100)),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Collaborator',
+            name="Collaborator",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('role', models.CharField(choices=[('OWNER', 'Owner'), ('MEMBER', 'Member')], max_length=10)),
-                ('job_title', models.CharField(max_length=255)),
-                ('organisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='collaborators', to='organisations.organisation')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='collaborations', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[("OWNER", "Owner"), ("MEMBER", "Member")],
+                        max_length=10,
+                    ),
+                ),
+                ("job_title", models.CharField(max_length=255)),
+                (
+                    "organisation",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="collaborators",
+                        to="organisations.organisation",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="collaborations",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('user', 'organisation')},
+                "unique_together": {("user", "organisation")},
             },
         ),
     ]

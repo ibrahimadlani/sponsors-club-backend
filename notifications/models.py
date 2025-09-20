@@ -9,7 +9,6 @@ from django.db import models
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -23,20 +22,19 @@ class BaseModel(models.Model):
 class Notification(BaseModel):
     """Notification entry targeting a user."""
 
-
     class Type(models.TextChoices):
         """Supported notification categories."""
 
-        NEW_MESSAGE = 'NEW_MESSAGE', 'New Message'
-        CONTRACT_STATUS = 'CONTRACT_STATUS', 'Contract Status'
-        NEW_FOLLOW = 'NEW_FOLLOW', 'New Follow'
-        STAT_UPDATE = 'STAT_UPDATE', 'Stat Update'
-        PAYMENT = 'PAYMENT', 'Payment'
+        NEW_MESSAGE = "NEW_MESSAGE", "New Message"
+        CONTRACT_STATUS = "CONTRACT_STATUS", "Contract Status"
+        NEW_FOLLOW = "NEW_FOLLOW", "New Follow"
+        STAT_UPDATE = "STAT_UPDATE", "Stat Update"
+        PAYMENT = "PAYMENT", "Payment"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='notifications',
+        related_name="notifications",
     )
     type = models.CharField(max_length=32, choices=Type.choices)
     payload = models.JSONField(default=dict, blank=True)
@@ -47,10 +45,10 @@ class Notification(BaseModel):
 
         indexes = [
             models.Index(
-                fields=('user', 'is_read', '-created_at'),
+                fields=("user", "is_read", "-created_at"),
             ),
         ]
-        ordering = ('-created_at',)
+        ordering = ("-created_at",)
 
     def __str__(self):
         return f"Notification({self.type}) for {self.user}"

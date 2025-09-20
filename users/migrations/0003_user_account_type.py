@@ -5,15 +5,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0002_delete_collaborator_delete_organisation'),
+        ("users", "0002_delete_collaborator_delete_organisation"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='account_type',
-            field=models.CharField(choices=[('AGENT', 'Agent'), ('ORGANISATION', 'Organisation')], default='AGENT', max_length=20, verbose_name='account type'),
+            model_name="user",
+            name="account_type",
+            field=models.CharField(
+                choices=[("AGENT", "Agent"), ("ORGANISATION", "Organisation")],
+                default="AGENT",
+                max_length=20,
+                verbose_name="account type",
+            ),
         ),
     ]

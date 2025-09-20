@@ -1,6 +1,5 @@
 """Views providing messaging thread and message APIs."""
 
-
 from django.db.models import Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
@@ -24,14 +23,14 @@ from .serializers import (
 )
 
 
-MESSAGING_INITIATE_REQUIREMENT = AGENT_FEATURES['messaging_initiate']
+MESSAGING_INITIATE_REQUIREMENT = AGENT_FEATURES["messaging_initiate"]
 
 
 class ThreadPagination(PageNumberPagination):
     """Pagination configuration for thread listings."""
 
     page_size = 20
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 100
 
 
@@ -48,13 +47,13 @@ class ThreadViewSet(viewsets.GenericViewSet):
         user = self.request.user
         return (
             Thread.objects.select_related(
-                'collaborator__organisation',
-                'collaborator__user',
-                'agent__user',
-                'athlete__sport',
+                "collaborator__organisation",
+                "collaborator__user",
+                "agent__user",
+                "athlete__sport",
             )
             .filter(Q(collaborator__user=user) | Q(agent__user=user))
-            .order_by('-last_message_at', '-created_at')
+            .order_by("-last_message_at", "-created_at")
         )
 
     def list(self, request, *args, **kwargs):
@@ -74,12 +73,12 @@ class ThreadViewSet(viewsets.GenericViewSet):
 
         serializer = ThreadCreateSerializer(
             data=request.data,
-            context={'request': request},
+            context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
-        agent = validated['agent']
-        collaborator = validated['collaborator']
+        agent = validated["agent"]
+        collaborator = validated["collaborator"]
         user = request.user
 
         agent_profile = get_agent_profile(user)
@@ -87,12 +86,12 @@ class ThreadViewSet(viewsets.GenericViewSet):
             if not agent_meets_requirement(user, MESSAGING_INITIATE_REQUIREMENT):
                 payload = requirement_denied_payload(
                     MESSAGING_INITIATE_REQUIREMENT,
-                    'Permission denied.',
+                    "Permission denied.",
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
         elif collaborator.user_id != user.id and not request.user.is_staff:
             return Response(
-                {'detail': 'Permission denied.'},
+                {"detail": "Permission denied."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         thread = serializer.save()
@@ -104,7 +103,7 @@ class ThreadMessagesPagination(PageNumberPagination):
     """Pagination configuration for thread message listings."""
 
     page_size = 50
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 200
 
 
@@ -119,13 +118,15 @@ class ThreadMessagesView(APIView):
 
         thread = (
             Thread.objects.select_related(
-                'collaborator__user',
-                'agent__user',
+                "collaborator__user",
+                "agent__user",
             )
             .filter(id=thread_id)
             .first()
         )
-        if thread and IsThreadParticipant().has_object_permission(request, self, thread):
+        if thread and IsThreadParticipant().has_object_permission(
+            request, self, thread
+        ):
             return thread
         return None
 
@@ -135,14 +136,14 @@ class ThreadMessagesView(APIView):
         thread = self.get_thread(request, thread_id)
         if not thread:
             return Response(
-                {'detail': 'Thread not found or access denied.'},
+                {"detail": "Thread not found or access denied."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         messages = (
             Message.objects.filter(thread=thread)
-            .select_related('sender')
-            .order_by('created_at')
+            .select_related("sender")
+            .order_by("created_at")
         )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(messages, request, view=self)
@@ -155,13 +156,13 @@ class ThreadMessagesView(APIView):
         thread = self.get_thread(request, thread_id)
         if not thread:
             return Response(
-                {'detail': 'Thread not found or access denied.'},
+                {"detail": "Thread not found or access denied."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         serializer = MessageCreateSerializer(
             data=request.data,
-            context={'request': request, 'thread': thread},
+            context={"request": request, "thread": thread},
         )
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
@@ -181,20 +182,20 @@ class MessageReadView(APIView):
 
         message = (
             Message.objects.select_related(
-                'thread__collaborator__user',
-                'thread__agent__user',
+                "thread__collaborator__user",
+                "thread__agent__user",
             )
             .filter(id=message_id)
             .first()
         )
         if not message:
             return Response(
-                {'detail': 'Message not found.'},
+                {"detail": "Message not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         if not IsThreadParticipant().has_object_permission(request, self, message):
             return Response(
-                {'detail': 'Access denied.'},
+                {"detail": "Access denied."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 

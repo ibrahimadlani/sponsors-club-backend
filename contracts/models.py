@@ -1,6 +1,5 @@
 """Data models for contract templates, drafts, and history tracking."""
 
-
 import uuid
 
 from django.conf import settings
@@ -26,17 +25,17 @@ class ClauseTemplate(BaseModel):
     """Reusable clause template supporting tokenised content and versioning."""
 
     class ClauseType(models.TextChoices):
-        OBLIGATION = 'obligation', 'Obligation'
-        CONDITION = 'condition', 'Condition'
-        PAIEMENT = 'paiement', 'Paiement'
-        DUREE = 'duree', 'Durée'
-        LEGAL = 'legal', 'Légal'
+        OBLIGATION = "obligation", "Obligation"
+        CONDITION = "condition", "Condition"
+        PAIEMENT = "paiement", "Paiement"
+        DUREE = "duree", "Durée"
+        LEGAL = "legal", "Légal"
 
     identifier = models.CharField(max_length=100, unique=True)
     title = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=ClauseType.choices)
     content = models.TextField(
-        help_text='Content supporting placeholder tokens like [key].',
+        help_text="Content supporting placeholder tokens like [key].",
     )
     placeholders = models.JSONField(default=list, blank=True)
     mandatory = models.BooleanField(default=False)
@@ -44,7 +43,7 @@ class ClauseTemplate(BaseModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ('identifier', 'version')
+        ordering = ("identifier", "version")
 
     def __str__(self):
         return f"{self.identifier} v{self.version}"
@@ -54,26 +53,26 @@ class Contract(BaseModel):
     """Represents a contract between an organisation and an athlete."""
 
     class Status(models.TextChoices):
-        DRAFT = 'DRAFT', 'Draft'
-        AGREEMENT = 'AGREEMENT', 'Agreement'
-        VERIFICATION = 'VERIFICATION', 'Verification'
-        ACTIVE = 'ACTIVE', 'Active'
-        TERMINATED = 'TERMINATED', 'Terminated'
+        DRAFT = "DRAFT", "Draft"
+        AGREEMENT = "AGREEMENT", "Agreement"
+        VERIFICATION = "VERIFICATION", "Verification"
+        ACTIVE = "ACTIVE", "Active"
+        TERMINATED = "TERMINATED", "Terminated"
 
     organisation = models.ForeignKey(
         Organisation,
         on_delete=models.CASCADE,
-        related_name='contracts',
+        related_name="contracts",
     )
     athlete = models.ForeignKey(
         Athlete,
         on_delete=models.CASCADE,
-        related_name='contracts',
+        related_name="contracts",
     )
     created_by = models.ForeignKey(
         Collaborator,
         on_delete=models.CASCADE,
-        related_name='created_contracts',
+        related_name="created_contracts",
     )
     status = models.CharField(
         max_length=20,
@@ -83,18 +82,18 @@ class Contract(BaseModel):
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    currency = models.CharField(max_length=10, default='EUR')
+    currency = models.CharField(max_length=10, default="EUR")
 
     class Meta:
         indexes = [
             models.Index(
-                fields=('organisation', 'status'),
-                name='contract_org_status_idx',
+                fields=("organisation", "status"),
+                name="contract_org_status_idx",
             ),
-            models.Index(fields=('athlete',), name='contract_athlete_idx'),
-            models.Index(fields=('start_date',), name='contract_start_idx'),
+            models.Index(fields=("athlete",), name="contract_athlete_idx"),
+            models.Index(fields=("start_date",), name="contract_start_idx"),
         ]
-        ordering = ('-created_at',)
+        ordering = ("-created_at",)
 
     def __str__(self):
         return f"Contract {self.organisation} ↔ {self.athlete} ({self.status})"
@@ -106,12 +105,12 @@ class ContractClause(BaseModel):
     contract = models.ForeignKey(
         Contract,
         on_delete=models.CASCADE,
-        related_name='clauses',
+        related_name="clauses",
     )
     template = models.ForeignKey(
         ClauseTemplate,
         on_delete=models.PROTECT,
-        related_name='contract_clauses',
+        related_name="contract_clauses",
     )
     values = models.JSONField(default=dict, blank=True)
     order_index = models.PositiveIntegerField()
@@ -119,11 +118,11 @@ class ContractClause(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=('contract', 'template', 'order_index'),
-                name='unique_contract_clause_order',
+                fields=("contract", "template", "order_index"),
+                name="unique_contract_clause_order",
             ),
         ]
-        ordering = ('contract', 'order_index')
+        ordering = ("contract", "order_index")
 
     def __str__(self):
         return f"Clause {self.template.identifier} for {self.contract}"
@@ -135,7 +134,7 @@ class ContractVersion(BaseModel):
     contract = models.ForeignKey(
         Contract,
         on_delete=models.CASCADE,
-        related_name='versions',
+        related_name="versions",
     )
     version_number = models.PositiveIntegerField()
     snapshot = models.JSONField(default=dict)
@@ -143,11 +142,11 @@ class ContractVersion(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=('contract', 'version_number'),
-                name='unique_contract_version_number',
+                fields=("contract", "version_number"),
+                name="unique_contract_version_number",
             ),
         ]
-        ordering = ('contract', '-version_number')
+        ordering = ("contract", "-version_number")
 
     def __str__(self):
         return f"{self.contract} v{self.version_number}"
@@ -155,9 +154,10 @@ class ContractVersion(BaseModel):
     def save(self, *args, **kwargs):
         if self.pk is None and not self.version_number:
             last_version = (
-                type(self).objects.filter(contract=self.contract)
-                .aggregate(max_version=Max('version_number'))
-                .get('max_version')
+                type(self)
+                .objects.filter(contract=self.contract)
+                .aggregate(max_version=Max("version_number"))
+                .get("max_version")
             )
             self.version_number = (last_version or 0) + 1
         super().save(*args, **kwargs)
@@ -169,7 +169,7 @@ class ContractStatusHistory(BaseModel):
     contract = models.ForeignKey(
         Contract,
         on_delete=models.CASCADE,
-        related_name='status_history',
+        related_name="status_history",
     )
     from_status = models.CharField(
         max_length=20,
@@ -183,16 +183,16 @@ class ContractStatusHistory(BaseModel):
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name='contract_status_changes',
+        related_name="contract_status_changes",
     )
     changed_at = models.DateTimeField(auto_now_add=True)
     reason = models.TextField(blank=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=('contract', 'changed_at')),
+            models.Index(fields=("contract", "changed_at")),
         ]
-        ordering = ('-changed_at',)
+        ordering = ("-changed_at",)
 
     def __str__(self):
         return f"{self.contract} {self.from_status} -> {self.to_status}"

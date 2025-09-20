@@ -1,6 +1,5 @@
 """Views for interacting with follow relationships."""
 
-
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -28,10 +27,9 @@ class AthleteFollowView(APIView):
     def _get_collaborator(self, request):
         """Return the collaborator referenced in the request payload or query params."""
 
-        collaborator_id = (
-            request.data.get('collaborator_id')
-            or request.query_params.get('collaborator_id')
-        )
+        collaborator_id = request.data.get(
+            "collaborator_id"
+        ) or request.query_params.get("collaborator_id")
         queryset = Collaborator.objects.filter(user=request.user)
         if collaborator_id:
             return get_object_or_404(queryset, id=collaborator_id)
@@ -48,18 +46,18 @@ class AthleteFollowView(APIView):
             request.user,
             collaborator.organisation,
         )
-        max_follows = features.get('max_follows')
+        max_follows = features.get("max_follows")
         try:
             max_follows = int(max_follows)
         except (TypeError, ValueError):
             max_follows = 0
 
-        requirement, granted = user_feature_requirement(request.user, 'follow_slots')
-        requirement = requirement or COLLABORATOR_FEATURES['follow_slots']
+        requirement, granted = user_feature_requirement(request.user, "follow_slots")
+        requirement = requirement or COLLABORATOR_FEATURES["follow_slots"]
         if not granted and max_follows <= 0:
             payload = requirement_denied_payload(
                 requirement,
-                'Follow limit reached. Upgrade your organisation plan to track more athletes.',
+                "Follow limit reached. Upgrade your organisation plan to track more athletes.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
@@ -70,7 +68,7 @@ class AthleteFollowView(APIView):
             if current_count >= max_follows:
                 payload = requirement_denied_payload(
                     requirement,
-                    'Follow limit reached. Upgrade your organisation plan to track more athletes.',
+                    "Follow limit reached. Upgrade your organisation plan to track more athletes.",
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
@@ -83,7 +81,7 @@ class AthleteFollowView(APIView):
             collaborator = self._get_collaborator(request)
         except Collaborator.DoesNotExist:
             return Response(
-                {'detail': 'Collaborator membership required.'},
+                {"detail": "Collaborator membership required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -107,7 +105,7 @@ class AthleteFollowView(APIView):
             collaborator = self._get_collaborator(request)
         except Collaborator.DoesNotExist:
             return Response(
-                {'detail': 'Collaborator membership required.'},
+                {"detail": "Collaborator membership required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -119,7 +117,7 @@ class AthleteFollowView(APIView):
         if deleted_count:
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(
-            {'detail': 'Follow relationship not found.'},
+            {"detail": "Follow relationship not found."},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -132,13 +130,11 @@ class MyFollowsView(APIView):
     def get(self, request, *_args, **_kwargs):
         """Return serialized follow records for the requesting user."""
 
-        collaborator_ids = (
-            Collaborator.objects.filter(user=request.user)
-            .values_list('id', flat=True)
+        collaborator_ids = Collaborator.objects.filter(user=request.user).values_list(
+            "id", flat=True
         )
-        follows = (
-            Follow.objects.filter(collaborator_id__in=collaborator_ids)
-            .select_related('athlete__sport')
-        )
+        follows = Follow.objects.filter(
+            collaborator_id__in=collaborator_ids
+        ).select_related("athlete__sport")
         serializer = FollowSerializer(follows, many=True)
         return Response(serializer.data)

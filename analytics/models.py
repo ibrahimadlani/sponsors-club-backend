@@ -1,6 +1,5 @@
 """Analytics data models for athlete statistics."""
 
-
 import uuid
 
 from django.db import models
@@ -23,15 +22,15 @@ class AthleteStat(BaseModel):
     """Time-series metric captured for an athlete."""
 
     class Metric(models.TextChoices):
-        FOLLOWERS = 'followers', 'Followers'
-        ENGAGEMENT = 'engagement', 'Engagement'
-        RANK = 'rank', 'Rank'
-        CUSTOM = 'custom', 'Custom'
+        FOLLOWERS = "followers", "Followers"
+        ENGAGEMENT = "engagement", "Engagement"
+        RANK = "rank", "Rank"
+        CUSTOM = "custom", "Custom"
 
     athlete = models.ForeignKey(
         Athlete,
         on_delete=models.CASCADE,
-        related_name='stats',
+        related_name="stats",
     )
     metric = models.CharField(max_length=32, choices=Metric.choices)
     value = models.DecimalField(max_digits=12, decimal_places=2)
@@ -41,21 +40,21 @@ class AthleteStat(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=('athlete', 'metric', 'date'),
-                name='unique_athletestat_per_day',
+                fields=("athlete", "metric", "date"),
+                name="unique_athletestat_per_day",
             ),
         ]
         indexes = [
             models.Index(
-                fields=('metric', 'date'),
-                name='athstat_metric_date_idx',
+                fields=("metric", "date"),
+                name="athstat_metric_date_idx",
             ),
             models.Index(
-                fields=('athlete', 'metric', 'date'),
-                name='athstat_ath_metric_date_idx',
+                fields=("athlete", "metric", "date"),
+                name="athstat_ath_metric_date_idx",
             ),
         ]
-        ordering = ('athlete', 'metric', '-date')
+        ordering = ("athlete", "metric", "-date")
 
     def __str__(self):
         return f"{self.athlete} {self.metric} on {self.date}: {self.value}"

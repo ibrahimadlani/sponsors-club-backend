@@ -5,49 +5,61 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0004_update_account_type_to_collaborator'),
+        ("users", "0004_update_account_type_to_collaborator"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='user',
-            name='username',
+            model_name="user",
+            name="username",
         ),
         migrations.AddField(
-            model_name='user',
-            name='date_of_birth',
-            field=models.DateField(blank=True, null=True, verbose_name='date of birth'),
+            model_name="user",
+            name="date_of_birth",
+            field=models.DateField(blank=True, null=True, verbose_name="date of birth"),
         ),
         migrations.AddField(
-            model_name='user',
-            name='email_verified',
-            field=models.BooleanField(default=False, verbose_name='email verified'),
+            model_name="user",
+            name="email_verified",
+            field=models.BooleanField(default=False, verbose_name="email verified"),
         ),
         migrations.AddField(
-            model_name='user',
-            name='first_name',
-            field=models.CharField(blank=True, max_length=150, verbose_name='first name'),
+            model_name="user",
+            name="first_name",
+            field=models.CharField(
+                blank=True, max_length=150, verbose_name="first name"
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='last_name',
-            field=models.CharField(blank=True, max_length=150, verbose_name='last name'),
+            model_name="user",
+            name="last_name",
+            field=models.CharField(
+                blank=True, max_length=150, verbose_name="last name"
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='phone_number',
-            field=models.CharField(blank=True, max_length=32, verbose_name='phone number'),
+            model_name="user",
+            name="phone_number",
+            field=models.CharField(
+                blank=True, max_length=32, verbose_name="phone number"
+            ),
         ),
         migrations.AlterField(
-            model_name='user',
-            name='account_type',
-            field=models.CharField(choices=[('AGENT', 'Agent'), ('COLLABORATOR', 'Collaborator')], default='AGENT', max_length=20, verbose_name='account type'),
+            model_name="user",
+            name="account_type",
+            field=models.CharField(
+                choices=[("AGENT", "Agent"), ("COLLABORATOR", "Collaborator")],
+                default="AGENT",
+                max_length=20,
+                verbose_name="account type",
+            ),
         ),
         migrations.AlterField(
-            model_name='user',
-            name='email',
-            field=models.EmailField(max_length=254, unique=True, verbose_name='email address'),
+            model_name="user",
+            name="email",
+            field=models.EmailField(
+                max_length=254, unique=True, verbose_name="email address"
+            ),
         ),
     ]

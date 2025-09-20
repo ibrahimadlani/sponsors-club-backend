@@ -4,27 +4,30 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('analytics', '0001_initial'),
+        ("analytics", "0001_initial"),
     ]
 
     operations = [
         migrations.RenameIndex(
-            model_name='athletestat',
-            new_name='athstat_metric_date_idx',
-            old_name='analytics_a_metric_38ed28_idx',
+            model_name="athletestat",
+            new_name="athstat_metric_date_idx",
+            old_name="analytics_a_metric_38ed28_idx",
         ),
         migrations.AlterUniqueTogether(
-            name='athletestat',
+            name="athletestat",
             unique_together=set(),
         ),
         migrations.AddIndex(
-            model_name='athletestat',
-            index=models.Index(fields=['athlete', 'metric', 'date'], name='athstat_ath_metric_date_idx'),
+            model_name="athletestat",
+            index=models.Index(
+                fields=["athlete", "metric", "date"], name="athstat_ath_metric_date_idx"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='athletestat',
-            constraint=models.UniqueConstraint(fields=('athlete', 'metric', 'date'), name='unique_athletestat_per_day'),
+            model_name="athletestat",
+            constraint=models.UniqueConstraint(
+                fields=("athlete", "metric", "date"), name="unique_athletestat_per_day"
+            ),
         ),
     ]

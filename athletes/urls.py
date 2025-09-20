@@ -6,9 +6,9 @@ from rest_framework.routers import DefaultRouter
 from .views import AthleteViewSet, SportListView
 
 router = DefaultRouter()
-router.register(r'athletes', AthleteViewSet, basename='athlete')
+router.register(r"athletes", AthleteViewSet, basename="athlete")
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('sports/', SportListView.as_view(), name='sports-list'),
+    path("", include(router.urls)),
+    path("sports/", SportListView.as_view(), name="sports-list"),
 ]

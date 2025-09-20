@@ -1,6 +1,5 @@
 """Views powering the payments API."""
 
-
 import logging
 from datetime import datetime
 
@@ -37,7 +36,7 @@ class PlanListView(APIView):
     def get(self, request, *args, **kwargs):
         """Return all active plans ordered by price."""
 
-        plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price')
+        plans = SubscriptionPlan.objects.filter(is_active=True).order_by("price")
         serializer = SubscriptionPlanSerializer(plans, many=True)
         return Response(serializer.data)
 
@@ -54,7 +53,7 @@ class SubscriptionCreateView(APIView):
 
         serializer = SubscriptionCreateSerializer(
             data=request.data,
-            context={'request': request},
+            context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
         subscription = serializer.save()
@@ -88,20 +87,20 @@ class MySubscriptionView(APIView):
 
         if agent_profile:
             agent_subscription = (
-                queryset.filter(agent=agent_profile)
-                .order_by('-created_at')
-                .first()
+                queryset.filter(agent=agent_profile).order_by("-created_at").first()
             )
             if agent_subscription:
                 return agent_subscription
 
         organisation_ids = list(
-            Collaborator.objects.filter(user=user).values_list('organisation_id', flat=True)
+            Collaborator.objects.filter(user=user).values_list(
+                "organisation_id", flat=True
+            )
         )
         if organisation_ids:
             org_subscription = (
                 queryset.filter(organisation_id__in=organisation_ids)
-                .order_by('-created_at')
+                .order_by("-created_at")
                 .first()
             )
             if org_subscription:
@@ -116,7 +115,7 @@ class MySubscriptionView(APIView):
         subscription = self.get_subscription(request)
         if subscription is None:
             return Response(
-                {'detail': 'No active subscription found.'},
+                {"detail": "No active subscription found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(SubscriptionSerializer(subscription).data)
@@ -129,30 +128,30 @@ class MySubscriptionView(APIView):
         subscription = self.get_subscription(request)
         if subscription is None:
             return Response(
-                {'detail': 'No active subscription found.'},
+                {"detail": "No active subscription found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if subscription.agent_id:
-            requirement = AGENT_FEATURES['subscription_management']
+            requirement = AGENT_FEATURES["subscription_management"]
             if not agent_meets_requirement(request.user, requirement):
                 payload = requirement_denied_payload(
                     requirement,
-                    'Upgrade required to manage your agent subscription.',
+                    "Upgrade required to manage your agent subscription.",
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
         elif subscription.organisation_id:
-            requirement = COLLABORATOR_FEATURES['organisation_subscription_management']
+            requirement = COLLABORATOR_FEATURES["organisation_subscription_management"]
             if not collaborator_meets_requirement(request.user, requirement):
                 payload = requirement_denied_payload(
                     requirement,
-                    'Upgrade required to manage organisation subscriptions.',
+                    "Upgrade required to manage organisation subscriptions.",
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         subscription.status = Subscription.Status.CANCELED
         subscription.current_period_end = timezone.now()
-        subscription.save(update_fields=['status', 'current_period_end', 'updated_at'])
+        subscription.save(update_fields=["status", "current_period_end", "updated_at"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -166,18 +165,18 @@ class StripeWebhookView(APIView):
 
         del args, kwargs
 
-        event_type = request.data.get('type')
-        data_object = request.data.get('data', {}).get('object', {})
-        subscription_id = data_object.get('id') or data_object.get('subscription')
-        status_update = data_object.get('status')
+        event_type = request.data.get("type")
+        data_object = request.data.get("data", {}).get("object", {})
+        subscription_id = data_object.get("id") or data_object.get("subscription")
+        status_update = data_object.get("status")
 
         if not subscription_id:
             logger.warning(
-                'Stripe webhook received without subscription id: %s',
+                "Stripe webhook received without subscription id: %s",
                 request.data,
             )
             return Response(
-                {'detail': 'Missing subscription id.'},
+                {"detail": "Missing subscription id."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -185,21 +184,23 @@ class StripeWebhookView(APIView):
             stripe_subscription_id=subscription_id,
         ).first()
         if not subscription:
-            logger.warning('Stripe subscription %s not found.', subscription_id)
-            return Response({'detail': 'Subscription not tracked.'}, status=status.HTTP_200_OK)
+            logger.warning("Stripe subscription %s not found.", subscription_id)
+            return Response(
+                {"detail": "Subscription not tracked."}, status=status.HTTP_200_OK
+            )
 
         if status_update and status_update in dict(Subscription.Status.choices):
             subscription.status = status_update
-        if data_object.get('current_period_end'):
+        if data_object.get("current_period_end"):
             subscription.current_period_end = datetime.fromtimestamp(
-                data_object['current_period_end'],
+                data_object["current_period_end"],
                 tz=timezone.utc,
             )
-        subscription.save(update_fields=['status', 'current_period_end', 'updated_at'])
+        subscription.save(update_fields=["status", "current_period_end", "updated_at"])
 
         logger.info(
-            'Processed Stripe webhook %s for subscription %s',
+            "Processed Stripe webhook %s for subscription %s",
             event_type,
             subscription_id,
         )
-        return Response({'detail': 'Processed.'}, status=status.HTTP_200_OK)
+        return Response({"detail": "Processed."}, status=status.HTTP_200_OK)
