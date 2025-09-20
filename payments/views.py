@@ -124,8 +124,7 @@ def _select_matching_price(
     for price_obj in prices:
         price_dict = to_plain_dict(price_obj)
         currency = (
-            price_dict.get("currency")
-            or getattr(price_obj, "currency", "")
+            price_dict.get("currency") or getattr(price_obj, "currency", "")
         ).lower()
         if currency != target_currency:
             continue
@@ -250,7 +249,9 @@ def resolve_subscription_plan(
 
     price_id = None
     items = data_object.get("items") or {}
-    items_data = items.get("data") if isinstance(items, dict) else getattr(items, "data", [])
+    items_data = (
+        items.get("data") if isinstance(items, dict) else getattr(items, "data", [])
+    )
     if items_data:
         first_item = items_data[0]
         price = (
@@ -259,9 +260,7 @@ def resolve_subscription_plan(
             else getattr(first_item, "price", None)
         )
         price_id = (
-            price.get("id")
-            if isinstance(price, dict)
-            else getattr(price, "id", None)
+            price.get("id") if isinstance(price, dict) else getattr(price, "id", None)
         )
 
     if price_id:
@@ -332,7 +331,9 @@ def sync_subscription_from_payload(
 
     update_fields = []
 
-    if organisation and subscription.organisation_id != getattr(organisation, "id", None):
+    if organisation and subscription.organisation_id != getattr(
+        organisation, "id", None
+    ):
         subscription.organisation = organisation
         subscription.agent = None
         update_fields.extend(["organisation", "agent"])
@@ -360,8 +361,11 @@ def sync_subscription_from_payload(
         update_fields.append("stripe_customer_id")
 
     if update_fields:
-        subscription.save(update_fields=list(dict.fromkeys(update_fields + ["updated_at"])))
+        subscription.save(
+            update_fields=list(dict.fromkeys(update_fields + ["updated_at"]))
+        )
     return subscription
+
 
 class PlanListView(APIView):
     """List active subscription plans."""
@@ -457,8 +461,12 @@ class StripeCheckoutSessionView(APIView):
             )
 
         response_payload = {
-            "id": session.get("id") if isinstance(session, dict) else getattr(session, "id", None),
-            "url": session.get("url") if isinstance(session, dict) else getattr(session, "url", None),
+            "id": session.get("id")
+            if isinstance(session, dict)
+            else getattr(session, "id", None),
+            "url": session.get("url")
+            if isinstance(session, dict)
+            else getattr(session, "url", None),
             "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
             "plan": SubscriptionPlanSerializer(plan).data,
         }
@@ -662,7 +670,9 @@ class StripeWebhookView(APIView):
             "customer.subscription.deleted",
         }:
             if not data_object:
-                logger.warning("Subscription event received without data: %s", event_dict)
+                logger.warning(
+                    "Subscription event received without data: %s", event_dict
+                )
                 return Response(
                     {"detail": "Subscription data missing."},
                     status=status.HTTP_400_BAD_REQUEST,

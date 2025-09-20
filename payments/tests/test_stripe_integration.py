@@ -13,7 +13,9 @@ from payments.models import Subscription, SubscriptionPlan
 
 
 @pytest.mark.django_db
-def test_checkout_session_creation_sets_metadata(api_client, agent_user, settings, monkeypatch):
+def test_checkout_session_creation_sets_metadata(
+    api_client, agent_user, settings, monkeypatch
+):
     """Checkout session creation should call Stripe with scope metadata."""
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
@@ -28,7 +30,13 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
 
     class DummyPriceList:
         def __init__(self):
-            self.data = [type("Price", (), {"id": "price_123", "currency": "eur", "unit_amount": 5000})()]
+            self.data = [
+                type(
+                    "Price",
+                    (),
+                    {"id": "price_123", "currency": "eur", "unit_amount": 5000},
+                )()
+            ]
 
     def fake_price_list(**kwargs):
         captured_payload["price_list_kwargs"] = kwargs
@@ -229,7 +237,9 @@ def test_checkout_session_creation_recovers_from_missing_product(
 
 
 @pytest.mark.django_db
-def test_webhook_synchronises_subscription(api_client, agent_user, settings, monkeypatch):
+def test_webhook_synchronises_subscription(
+    api_client, agent_user, settings, monkeypatch
+):
     """Webhook subscription events should create or update local records."""
 
     settings.STRIPE_WEBHOOK_SECRET = "whsec_test"
@@ -271,7 +281,9 @@ def test_webhook_synchronises_subscription(api_client, agent_user, settings, mon
         assert json.loads(payload.decode("utf-8")) == event_payload
         return event_payload
 
-    monkeypatch.setattr(stripe.Webhook, "construct_event", staticmethod(fake_construct_event))
+    monkeypatch.setattr(
+        stripe.Webhook, "construct_event", staticmethod(fake_construct_event)
+    )
 
     response = api_client.post(
         reverse("payments-stripe-webhook"),

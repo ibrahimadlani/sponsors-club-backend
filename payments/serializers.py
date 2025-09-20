@@ -195,7 +195,9 @@ class SubscriptionCreateSerializer(serializers.Serializer):
             parse_datetime(current_period_end_raw) if current_period_end_raw else None
         )
         if current_period_end and current_period_end.tzinfo is None:
-            current_period_end = timezone.make_aware(current_period_end, datetime_timezone.utc)
+            current_period_end = timezone.make_aware(
+                current_period_end, datetime_timezone.utc
+            )
 
         subscription = Subscription.objects.create(
             organisation=organisation,
