@@ -22,6 +22,11 @@ urlpatterns = [
         TemplateView.as_view(template_name="poc/login.html"),
         name="poc-login",
     ),
+    path(
+        "poc/messaging/",
+        TemplateView.as_view(template_name="poc/messaging.html"),
+        name="poc-messaging",
+    ),
 ]
 
 if getattr(settings, "DRF_YASG_ENABLED", False):
