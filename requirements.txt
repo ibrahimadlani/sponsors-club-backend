@@ -6,7 +6,7 @@ typing_extensions==4.15.0  # Backported typing helpers consumed by Django
 pytz==2025.2  # Timezone database support for datetime handling
 tzdata==2025.2  # Bundled tzdata for minimal Docker images without system zoneinfo
 
-# REST framework and documentation tooling
+# REST framework and authentication tooling
 django-filter==25.1  # Queryset filtering integration for DRF
 djangorestframework==3.16.1  # Core REST API framework
 djangorestframework_simplejwt==5.5.1  # JWT authentication backend for DRF
@@ -19,20 +19,3 @@ Faker==37.8.0  # Generates sample data for management commands
 pillow==11.3.0  # Image processing for ImageField support
 gunicorn==23.0.0  # Production WSGI server used by the Docker entrypoint
 PyYAML==6.0.2  # YAML parsing for configuration-driven utilities
-
-# Quality assurance and developer tooling (linting handled solely by Ruff)
-coverage==7.10.6  # Coverage metrics for test suites
-pytest==8.4.2  # Primary Python test runner
-pytest-cov==7.0.0  # pytest plugin integrating coverage
-pytest-django==4.11.1  # Django-specific pytest helpers
-ruff==0.13.1  # Fast linting and formatting assistance
-
-# Supporting libraries pinned for reproducibility
-exceptiongroup==1.3.0  # Backport to improve tracebacks on Python 3.11
-iniconfig==2.1.0  # Configuration parser consumed by pytest
-packaging==25.0  # Version parsing utilities used by tooling
-platformdirs==4.4.0  # Cross-platform cache directory helpers for tooling
-pluggy==1.6.0  # Plugin system underpinning pytest
-Pygments==2.19.2  # Rich tracebacks and syntax highlighting
-tomli==2.2.1  # TOML parser for tooling configuration
-tomlkit==0.13.3  # Advanced TOML manipulation for Ruff
