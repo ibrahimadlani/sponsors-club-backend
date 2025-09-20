@@ -19,7 +19,6 @@ from organisations.serializers import (
     OrganisationListFilter,
     OrganisationSerializer,
 )
-from users.models import AgentProfile
 
 
 @pytest.fixture

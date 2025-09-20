@@ -3,24 +3,22 @@
 from __future__ import annotations
 
 import os
-from typing import Generator
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
-
+from collections.abc import Generator
 
 import django
+import pytest
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 django.setup()
 
-import pytest
-from django.contrib.auth import get_user_model
-from django.core.management import call_command
-from django.utils import timezone
-from rest_framework.test import APIClient
+from django.contrib.auth import get_user_model  # noqa: E402
+from django.core.management import call_command  # noqa: E402
+from django.utils import timezone  # noqa: E402
+from rest_framework.test import APIClient  # noqa: E402
 
-from organisations.models import Collaborator, Organisation
-from payments.models import Subscription, SubscriptionPlan
-from users.models import AgentProfile
+from organisations.models import Collaborator, Organisation  # noqa: E402
+from payments.models import Subscription, SubscriptionPlan  # noqa: E402
+from users.models import AgentProfile  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
