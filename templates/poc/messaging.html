@@ -373,7 +373,7 @@ function MessageTesterApp() {
                     method,
                     body !== undefined && !(body instanceof FormData)
                 ),
-                credentials: "include",
+                credentials: token ? "omit" : "include",
             };
             if (body !== undefined) {
                 requestInit.body = body instanceof FormData ? body : JSON.stringify(body);
@@ -413,7 +413,7 @@ function MessageTesterApp() {
             }
             return payload;
         },
-        [buildHeaders, normalizedBaseUrl, pushLog]
+        [buildHeaders, normalizedBaseUrl, pushLog, token]
     );
 
     const loadThreads = useCallback(
