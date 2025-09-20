@@ -6,10 +6,13 @@ typing_extensions==4.15.0  # Backported typing helpers consumed by Django
 pytz==2025.2  # Timezone database support for datetime handling
 tzdata==2025.2  # Bundled tzdata for minimal Docker images without system zoneinfo
 
-# REST framework and authentication tooling
+# REST framework, real-time transport, and authentication tooling
 django-filter==25.1  # Queryset filtering integration for DRF
 djangorestframework==3.16.1  # Core REST API framework
 djangorestframework_simplejwt==5.5.1  # JWT authentication backend for DRF
+channels==4.1.0  # ASGI layer enabling websocket support
+channels-redis==4.2.0  # Production-ready channel layer backend
+daphne==4.1.2  # ASGI server required for websocket testing
 drf-yasg==1.21.10  # OpenAPI schema generation for interactive docs
 uritemplate==4.2.0  # URL template expansion required by drf-yasg
 PyJWT==2.10.1  # Explicit pin aligned with SimpleJWT to avoid compatibility drift

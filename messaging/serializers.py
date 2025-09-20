@@ -1,233 +1,147 @@
-"""Serializers for messaging threads and messages."""
+"""Serializers exposing messaging threads and messages."""
 
-from django.db import transaction
+from __future__ import annotations
+
+from typing import Any
+
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from athletes.models import Athlete
 from organisations.models import Collaborator
 from users.models import AgentProfile
 
-from .constants import THREAD_PARTICIPANT_COLUMNS
 from .models import Message, Thread
 
 
-class CollaboratorSummarySerializer(serializers.ModelSerializer):
-    """Lightweight collaborator representation for thread payloads."""
+class CollaboratorSerializer(serializers.ModelSerializer):
+    """Lightweight collaborator representation embedded in a thread."""
 
     class Meta:
-        """Serializer configuration."""
-
         model = Collaborator
-        fields = ("id", "organisation_id", "role")
-        ref_name = "MessagingCollaboratorSummary"
-
-
-class AgentProfileSummarySerializer(serializers.ModelSerializer):
-    """Expose core agent profile fields for thread payloads."""
-
-    user_email = serializers.EmailField(source="user.email", read_only=True)
-
-    class Meta:
-        """Serializer configuration."""
-
-        model = AgentProfile
-        fields = ("id", "display_name", "user_email")
-        ref_name = "MessagingAgentSummary"
-
-
-class AthleteSummarySerializer(serializers.ModelSerializer):
-    """Expose the subset of athlete data used within messaging threads."""
-
-    class Meta:
-        """Serializer configuration."""
-
-        model = Athlete
-        fields = ("id", "full_name", "sport_id")
-        ref_name = "MessagingAthleteSummary"
-
-
-class ThreadSerializer(serializers.ModelSerializer):
-    """Serialize thread entities with related participant summaries."""
-
-    collaborator = CollaboratorSummarySerializer(read_only=True)
-    agent = AgentProfileSummarySerializer(read_only=True)
-    athlete = AthleteSummarySerializer(read_only=True)
-
-    class Meta:
-        """Serializer configuration."""
-
-        model = Thread
-        fields = ("id", *THREAD_PARTICIPANT_COLUMNS, "updated_at")
+        fields = ("id", "user_id", "organisation_id", "role", "job_title")
         read_only_fields = fields
 
 
-class ThreadCreateSerializer(serializers.Serializer):
-    """Validate payload required to open a messaging thread."""
+class AgentProfileSerializer(serializers.ModelSerializer):
+    """Expose essential agent profile attributes for messaging responses."""
 
-    collaborator_id = serializers.UUIDField(required=False)
-    agent_id = serializers.UUIDField(required=False)
-    athlete_id = serializers.UUIDField(required=False, allow_null=True)
+    user_id = serializers.UUIDField(source="user.id", read_only=True)
 
-    def validate(self, attrs):
-        """Ensure collaborator, agent, and optional athlete inputs are consistent."""
+    class Meta:
+        model = AgentProfile
+        fields = ("id", "user_id", "display_name")
+        read_only_fields = fields
 
-        request = self.context["request"]
-        user = request.user
 
-        collaborator = None
-        agent = None
-        athlete = None
+class AthleteSerializer(serializers.ModelSerializer):
+    """Represent the athlete linked to a conversation when available."""
 
-        collaborator_id = attrs.get("collaborator_id")
-        agent_id = attrs.get("agent_id")
-        athlete_id = attrs.get("athlete_id")
-
-        if collaborator_id:
-            collaborator = (
-                Collaborator.objects.filter(id=collaborator_id)
-                .select_related("user")
-                .first()
-            )
-            if not collaborator:
-                raise serializers.ValidationError(
-                    {"collaborator_id": "Collaborator not found."}
-                )
-        if agent_id:
-            agent = (
-                AgentProfile.objects.filter(id=agent_id).select_related("user").first()
-            )
-            if not agent:
-                raise serializers.ValidationError({"agent_id": "Agent not found."})
-        if athlete_id:
-            athlete = Athlete.objects.filter(id=athlete_id).first()
-            if not athlete:
-                raise serializers.ValidationError({"athlete_id": "Athlete not found."})
-
-        # Determine collaborator and agent based on requesting user if not provided
-        if collaborator is None:
-            collaborator = Collaborator.objects.filter(user=user).first()
-        if agent is None:
-            try:
-                agent = user.agent_profile
-            except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
-                agent = None
-
-        if collaborator is None or agent is None:
-            raise serializers.ValidationError(
-                "A collaborator and an agent must be specified."
-            )
-
-        if user.id not in {collaborator.user_id, agent.user_id}:
-            raise serializers.ValidationError(
-                "User must represent either the collaborator or the agent."
-            )
-
-        attrs["collaborator"] = collaborator
-        attrs["agent"] = agent
-        attrs["athlete"] = athlete
-
-        # Prevent duplicate threads
-        existing = Thread.objects.filter(
-            collaborator=collaborator,
-            agent=agent,
-            athlete=athlete,
-        ).exists()
-        if existing:
-            raise serializers.ValidationError(
-                "Thread already exists for these participants."
-            )
-
-        return attrs
-
-    @transaction.atomic
-    def create(self, validated_data):
-        """Persist a new thread based on validated participant data."""
-
-        collaborator = validated_data["collaborator"]
-        agent = validated_data["agent"]
-        athlete = validated_data["athlete"]
-        thread = Thread.objects.create(
-            collaborator=collaborator,
-            agent=agent,
-            athlete=athlete,
-        )
-        return thread
-
-    def update(self, instance, validated_data):
-        """Thread updates are not supported for this serializer."""
-
-        raise NotImplementedError("Thread updates are not supported.")
+    class Meta:
+        model = Athlete
+        fields = ("id", "full_name", "sport_id")
+        read_only_fields = fields
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    """Serialize individual messages, exposing sender metadata."""
+    """Serialize messages, handling creation and attachment URLs."""
 
-    sender_email = serializers.EmailField(source="sender.email", read_only=True)
+    thread = serializers.PrimaryKeyRelatedField(read_only=True)
+    sender = serializers.PrimaryKeyRelatedField(read_only=True)
+    attachment = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
-        """Serializer configuration."""
-
         model = Message
         fields = (
             "id",
             "thread",
             "sender",
-            "sender_email",
             "content",
             "attachment",
             "is_read",
             "created_at",
+            "updated_at",
         )
-        read_only_fields = ("id", "thread", "sender", "sender_email", "created_at")
+        read_only_fields = ("id", "thread", "sender", "is_read", "created_at", "updated_at")
+        extra_kwargs = {
+            "content": {"allow_blank": True, "required": False},
+        }
 
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Ensure that a message contains textual content or an attachment."""
 
-class MessageCreateSerializer(serializers.ModelSerializer):
-    """Validate and create outbound messages for a thread."""
-
-    class Meta:
-        """Serializer configuration."""
-
-        model = Message
-        fields = ("content", "attachment")
-
-    def validate(self, attrs):
-        """Ensure a message includes content or an attachment."""
-
-        content = attrs.get("content", "").strip()
-        if not content and not attrs.get("attachment"):
+        content = (attrs.get("content") or "").strip()
+        attachment = attrs.get("attachment")
+        if not content and not attachment:
             raise serializers.ValidationError(
-                "Message must contain content or an attachment."
+                {"content": _( "A message requires text content or an attachment." )}
             )
         return attrs
 
-    @transaction.atomic
-    def create(self, validated_data):
-        """Create the message, updating the thread last-message timestamp."""
+    def create(self, validated_data: dict[str, Any]) -> Message:
+        """Persist a new message for the configured thread and request user."""
 
-        thread = self.context["thread"]
-        sender = self.context["request"].user
+        request = self.context.get("request")
+        thread: Thread | None = self.context.get("thread")
+        if request is None or thread is None:
+            raise AssertionError("MessageSerializer requires request and thread context.")
+        attachment = validated_data.pop("attachment", None)
         message = Message.objects.create(
             thread=thread,
-            sender=sender,
+            sender=request.user,
+            attachment=attachment,
             **validated_data,
         )
-        thread.last_message_at = message.created_at
-        thread.save(update_fields=["last_message_at", "updated_at"])
         return message
 
+    def to_representation(self, instance: Message) -> dict[str, Any]:
+        """Render the attachment as an absolute URL when possible."""
 
-class MessageReadSerializer(serializers.ModelSerializer):
-    """Toggle the read state of a message."""
+        data = super().to_representation(instance)
+        attachment = data.get("attachment")
+        if attachment:
+            request = self.context.get("request")
+            if request is not None:
+                data["attachment"] = request.build_absolute_uri(attachment)
+        else:
+            data["attachment"] = None
+        return data
+
+
+class ThreadSerializer(serializers.ModelSerializer):
+    """Serialize a conversation with participant summaries and last message."""
+
+    collaborator = CollaboratorSerializer(read_only=True)
+    agent = AgentProfileSerializer(read_only=True)
+    athlete = AthleteSerializer(read_only=True)
+    last_message = serializers.SerializerMethodField()
 
     class Meta:
-        """Serializer configuration."""
+        model = Thread
+        fields = (
+            "id",
+            "collaborator",
+            "agent",
+            "athlete",
+            "last_message_at",
+            "created_at",
+            "updated_at",
+            "last_message",
+        )
+        read_only_fields = fields
 
-        model = Message
-        fields = ("is_read",)
+    def get_last_message(self, obj: Thread) -> dict[str, Any] | None:
+        """Return the most recent message associated with the thread."""
 
-    def update(self, instance, validated_data):
-        """Persist the new read state."""
-
-        instance.is_read = validated_data.get("is_read", True)
-        instance.save(update_fields=["is_read", "updated_at"])
-        return instance
+        message: Message | None = None
+        prefetched = getattr(obj, "_last_message_list", None)
+        if prefetched:
+            message = prefetched[0]
+        elif hasattr(obj, "_last_message"):
+            message = getattr(obj, "_last_message")
+        else:
+            message = obj.messages.order_by("-created_at").first()
+        if not message:
+            return None
+        serializer = MessageSerializer(message, context=self.context)
+        return serializer.data

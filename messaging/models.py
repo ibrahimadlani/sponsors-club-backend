@@ -4,6 +4,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from athletes.models import Athlete
 from organisations.models import Collaborator
@@ -103,3 +104,14 @@ class Message(BaseModel):
 
     def __str__(self):
         return f"Message from {self.sender} in {self.thread}"
+
+    def save(self, *args, **kwargs):
+        """Persist the message and refresh the thread metadata."""
+
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        if is_new:
+            timestamp = self.created_at or timezone.now()
+            Thread.objects.filter(id=self.thread_id).update(last_message_at=timestamp)
+            if hasattr(self, "thread"):
+                self.thread.last_message_at = timestamp
