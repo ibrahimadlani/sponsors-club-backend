@@ -29,6 +29,13 @@ def ensure_clause_template_columns(apps, schema_editor):
             f"ADD COLUMN {schema_editor.quote_name('version')} integer NOT NULL DEFAULT 1"
         )
 
+    if "is_mandatory" not in existing_columns:
+        bool_default = "0" if connection.vendor == "sqlite" else "false"
+        statements.append(
+            f"ALTER TABLE {schema_editor.quote_name(table_name)} "
+            f"ADD COLUMN {schema_editor.quote_name('is_mandatory')} boolean NOT NULL DEFAULT {bool_default}"
+        )
+
     if "is_active" not in existing_columns:
         bool_default = "1" if connection.vendor == "sqlite" else "true"
         statements.append(
