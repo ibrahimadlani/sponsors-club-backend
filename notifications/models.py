@@ -9,7 +9,6 @@ from django.db import models
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
-    # pylint: disable=too-few-public-methods
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -24,7 +23,6 @@ class BaseModel(models.Model):
 class Notification(BaseModel):
     """Notification entry targeting a user."""
 
-    # pylint: disable=too-few-public-methods
 
     class Type(models.TextChoices):
         """Supported notification categories."""

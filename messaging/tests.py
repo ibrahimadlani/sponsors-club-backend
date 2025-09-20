@@ -1,6 +1,5 @@
 """Integration tests covering messaging thread creation flows."""
 
-# pylint: disable=no-member
 
 import pytest
 from django.urls import reverse

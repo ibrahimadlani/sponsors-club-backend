@@ -1,6 +1,5 @@
 """Views for interacting with follow relationships."""
 
-# pylint: disable=no-member
 
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status

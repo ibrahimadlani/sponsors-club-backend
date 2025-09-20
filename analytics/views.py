@@ -54,7 +54,7 @@ def _user_can_access_stats_batch(user, athlete_ids):
     agent_profile = get_agent_profile(user)
     if agent_profile:
         owned_ids = set(
-            Athlete.objects.filter(  # pylint: disable=no-member
+            Athlete.objects.filter(
                 agent=agent_profile
             ).values_list('id', flat=True)
         )
@@ -64,7 +64,7 @@ def _user_can_access_stats_batch(user, athlete_ids):
 
 
 def _latest_stats_for_athlete(athlete):
-    stats = AthleteStat.objects.filter(  # pylint: disable=no-member
+    stats = AthleteStat.objects.filter(
         athlete=athlete
     ).order_by('-date')
     latest_by_metric = {}
@@ -81,7 +81,7 @@ class AthleteStatsView(APIView):
 
     def get(self, request, athlete_id):
         """Return the latest stats for the requested athlete."""
-        athlete = Athlete.objects.filter(id=athlete_id).first()  # pylint: disable=no-member
+        athlete = Athlete.objects.filter(id=athlete_id).first()
         if not athlete:
             return Response({'detail': 'Athlete not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -100,7 +100,7 @@ class AthleteStatsView(APIView):
     def post(self, request, athlete_id):
         """Create a new datapoint for the requested athlete."""
         athlete = (
-            Athlete.objects.filter(id=athlete_id)  # pylint: disable=no-member
+            Athlete.objects.filter(id=athlete_id)
             .select_related('agent')
             .first()
         )
@@ -118,7 +118,7 @@ class AthleteStatsView(APIView):
 
         serializer = AthleteStatCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        stat = AthleteStat.objects.create(  # pylint: disable=no-member
+        stat = AthleteStat.objects.create(
             athlete=athlete,
             **serializer.validated_data,
         )
@@ -132,7 +132,7 @@ class AthleteStatsTimeseriesView(APIView):
 
     def get(self, request, athlete_id):
         """Return the full time series for the athlete."""
-        athlete = Athlete.objects.filter(id=athlete_id).first()  # pylint: disable=no-member
+        athlete = Athlete.objects.filter(id=athlete_id).first()
         if not athlete:
             return Response({'detail': 'Athlete not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -144,7 +144,7 @@ class AthleteStatsTimeseriesView(APIView):
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         metric_filter = request.query_params.getlist('metric') or None
-        qs = AthleteStat.objects.filter(  # pylint: disable=no-member
+        qs = AthleteStat.objects.filter(
             athlete_id=athlete_id
         ).order_by('date')
         if metric_filter:
@@ -173,7 +173,7 @@ class AthleteStatsBatchView(APIView):
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
-        stats = AthleteStat.objects.filter(  # pylint: disable=no-member
+        stats = AthleteStat.objects.filter(
             athlete_id__in=athlete_ids,
             metric__in=metrics,
         ).order_by('athlete_id', 'metric', '-date')

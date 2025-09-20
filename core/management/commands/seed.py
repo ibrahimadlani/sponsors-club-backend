@@ -1,6 +1,5 @@
 """Populate the database with sample data using Faker."""
 
-# pylint: disable=no-member
 
 from __future__ import annotations
 

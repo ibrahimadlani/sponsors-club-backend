@@ -1,6 +1,5 @@
 """Core data models for the users application."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 import uuid
 
@@ -9,7 +8,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-class BaseModel(models.Model):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -50,7 +49,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class User(BaseModel, AbstractBaseUser, PermissionsMixin):  # pylint: disable=missing-class-docstring
+class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     """Primary user model backing authentication and account metadata."""
 
     class AccountType(models.TextChoices):
@@ -95,7 +94,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):  # pylint: disable=mi
         super().save(*args, **kwargs)
 
 
-class AgentProfile(BaseModel):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class AgentProfile(BaseModel):
     """Profile details that extend the base user for agent accounts."""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='agent_profile')

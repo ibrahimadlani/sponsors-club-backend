@@ -13,7 +13,6 @@ from users.models import AgentProfile
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
-    # pylint: disable=too-few-public-methods
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -49,7 +48,6 @@ class Subscription(BaseModel):
     class Status(models.TextChoices):
         """Enumeration of subscription lifecycle states."""
 
-        # pylint: disable=too-few-public-methods
 
         ACTIVE = 'active', 'Active'
         PAST_DUE = 'past_due', 'Past Due'
@@ -88,7 +86,6 @@ class Subscription(BaseModel):
     class Meta:
         """Django metadata for subscription model configuration."""
 
-        # pylint: disable=too-few-public-methods
 
         indexes = [
             models.Index(fields=('organisation',), name='subscription_organisation_idx'),

@@ -7,7 +7,6 @@ from typing import Generator
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
-# pylint: disable=wrong-import-position,no-member
 
 import django
 

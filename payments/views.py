@@ -1,6 +1,5 @@
 """Views powering the payments API."""
 
-# pylint: disable=no-member
 
 import logging
 from datetime import datetime
@@ -35,7 +34,7 @@ class PlanListView(APIView):
 
     permission_classes = (permissions.AllowAny,)
 
-    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+    def get(self, request, *args, **kwargs):
         """Return all active plans ordered by price."""
 
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price')

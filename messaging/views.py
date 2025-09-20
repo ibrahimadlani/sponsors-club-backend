@@ -1,6 +1,5 @@
 """Views providing messaging thread and message APIs."""
 
-# pylint: disable=no-member
 
 from django.db.models import Q
 from rest_framework import permissions, status, viewsets
@@ -58,7 +57,7 @@ class ThreadViewSet(viewsets.GenericViewSet):
             .order_by('-last_message_at', '-created_at')
         )
 
-    def list(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+    def list(self, request, *args, **kwargs):
         """Return a paginated list of threads for the current user."""
 
         del args, kwargs
@@ -68,7 +67,7 @@ class ThreadViewSet(viewsets.GenericViewSet):
         serializer = ThreadSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
-    def create(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+    def create(self, request, *args, **kwargs):
         """Create a messaging thread after validating entitlement."""
 
         del args, kwargs

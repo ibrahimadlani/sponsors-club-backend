@@ -1,6 +1,5 @@
 """Serializers for notification resources."""
 
-# pylint: disable=too-few-public-methods
 
 from rest_framework import serializers
 

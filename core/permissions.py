@@ -18,7 +18,7 @@ def get_agent_profile(user: User) -> Optional[AgentProfile]:
     """Return the agent profile for the given user if it exists."""
     try:
         return user.agent_profile  # type: ignore[attr-defined]
-    except AgentProfile.DoesNotExist:  # pylint: disable=no-member
+    except AgentProfile.DoesNotExist:
         return None
 
 
@@ -31,7 +31,7 @@ def user_is_collaborator(user: User) -> bool:
     """Return True when the user belongs to at least one organisation."""
     if not user or not user.is_authenticated:
         return False
-    return Collaborator.objects.filter(user=user).exists()  # pylint: disable=no-member
+    return Collaborator.objects.filter(user=user).exists()
 
 
 def user_is_collaborator_owner(user: User, organisation: Optional[Organisation] = None) -> bool:
@@ -39,7 +39,7 @@ def user_is_collaborator_owner(user: User, organisation: Optional[Organisation] 
     filters = Q(user=user, role=Collaborator.Role.OWNER)
     if organisation is not None:
         filters &= Q(organisation=organisation)
-    return Collaborator.objects.filter(filters).exists()  # pylint: disable=no-member
+    return Collaborator.objects.filter(filters).exists()
 
 
 def get_active_agent_subscription(user: User) -> Optional[Subscription]:
@@ -48,7 +48,7 @@ def get_active_agent_subscription(user: User) -> Optional[Subscription]:
     if not agent_profile:
         return None
     return (
-        Subscription.objects.filter(  # pylint: disable=no-member
+        Subscription.objects.filter(
             agent=agent_profile,
             status=Subscription.Status.ACTIVE,
         )
@@ -61,13 +61,13 @@ def get_active_agent_subscription(user: User) -> Optional[Subscription]:
 def get_active_organisation_subscriptions(user: User) -> list[Subscription]:
     """Return active organisation subscriptions linked to the user via collaborations."""
     organisation_ids = list(
-        Collaborator.objects.filter(user=user)  # pylint: disable=no-member
+        Collaborator.objects.filter(user=user)
         .values_list('organisation_id', flat=True)
     )
     if not organisation_ids:
         return []
     return list(
-        Subscription.objects.filter(  # pylint: disable=no-member
+        Subscription.objects.filter(
             organisation_id__in=organisation_ids,
             status=Subscription.Status.ACTIVE,
         )

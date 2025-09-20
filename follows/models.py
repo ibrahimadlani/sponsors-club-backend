@@ -11,7 +11,6 @@ from organisations.models import Collaborator
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamp metadata."""
 
-    # pylint: disable=too-few-public-methods
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -26,7 +25,6 @@ class BaseModel(models.Model):
 class Follow(BaseModel):
     """Link a collaborator to an athlete they wish to track."""
 
-    # pylint: disable=too-few-public-methods
 
     collaborator = models.ForeignKey(
         Collaborator,

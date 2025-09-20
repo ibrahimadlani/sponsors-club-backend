@@ -10,4 +10,4 @@ class FollowsConfig(AppConfig):
     name = 'follows'
 
     def ready(self):
-        pass  # pylint: disable=import-outside-toplevel, unused-import
+        pass

@@ -1,6 +1,5 @@
 """Serializers for payment plans and subscriptions."""
 
-# pylint: disable=no-member,too-few-public-methods
 
 from django.db import transaction
 from django.utils import timezone

@@ -1,6 +1,5 @@
 """Serializers supporting the users API endpoints."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods,duplicate-code
 
 from django.db import transaction
 from rest_framework import serializers
@@ -10,7 +9,7 @@ from organisations.models import Collaborator
 from .models import AgentProfile, User
 
 
-class UserSerializer(serializers.ModelSerializer):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class UserSerializer(serializers.ModelSerializer):
     """Serialize the base user fields shared across endpoints."""
 
     class Meta:
@@ -39,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer):  # pylint: disable=too-few-pu
         )
 
 
-class RegisterSerializer(serializers.ModelSerializer):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class RegisterSerializer(serializers.ModelSerializer):
     """Handle registration for both agent and collaborator accounts."""
 
     password = serializers.CharField(write_only=True)
@@ -96,7 +95,7 @@ class RegisterSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:
             default_display_name = f"{user.first_name} {user.last_name}".strip() or user.email
-            AgentProfile.objects.create(  # pylint: disable=no-member
+            AgentProfile.objects.create(
                 user=user,
                 display_name=display_name or default_display_name,
             )
@@ -107,7 +106,7 @@ class RegisterSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
         return UserSerializer(instance, context=self.context).data
 
 
-class MeUpdateSerializer(serializers.ModelSerializer):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class MeUpdateSerializer(serializers.ModelSerializer):
     """Allow the authenticated user to update their profile details."""
 
     display_name = serializers.CharField(required=False, allow_blank=True)
@@ -137,7 +136,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
             instance.save()
 
         if display_name is not None and instance.account_type == User.AccountType.AGENT:
-            agent_profile, _ = AgentProfile.objects.get_or_create(  # pylint: disable=no-member
+            agent_profile, _ = AgentProfile.objects.get_or_create(
                 user=instance,
             )
             agent_profile.display_name = display_name
@@ -151,7 +150,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
         if instance.account_type == User.AccountType.AGENT:
             try:
                 agent_profile = instance.agent_profile
-            except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]  # pylint: disable=no-member
+            except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
                 agent_profile = None
             if agent_profile is not None:
                 data['agent_profile'] = {
@@ -161,7 +160,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):  # pylint: disable=too-fe
         return data
 
 
-class RolesSerializer(serializers.Serializer):  # pylint: disable=too-few-public-methods,missing-class-docstring
+class RolesSerializer(serializers.Serializer):
     """Represent the various collaborations and agent details for a user."""
 
     is_agent = serializers.BooleanField()
@@ -177,7 +176,7 @@ class RolesSerializer(serializers.Serializer):  # pylint: disable=too-few-public
         raise NotImplementedError('RolesSerializer is read-only.')
 
 
-class RolesDataBuilder:  # pylint: disable=too-few-public-methods,missing-class-docstring
+class RolesDataBuilder:
     """Utility for building the /me/roles response payload."""
 
     def __init__(self, user):
@@ -189,7 +188,7 @@ class RolesDataBuilder:  # pylint: disable=too-few-public-methods,missing-class-
         agent_info = None
         try:
             agent_profile = self.user.agent_profile
-        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]  # pylint: disable=no-member
+        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
             agent_profile = None
         if agent_profile is not None:
             agent_info = {
@@ -204,7 +203,7 @@ class RolesDataBuilder:  # pylint: disable=too-few-public-methods,missing-class-
                 'organisation_name': collaboration.organisation.name,
                 'role': collaboration.role,
             }
-            for collaboration in Collaborator.objects.filter(  # pylint: disable=no-member
+            for collaboration in Collaborator.objects.filter(
                 user=self.user
             ).select_related('organisation')
         ]

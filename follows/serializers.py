@@ -10,7 +10,6 @@ from .models import Follow
 class FollowSerializer(serializers.ModelSerializer):
     """Serialize the follower relationship along with athlete details."""
 
-    # pylint: disable=too-few-public-methods
 
     athlete = AthletePublicSerializer(read_only=True)
 

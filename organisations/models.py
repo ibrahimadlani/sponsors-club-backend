@@ -1,6 +1,5 @@
 """Database models for organisations and their collaborators."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 import uuid
 
@@ -47,7 +46,7 @@ class Organisation(BaseModel):
 
     def get_owner_id(self):
         """Return the collaborator identifier for the organisation owner."""
-        owner = self.collaborators.filter(  # pylint: disable=no-member
+        owner = self.collaborators.filter(
             role=Collaborator.Role.OWNER
         ).first()
         return owner.id if owner else None

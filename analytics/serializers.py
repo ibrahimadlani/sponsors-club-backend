@@ -1,6 +1,5 @@
 """Serializers backing analytics endpoints."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 from rest_framework import serializers
 
@@ -44,10 +43,10 @@ class AthleteStatAggregateSerializer(serializers.Serializer):
     date = serializers.DateField()
     extra = serializers.JSONField()
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         raise NotImplementedError('Aggregate serializer is read-only.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         raise NotImplementedError('Aggregate serializer is read-only.')
 
 
@@ -63,8 +62,8 @@ class AthleteStatsBatchRequestSerializer(serializers.Serializer):
         allow_empty=False,
     )
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         raise NotImplementedError('Batch request serializer is read-only.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         raise NotImplementedError('Batch request serializer is read-only.')

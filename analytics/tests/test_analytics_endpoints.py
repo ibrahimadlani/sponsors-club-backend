@@ -1,4 +1,3 @@
-# pylint: skip-file
 
 from datetime import date
 

@@ -1,6 +1,5 @@
 """Analytics data models for athlete statistics."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 import uuid
 

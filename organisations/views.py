@@ -22,7 +22,7 @@ from .serializers import (
 )
 
 
-class OrganisationViewSet(  # pylint: disable=too-many-ancestors
+class OrganisationViewSet(
     viewsets.GenericViewSet,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -31,7 +31,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
 ):
     """Expose CRUD operations and collaborator management for organisations."""
     organisation = None
-    queryset = Organisation.objects.all().order_by('name')  # pylint: disable=no-member
+    queryset = Organisation.objects.all().order_by('name')
     serializer_class = OrganisationSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -90,7 +90,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
     def collaborators(self, _request, *_args, **_kwargs):
         """Return the collaborators associated with the organisation."""
         organisation = self._get_organisation()
-        collaborators = organisation.collaborators.select_related('user').all()  # pylint: disable=no-member
+        collaborators = organisation.collaborators.select_related('user').all()
         serializer = CollaboratorSerializer(collaborators, many=True)
         return Response(serializer.data)
 
@@ -98,7 +98,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
     def add_collaborator(self, request, *_args, **_kwargs):
         """Invite an existing user to collaborate with the organisation."""
         organisation = self._get_organisation()
-        if not Collaborator.objects.filter(  # pylint: disable=no-member
+        if not Collaborator.objects.filter(
             organisation=organisation,
             user=request.user,
             role=Collaborator.Role.OWNER,
@@ -129,7 +129,7 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
         except (TypeError, ValueError):
             max_collaborators = 0
         if max_collaborators > 0:
-            current_count = organisation.collaborators.count()  # pylint: disable=no-member
+            current_count = organisation.collaborators.count()
             if current_count >= max_collaborators:
                 requirement = COLLABORATOR_FEATURES['collaborator_slots']
                 payload = requirement_denied_payload(
@@ -150,13 +150,13 @@ class OrganisationViewSet(  # pylint: disable=too-many-ancestors
     def remove_collaborator(self, request, collaborator_id=None):
         """Remove a collaborator if the requester is an organisation owner."""
         try:
-            collaborator = Collaborator.objects.select_related('organisation').get(  # pylint: disable=no-member
+            collaborator = Collaborator.objects.select_related('organisation').get(
                 id=collaborator_id
             )
-        except Collaborator.DoesNotExist:  # pylint: disable=no-member
+        except Collaborator.DoesNotExist:
             return Response({'detail': 'Collaborator not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not Collaborator.objects.filter(  # pylint: disable=no-member
+        if not Collaborator.objects.filter(
             organisation=collaborator.organisation,
             user=request.user,
             role=Collaborator.Role.OWNER,

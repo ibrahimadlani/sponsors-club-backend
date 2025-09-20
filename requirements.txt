@@ -24,15 +24,12 @@ PyYAML==6.0.2  # YAML parsing for configuration-driven utilities
 coverage==7.10.6  # Coverage metrics for test suites
 flake8==7.3.0  # PEP8 and linting enforcement
 isort==6.0.1  # Automated import sorting
-pylint==3.3.8  # Static analysis checks
 pytest==8.4.2  # Primary Python test runner
 pytest-cov==7.0.0  # pytest plugin integrating coverage
 pytest-django==4.11.1  # Django-specific pytest helpers
 ruff==0.13.1  # Fast linting and formatting assistance
 
 # Supporting libraries pinned for reproducibility
-astroid==3.3.11  # Pylint's Python AST representation layer
-dill==0.4.0  # Serializer used by coverage/pylint internals
 exceptiongroup==1.3.0  # Backport to improve tracebacks on Python 3.11
 iniconfig==2.1.0  # Configuration parser consumed by pytest
 mccabe==0.7.0  # Cyclomatic complexity plugin for Flake8

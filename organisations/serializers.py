@@ -1,6 +1,5 @@
 """Serializers used across organisation endpoints."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 from django.db import transaction
 from rest_framework import serializers
@@ -41,11 +40,11 @@ class OrganisationListFilter(serializers.Serializer):
     size = serializers.ChoiceField(required=False, choices=Organisation.Size.choices)
     country = serializers.CharField(required=False)
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         """Disallow creation on pure validation serializers."""
         raise NotImplementedError('OrganisationListFilter does not create instances.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         """Disallow updates on pure validation serializers."""
         raise NotImplementedError('OrganisationListFilter does not update instances.')
 
@@ -74,11 +73,11 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'non_field_errors': ['Only collaborator accounts may create organisations.']}
             )
-        organisation = Organisation.objects.create(  # pylint: disable=no-member
+        organisation = Organisation.objects.create(
             owner=user,
             **validated_data,
         )
-        Collaborator.objects.create(  # pylint: disable=no-member
+        Collaborator.objects.create(
             user=user,
             organisation=organisation,
             role=Collaborator.Role.OWNER,
@@ -136,7 +135,7 @@ class CollaboratorCreateSerializer(serializers.ModelSerializer):
         """Ensure the invitee is not already collaborating with the organisation."""
         email = attrs['email']
         organisation = self.context['organisation']
-        if Collaborator.objects.filter(  # pylint: disable=no-member
+        if Collaborator.objects.filter(
             organisation=organisation,
             user__email=email,
         ).exists():
@@ -152,8 +151,8 @@ class CollaboratorCreateSerializer(serializers.ModelSerializer):
         organisation = self.context['organisation']
 
         try:
-            user = User.objects.get(email=email)  # pylint: disable=no-member
-        except User.DoesNotExist as exc:  # pylint: disable=no-member
+            user = User.objects.get(email=email)
+        except User.DoesNotExist as exc:
             raise serializers.ValidationError(
                 {'email': 'No user found with this email address.'}
             ) from exc
@@ -163,7 +162,7 @@ class CollaboratorCreateSerializer(serializers.ModelSerializer):
                 {'email': 'Only collaborator accounts may join organisations.'}
             )
 
-        collaborator = Collaborator.objects.create(  # pylint: disable=no-member
+        collaborator = Collaborator.objects.create(
             user=user,
             organisation=organisation,
             **validated_data,

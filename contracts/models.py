@@ -1,6 +1,5 @@
 """Data models for contract templates, drafts, and history tracking."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 import uuid
 
@@ -127,7 +126,7 @@ class ContractClause(BaseModel):
         ordering = ('contract', 'order_index')
 
     def __str__(self):
-        return f"Clause {self.template.identifier} for {self.contract}"  # pylint: disable=no-member
+        return f"Clause {self.template.identifier} for {self.contract}"
 
 
 class ContractVersion(BaseModel):
@@ -156,7 +155,7 @@ class ContractVersion(BaseModel):
     def save(self, *args, **kwargs):
         if self.pk is None and not self.version_number:
             last_version = (
-                type(self).objects.filter(contract=self.contract)  # pylint: disable=no-member
+                type(self).objects.filter(contract=self.contract)
                 .aggregate(max_version=Max('version_number'))
                 .get('max_version')
             )

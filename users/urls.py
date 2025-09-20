@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import (
 
 from .views import MeEntitlementsView, MeRolesView, MeView, RegisterView
 
-app_name = 'users'  # pylint: disable=invalid-name
+app_name = 'users'
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),

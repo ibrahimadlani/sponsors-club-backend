@@ -1,4 +1,3 @@
-# pylint: skip-file
 
 import pytest
 from django.urls import reverse

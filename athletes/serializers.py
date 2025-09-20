@@ -1,6 +1,5 @@
 """Serializers powering athlete CRUD and public views."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -42,7 +41,7 @@ class AthletePublicSerializer(serializers.ModelSerializer):
 class AthleteSerializer(serializers.ModelSerializer):
     sport = SportSerializer(read_only=True)
     sport_id = serializers.PrimaryKeyRelatedField(
-        queryset=Sport.objects.all(),  # pylint: disable=no-member
+        queryset=Sport.objects.all(),
         source='sport',
         write_only=True,
     )
@@ -79,7 +78,7 @@ class AthleteSerializer(serializers.ModelSerializer):
         request = self.context['request']
         try:
             agent_profile = request.user.agent_profile
-        except AgentProfile.DoesNotExist as exc:  # pylint: disable=no-member
+        except AgentProfile.DoesNotExist as exc:
             error = {'non_field_errors': ['Agent profile not found for user.']}
             raise serializers.ValidationError(error) from exc
         if self.instance and self.instance.agent != agent_profile:
@@ -103,14 +102,14 @@ class AthleteSerializer(serializers.ModelSerializer):
             payload = requirement_denied_payload(requirement, message)
             raise PermissionDenied(payload)
         if max_athletes > 0:
-            current_count = Athlete.objects.filter(  # pylint: disable=no-member
+            current_count = Athlete.objects.filter(
                 agent=agent_profile
             ).count()
             if current_count >= max_athletes:
                 message = 'Athlete limit reached. Upgrade to add more athletes.'
                 payload = requirement_denied_payload(requirement, message)
                 raise PermissionDenied(payload)
-        athlete = Athlete.objects.create(  # pylint: disable=no-member
+        athlete = Athlete.objects.create(
             agent=agent_profile,
             **validated_data,
         )

@@ -1,6 +1,5 @@
 """Tests for organisation models, serializers, permissions and API views."""
 
-# pylint: skip-file
 
 import uuid
 

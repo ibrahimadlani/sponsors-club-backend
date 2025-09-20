@@ -9,10 +9,10 @@ from .permissions import CanViewAthlete, IsAgentUser, IsAthleteOwner, IsCollabor
 from .serializers import AthleteSerializer, SportSerializer
 
 
-class AthleteViewSet(viewsets.ModelViewSet):  # pylint: disable=too-many-ancestors
+class AthleteViewSet(viewsets.ModelViewSet):
     """Provide list/retrieve/create/update/delete operations for athletes."""
 
-    queryset = Athlete.objects.select_related('sport', 'agent__user').all()  # pylint: disable=no-member
+    queryset = Athlete.objects.select_related('sport', 'agent__user').all()
 
     def get_serializer_class(self):
         """Return the serializer class used for this action."""
@@ -48,6 +48,6 @@ class SportListView(APIView):
 
     def get(self, _request, *_args, **_kwargs):
         """Return all sports ordered alphabetically by name."""
-        sports = Sport.objects.all().order_by('name')  # pylint: disable=no-member
+        sports = Sport.objects.all().order_by('name')
         serializer = SportSerializer(sports, many=True)
         return Response(serializer.data)

@@ -1,6 +1,5 @@
 """Serializers for messaging threads and messages."""
 
-# pylint: disable=no-member,too-few-public-methods
 
 from django.db import transaction
 from rest_framework import serializers

@@ -1,6 +1,5 @@
 """Minimal stub implementation for Django REST Framework integration."""
 
-# pylint: disable=too-few-public-methods,unused-argument
 
 
 class DjangoFilterBackend:

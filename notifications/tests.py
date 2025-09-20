@@ -1,6 +1,5 @@
 """Integration tests for notification endpoints."""
 
-# pylint: disable=no-member
 
 import pytest
 from django.urls import reverse

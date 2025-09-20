@@ -1,6 +1,5 @@
 """Integration tests for the athletes API endpoints."""
 
-# pylint: disable=no-member,redefined-outer-name,missing-function-docstring,unused-argument
 
 from datetime import date
 

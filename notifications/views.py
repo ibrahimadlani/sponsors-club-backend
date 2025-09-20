@@ -1,6 +1,5 @@
 """Views for listing and updating notifications."""
 
-# pylint: disable=no-member
 
 from rest_framework import generics, permissions, status
 from rest_framework.pagination import PageNumberPagination
@@ -30,7 +29,7 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = NotificationPagination
 
-    def list(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+    def list(self, request, *args, **kwargs):
         """Return notifications or a feature-requirement denial."""
 
         requirement, granted = user_feature_requirement(request.user, 'notification_center')

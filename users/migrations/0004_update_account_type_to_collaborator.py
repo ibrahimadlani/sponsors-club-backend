@@ -1,6 +1,5 @@
 """Update stored account type values to use the collaborator label."""
 
-# pylint: skip-file
 
 from django.db import migrations
 

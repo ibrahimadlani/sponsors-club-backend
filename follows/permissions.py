@@ -1,6 +1,5 @@
 """Custom permission classes for the follows API."""
 
-# pylint: disable=no-member
 
 from rest_framework import permissions
 

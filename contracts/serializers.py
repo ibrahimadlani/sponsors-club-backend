@@ -1,6 +1,5 @@
 """Serializers handling contract creation, clauses, and status updates."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 from django.db import transaction
 from rest_framework import serializers
@@ -127,7 +126,7 @@ class ContractSerializer(serializers.ModelSerializer):
     def get_status_history(self, obj):
         """Serialize the status history ordered by most recent first."""
 
-        history = obj.status_history.order_by('-changed_at')  # pylint: disable=no-member
+        history = obj.status_history.order_by('-changed_at')
         return ContractStatusHistorySerializer(history, many=True).data
 
 
@@ -136,12 +135,12 @@ class ContractClauseInputSerializer(serializers.Serializer):
     order_index = serializers.IntegerField(min_value=0, required=False, default=0)
     values = serializers.JSONField(required=False)
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         """Disallow DRF from attempting to create instances for input serializer."""
 
         raise NotImplementedError('ContractClauseInputSerializer is input-only.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         """Disallow DRF from updating instances for input serializer."""
 
         raise NotImplementedError('ContractClauseInputSerializer is input-only.')
@@ -172,18 +171,18 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         organisation_id = attrs['organisation_id']
         athlete_id = attrs['athlete_id']
 
-        organisation = Organisation.objects.filter(  # pylint: disable=no-member
+        organisation = Organisation.objects.filter(
             id=organisation_id
         ).first()
         if not organisation:
             raise serializers.ValidationError({'organisation_id': 'Organisation not found.'})
-        athlete = Athlete.objects.select_related('agent').filter(  # pylint: disable=no-member
+        athlete = Athlete.objects.select_related('agent').filter(
             id=athlete_id
         ).first()
         if not athlete:
             raise serializers.ValidationError({'athlete_id': 'Athlete not found.'})
 
-        collaborator = Collaborator.objects.filter(  # pylint: disable=no-member
+        collaborator = Collaborator.objects.filter(
             organisation=organisation,
             user=user,
         ).first()
@@ -214,7 +213,7 @@ class ContractCreateSerializer(serializers.ModelSerializer):
 
         resolved_clauses = []
         for clause_data in clauses_data:
-            template = ClauseTemplate.objects.filter(  # pylint: disable=no-member
+            template = ClauseTemplate.objects.filter(
                 id=clause_data['template_id']
             ).first()
             if not template:
@@ -222,7 +221,7 @@ class ContractCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'clauses': message})
             resolved_clauses.append((template, clause_data))
 
-        contract = Contract.objects.create(  # pylint: disable=no-member
+        contract = Contract.objects.create(
             organisation=organisation,
             athlete=athlete,
             created_by=created_by,
@@ -230,7 +229,7 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         )
 
         for template, clause_data in resolved_clauses:
-            ContractClause.objects.create(  # pylint: disable=no-member
+            ContractClause.objects.create(
                 contract=contract,
                 template=template,
                 values=clause_data.get('values', {}),
@@ -244,12 +243,12 @@ class ContractStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Contract.Status.choices)
     reason = serializers.CharField(required=False, allow_blank=True)
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         """Prevent creation; serializer is used only for validation."""
 
         raise NotImplementedError('ContractStatusUpdateSerializer is read-only.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         """Prevent updates; serializer is used only for validation."""
 
         raise NotImplementedError('ContractStatusUpdateSerializer is read-only.')
@@ -267,12 +266,12 @@ class ContractClauseUpsertSerializer(serializers.Serializer):
     order_index = serializers.IntegerField(min_value=0, required=False, default=0)
     values = serializers.JSONField(required=False)
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
+    def create(self, validated_data):
         """Prevent creation attempts for this utility serializer."""
 
         raise NotImplementedError('ContractClauseUpsertSerializer is utility-only.')
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
+    def update(self, instance, validated_data):
         """Prevent update attempts for this utility serializer."""
 
         raise NotImplementedError('ContractClauseUpsertSerializer is utility-only.')

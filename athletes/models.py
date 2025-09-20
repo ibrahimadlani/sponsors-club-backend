@@ -1,6 +1,5 @@
 """Data models describing sports and athletes managed on the platform."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
 
 import uuid
 

@@ -13,7 +13,6 @@ from users.models import AgentProfile
 class BaseModel(models.Model):
     """Abstract base model providing UUID primary key and timestamps."""
 
-    # pylint: disable=too-few-public-methods
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -28,7 +27,6 @@ class BaseModel(models.Model):
 class Thread(BaseModel):
     """Two-way conversation between a collaborator and an agent, optionally about an athlete."""
 
-    # pylint: disable=too-few-public-methods
 
     collaborator = models.ForeignKey(
         Collaborator,
@@ -74,7 +72,6 @@ class Thread(BaseModel):
 class Message(BaseModel):
     """Individual message sent within a thread."""
 
-    # pylint: disable=too-few-public-methods
 
     thread = models.ForeignKey(
         Thread,

@@ -1,6 +1,5 @@
 """Integration tests for contract API behaviour."""
 
-# pylint: disable=no-member,redefined-outer-name,missing-function-docstring,unused-argument
 
 from datetime import date
 

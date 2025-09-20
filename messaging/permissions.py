@@ -1,6 +1,5 @@
 """Permission helpers for the messaging application."""
 
-# pylint: disable=no-member
 
 from rest_framework import permissions
 

@@ -1,6 +1,5 @@
 """Add explicit owner foreign key to organisations."""
 
-# pylint: skip-file
 
 from django.conf import settings
 from django.db import migrations, models

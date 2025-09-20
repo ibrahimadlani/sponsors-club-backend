@@ -27,7 +27,7 @@ class IsAuthenticatedCollaborator(permissions.BasePermission):
             return True
         if organisation is None:
             return False
-        return Collaborator.objects.filter(  # pylint: disable=no-member
+        return Collaborator.objects.filter(
             organisation=organisation,
             user=request.user,
         ).exists()
@@ -41,7 +41,7 @@ class IsOrganisationOwner(permissions.BasePermission):
         organisation = getattr(view, 'organisation', None)
         if organisation is None:
             return False
-        return Collaborator.objects.filter(  # pylint: disable=no-member
+        return Collaborator.objects.filter(
             organisation=organisation,
             user=request.user,
             role=Collaborator.Role.OWNER,

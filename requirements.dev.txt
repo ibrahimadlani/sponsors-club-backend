@@ -1,7 +1,5 @@
 asgiref==3.9.1
-astroid==3.3.11
 coverage==7.10.6
-dill==0.4.0
 Django==4.2.24
 django-filter==25.1
 djangorestframework==3.16.1
@@ -22,7 +20,6 @@ pycodestyle==2.14.0
 pyflakes==3.4.0
 Pygments==2.19.2
 PyJWT==2.10.1
-pylint==3.3.8
 pytest==8.4.2
 pytest-cov==7.0.0
 pytest-django==4.11.1

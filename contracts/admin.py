@@ -1,6 +1,5 @@
 """Admin registrations for contract templates, versions, and status history."""
 
-# pylint: disable=duplicate-code
 
 from django.contrib import admin
 

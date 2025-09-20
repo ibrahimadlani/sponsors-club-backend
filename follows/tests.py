@@ -1,6 +1,5 @@
 """Integration tests for follows endpoints."""
 
-# pylint: disable=no-member
 
 from datetime import date
 

@@ -54,10 +54,10 @@ class ContractsViewSet(viewsets.GenericViewSet):
         """Return contracts accessible to the current user."""
 
         if getattr(self, 'swagger_fake_view', False):  # pragma: no cover
-            return Contract.objects.none()  # pylint: disable=no-member
+            return Contract.objects.none()
 
         user = self.request.user
-        base_qs = Contract.objects.select_related(  # pylint: disable=no-member
+        base_qs = Contract.objects.select_related(
             'organisation',
             'athlete__sport',
             'created_by__user',
@@ -68,14 +68,14 @@ class ContractsViewSet(viewsets.GenericViewSet):
 
         filters = Q()
         collaborator_org_ids = list(
-            Collaborator.objects.filter(user=user)  # pylint: disable=no-member
+            Collaborator.objects.filter(user=user)
             .values_list('organisation_id', flat=True)
         )
         if collaborator_org_ids:
             filters |= Q(organisation_id__in=collaborator_org_ids)
         try:
             agent_profile = user.agent_profile
-        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]  # pylint: disable=no-member
+        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
             agent_profile = None
         if agent_profile:
             filters |= Q(athlete__agent=agent_profile)
@@ -141,7 +141,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
 
         contract.status = new_status
         contract.save(update_fields=['status', 'updated_at'])
-        ContractStatusHistory.objects.create(  # pylint: disable=no-member
+        ContractStatusHistory.objects.create(
             contract=contract,
             from_status=previous_status,
             to_status=new_status,
@@ -156,13 +156,13 @@ class ContractsViewSet(viewsets.GenericViewSet):
         """Return the ordered list of contract versions."""
 
         contract = self.get_object()
-        versions_qs = contract.versions.order_by('-version_number')  # pylint: disable=no-member
+        versions_qs = contract.versions.order_by('-version_number')
         serializer = ContractVersionSerializer(versions_qs, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='clauses')
     @transaction.atomic
-    def upsert_clause(self, request, *_args, **_kwargs):  # pylint: disable=too-many-locals
+    def upsert_clause(self, request, *_args, **_kwargs):
         """Create or update a clause on the contract."""
 
         contract = self.get_object()
@@ -184,14 +184,14 @@ class ContractsViewSet(viewsets.GenericViewSet):
         order_index = serializer.validated_data.get('order_index', 0)
         values = serializer.validated_data.get('values', {})
 
-        template = ClauseTemplate.objects.filter(  # pylint: disable=no-member
+        template = ClauseTemplate.objects.filter(
             id=template_id
         ).first()
         if not template:
             detail = 'Clause template not found.'
             return Response({'detail': detail}, status=status.HTTP_404_NOT_FOUND)
 
-        clause, created = ContractClause.objects.get_or_create(  # pylint: disable=no-member
+        clause, created = ContractClause.objects.get_or_create(
             contract=contract,
             template=template,
             order_index=order_index,
@@ -219,7 +219,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
     def _user_is_owner(self, user, organisation_id):
         """Return True when the user owns the organisation or is superuser."""
 
-        is_owner = Collaborator.objects.filter(  # pylint: disable=no-member
+        is_owner = Collaborator.objects.filter(
             user=user,
             organisation_id=organisation_id,
             role=Collaborator.Role.OWNER,
@@ -243,7 +243,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
         """Persist a snapshot of the current contract state."""
 
         snapshot = self._build_snapshot(contract)
-        ContractVersion.objects.create(  # pylint: disable=no-member
+        ContractVersion.objects.create(
             contract=contract,
             snapshot=snapshot,
             version_number=0,
@@ -253,7 +253,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
         """Return a dictionary representing the current contract state."""
 
         contract.refresh_from_db()
-        clauses = contract.clauses.select_related('template').order_by(  # pylint: disable=no-member
+        clauses = contract.clauses.select_related('template').order_by(
             'order_index'
         )
         amount = contract.amount
@@ -274,7 +274,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
                 {
                     'id': str(clause.id),
                     'template_id': str(clause.template_id),
-                    'template_identifier': clause.template.identifier,  # pylint: disable=no-member
+                    'template_identifier': clause.template.identifier,
                     'values': clause.values,
                     'order_index': clause.order_index,
                 }
@@ -286,7 +286,7 @@ class ContractsViewSet(viewsets.GenericViewSet):
         """Render contract text by substituting placeholder values."""
 
         outputs = []
-        clauses = contract.clauses.select_related('template').order_by(  # pylint: disable=no-member
+        clauses = contract.clauses.select_related('template').order_by(
             'order_index'
         )
         for clause in clauses:
