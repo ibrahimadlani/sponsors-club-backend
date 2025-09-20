@@ -1,7 +1,5 @@
 """Data models describing sports and athletes managed on the platform."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
-
 import uuid
 
 from django.db import models
@@ -36,12 +34,12 @@ class Athlete(BaseModel):
     sport = models.ForeignKey(
         Sport,
         on_delete=models.PROTECT,
-        related_name='athletes',
+        related_name="athletes",
     )
     agent = models.ForeignKey(
         AgentProfile,
         on_delete=models.CASCADE,
-        related_name='athletes',
+        related_name="athletes",
     )
     full_name = models.CharField(max_length=255)
     birth_date = models.DateField()
@@ -50,8 +48,10 @@ class Athlete(BaseModel):
     social_links = models.JSONField(default=dict, blank=True)
     is_self_represented = models.BooleanField(default=False)
     followers_count_cached = models.PositiveIntegerField(default=0)
-    engagement_rate_cached = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    avatar = models.ImageField(upload_to='athlete_avatars/', blank=True, null=True)
+    engagement_rate_cached = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0
+    )
+    avatar = models.ImageField(upload_to="athlete_avatars/", blank=True, null=True)
 
     def __str__(self):
         return str(self.full_name)

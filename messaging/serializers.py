@@ -1,7 +1,5 @@
 """Serializers for messaging threads and messages."""
 
-# pylint: disable=no-member,too-few-public-methods
-
 from django.db import transaction
 from rest_framework import serializers
 
@@ -20,21 +18,21 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = Collaborator
-        fields = ('id', 'organisation_id', 'role')
-        ref_name = 'MessagingCollaboratorSummary'
+        fields = ("id", "organisation_id", "role")
+        ref_name = "MessagingCollaboratorSummary"
 
 
 class AgentProfileSummarySerializer(serializers.ModelSerializer):
     """Expose core agent profile fields for thread payloads."""
 
-    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
         """Serializer configuration."""
 
         model = AgentProfile
-        fields = ('id', 'display_name', 'user_email')
-        ref_name = 'MessagingAgentSummary'
+        fields = ("id", "display_name", "user_email")
+        ref_name = "MessagingAgentSummary"
 
 
 class AthleteSummarySerializer(serializers.ModelSerializer):
@@ -44,8 +42,8 @@ class AthleteSummarySerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = Athlete
-        fields = ('id', 'full_name', 'sport_id')
-        ref_name = 'MessagingAthleteSummary'
+        fields = ("id", "full_name", "sport_id")
+        ref_name = "MessagingAthleteSummary"
 
 
 class ThreadSerializer(serializers.ModelSerializer):
@@ -59,7 +57,7 @@ class ThreadSerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = Thread
-        fields = ('id', *THREAD_PARTICIPANT_COLUMNS, 'updated_at')
+        fields = ("id", *THREAD_PARTICIPANT_COLUMNS, "updated_at")
         read_only_fields = fields
 
 
@@ -73,33 +71,37 @@ class ThreadCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         """Ensure collaborator, agent, and optional athlete inputs are consistent."""
 
-        request = self.context['request']
+        request = self.context["request"]
         user = request.user
 
         collaborator = None
         agent = None
         athlete = None
 
-        collaborator_id = attrs.get('collaborator_id')
-        agent_id = attrs.get('agent_id')
-        athlete_id = attrs.get('athlete_id')
+        collaborator_id = attrs.get("collaborator_id")
+        agent_id = attrs.get("agent_id")
+        athlete_id = attrs.get("athlete_id")
 
         if collaborator_id:
             collaborator = (
                 Collaborator.objects.filter(id=collaborator_id)
-                .select_related('user')
+                .select_related("user")
                 .first()
             )
             if not collaborator:
-                raise serializers.ValidationError({'collaborator_id': 'Collaborator not found.'})
+                raise serializers.ValidationError(
+                    {"collaborator_id": "Collaborator not found."}
+                )
         if agent_id:
-            agent = AgentProfile.objects.filter(id=agent_id).select_related('user').first()
+            agent = (
+                AgentProfile.objects.filter(id=agent_id).select_related("user").first()
+            )
             if not agent:
-                raise serializers.ValidationError({'agent_id': 'Agent not found.'})
+                raise serializers.ValidationError({"agent_id": "Agent not found."})
         if athlete_id:
             athlete = Athlete.objects.filter(id=athlete_id).first()
             if not athlete:
-                raise serializers.ValidationError({'athlete_id': 'Athlete not found.'})
+                raise serializers.ValidationError({"athlete_id": "Athlete not found."})
 
         # Determine collaborator and agent based on requesting user if not provided
         if collaborator is None:
@@ -112,17 +114,17 @@ class ThreadCreateSerializer(serializers.Serializer):
 
         if collaborator is None or agent is None:
             raise serializers.ValidationError(
-                'A collaborator and an agent must be specified.'
+                "A collaborator and an agent must be specified."
             )
 
         if user.id not in {collaborator.user_id, agent.user_id}:
             raise serializers.ValidationError(
-                'User must represent either the collaborator or the agent.'
+                "User must represent either the collaborator or the agent."
             )
 
-        attrs['collaborator'] = collaborator
-        attrs['agent'] = agent
-        attrs['athlete'] = athlete
+        attrs["collaborator"] = collaborator
+        attrs["agent"] = agent
+        attrs["athlete"] = athlete
 
         # Prevent duplicate threads
         existing = Thread.objects.filter(
@@ -131,7 +133,9 @@ class ThreadCreateSerializer(serializers.Serializer):
             athlete=athlete,
         ).exists()
         if existing:
-            raise serializers.ValidationError('Thread already exists for these participants.')
+            raise serializers.ValidationError(
+                "Thread already exists for these participants."
+            )
 
         return attrs
 
@@ -139,9 +143,9 @@ class ThreadCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         """Persist a new thread based on validated participant data."""
 
-        collaborator = validated_data['collaborator']
-        agent = validated_data['agent']
-        athlete = validated_data['athlete']
+        collaborator = validated_data["collaborator"]
+        agent = validated_data["agent"]
+        athlete = validated_data["athlete"]
         thread = Thread.objects.create(
             collaborator=collaborator,
             agent=agent,
@@ -152,29 +156,29 @@ class ThreadCreateSerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         """Thread updates are not supported for this serializer."""
 
-        raise NotImplementedError('Thread updates are not supported.')
+        raise NotImplementedError("Thread updates are not supported.")
 
 
 class MessageSerializer(serializers.ModelSerializer):
     """Serialize individual messages, exposing sender metadata."""
 
-    sender_email = serializers.EmailField(source='sender.email', read_only=True)
+    sender_email = serializers.EmailField(source="sender.email", read_only=True)
 
     class Meta:
         """Serializer configuration."""
 
         model = Message
         fields = (
-            'id',
-            'thread',
-            'sender',
-            'sender_email',
-            'content',
-            'attachment',
-            'is_read',
-            'created_at',
+            "id",
+            "thread",
+            "sender",
+            "sender_email",
+            "content",
+            "attachment",
+            "is_read",
+            "created_at",
         )
-        read_only_fields = ('id', 'thread', 'sender', 'sender_email', 'created_at')
+        read_only_fields = ("id", "thread", "sender", "sender_email", "created_at")
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):
@@ -184,29 +188,31 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = Message
-        fields = ('content', 'attachment')
+        fields = ("content", "attachment")
 
     def validate(self, attrs):
         """Ensure a message includes content or an attachment."""
 
-        content = attrs.get('content', '').strip()
-        if not content and not attrs.get('attachment'):
-            raise serializers.ValidationError('Message must contain content or an attachment.')
+        content = attrs.get("content", "").strip()
+        if not content and not attrs.get("attachment"):
+            raise serializers.ValidationError(
+                "Message must contain content or an attachment."
+            )
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         """Create the message, updating the thread last-message timestamp."""
 
-        thread = self.context['thread']
-        sender = self.context['request'].user
+        thread = self.context["thread"]
+        sender = self.context["request"].user
         message = Message.objects.create(
             thread=thread,
             sender=sender,
             **validated_data,
         )
         thread.last_message_at = message.created_at
-        thread.save(update_fields=['last_message_at', 'updated_at'])
+        thread.save(update_fields=["last_message_at", "updated_at"])
         return message
 
 
@@ -217,11 +223,11 @@ class MessageReadSerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = Message
-        fields = ('is_read',)
+        fields = ("is_read",)
 
     def update(self, instance, validated_data):
         """Persist the new read state."""
 
-        instance.is_read = validated_data.get('is_read', True)
-        instance.save(update_fields=['is_read', 'updated_at'])
+        instance.is_read = validated_data.get("is_read", True)
+        instance.save(update_fields=["is_read", "updated_at"])
         return instance

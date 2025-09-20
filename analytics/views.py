@@ -23,7 +23,7 @@ from .serializers import (
 )
 
 
-ATHLETE_STATS_REQUIREMENT = COLLABORATOR_FEATURES['athlete_stats_all']
+ATHLETE_STATS_REQUIREMENT = COLLABORATOR_FEATURES["athlete_stats_all"]
 
 
 def _user_can_view_athlete_stats(user, athlete):
@@ -54,9 +54,7 @@ def _user_can_access_stats_batch(user, athlete_ids):
     agent_profile = get_agent_profile(user)
     if agent_profile:
         owned_ids = set(
-            Athlete.objects.filter(  # pylint: disable=no-member
-                agent=agent_profile
-            ).values_list('id', flat=True)
+            Athlete.objects.filter(agent=agent_profile).values_list("id", flat=True)
         )
         if set(athlete_ids).issubset(owned_ids):
             return True
@@ -64,9 +62,7 @@ def _user_can_access_stats_batch(user, athlete_ids):
 
 
 def _latest_stats_for_athlete(athlete):
-    stats = AthleteStat.objects.filter(  # pylint: disable=no-member
-        athlete=athlete
-    ).order_by('-date')
+    stats = AthleteStat.objects.filter(athlete=athlete).order_by("-date")
     latest_by_metric = {}
     for stat in stats:
         latest_by_metric.setdefault(stat.metric, stat)
@@ -81,14 +77,16 @@ class AthleteStatsView(APIView):
 
     def get(self, request, athlete_id):
         """Return the latest stats for the requested athlete."""
-        athlete = Athlete.objects.filter(id=athlete_id).first()  # pylint: disable=no-member
+        athlete = Athlete.objects.filter(id=athlete_id).first()
         if not athlete:
-            return Response({'detail': 'Athlete not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Athlete not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         if not _user_can_view_athlete_stats(request.user, athlete):
             payload = requirement_denied_payload(
                 ATHLETE_STATS_REQUIREMENT,
-                'Stats access restricted to owning agents or subscribed organisations.',
+                "Stats access restricted to owning agents or subscribed organisations.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
@@ -99,30 +97,29 @@ class AthleteStatsView(APIView):
     @transaction.atomic
     def post(self, request, athlete_id):
         """Create a new datapoint for the requested athlete."""
-        athlete = (
-            Athlete.objects.filter(id=athlete_id)  # pylint: disable=no-member
-            .select_related('agent')
-            .first()
-        )
+        athlete = Athlete.objects.filter(id=athlete_id).select_related("agent").first()
         if not athlete:
-            return Response({'detail': 'Athlete not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Athlete not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        if (
-            not request.user.is_staff
-            and not _user_can_modify_athlete_stats(request.user, athlete)
+        if not request.user.is_staff and not _user_can_modify_athlete_stats(
+            request.user, athlete
         ):
             return Response(
-                {'detail': 'Only the athlete agent or staff may add stats.'},
+                {"detail": "Only the athlete agent or staff may add stats."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = AthleteStatCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        stat = AthleteStat.objects.create(  # pylint: disable=no-member
+        stat = AthleteStat.objects.create(
             athlete=athlete,
             **serializer.validated_data,
         )
-        return Response(AthleteStatSerializer(stat).data, status=status.HTTP_201_CREATED)
+        return Response(
+            AthleteStatSerializer(stat).data, status=status.HTTP_201_CREATED
+        )
 
 
 class AthleteStatsTimeseriesView(APIView):
@@ -132,21 +129,21 @@ class AthleteStatsTimeseriesView(APIView):
 
     def get(self, request, athlete_id):
         """Return the full time series for the athlete."""
-        athlete = Athlete.objects.filter(id=athlete_id).first()  # pylint: disable=no-member
+        athlete = Athlete.objects.filter(id=athlete_id).first()
         if not athlete:
-            return Response({'detail': 'Athlete not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Athlete not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         if not _user_can_view_athlete_stats(request.user, athlete):
             payload = requirement_denied_payload(
                 ATHLETE_STATS_REQUIREMENT,
-                'Stats access restricted to owning agents or subscribed organisations.',
+                "Stats access restricted to owning agents or subscribed organisations.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
-        metric_filter = request.query_params.getlist('metric') or None
-        qs = AthleteStat.objects.filter(  # pylint: disable=no-member
-            athlete_id=athlete_id
-        ).order_by('date')
+        metric_filter = request.query_params.getlist("metric") or None
+        qs = AthleteStat.objects.filter(athlete_id=athlete_id).order_by("date")
         if metric_filter:
             qs = qs.filter(metric__in=metric_filter)
         serializer = AthleteStatSerializer(qs, many=True)
@@ -163,20 +160,20 @@ class AthleteStatsBatchView(APIView):
         serializer = AthleteStatsBatchRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        athlete_ids = data['athlete_ids']
-        metrics = data['metrics']
+        athlete_ids = data["athlete_ids"]
+        metrics = data["metrics"]
 
         if not _user_can_access_stats_batch(request.user, athlete_ids):
             payload = requirement_denied_payload(
                 ATHLETE_STATS_REQUIREMENT,
-                'Stats access restricted to owning agents or subscribed organisations.',
+                "Stats access restricted to owning agents or subscribed organisations.",
             )
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
-        stats = AthleteStat.objects.filter(  # pylint: disable=no-member
+        stats = AthleteStat.objects.filter(
             athlete_id__in=athlete_ids,
             metric__in=metrics,
-        ).order_by('athlete_id', 'metric', '-date')
+        ).order_by("athlete_id", "metric", "-date")
 
         latest_by_metric = {}
         for stat in stats:

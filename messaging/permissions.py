@@ -1,7 +1,5 @@
 """Permission helpers for the messaging application."""
 
-# pylint: disable=no-member
-
 from rest_framework import permissions
 
 from .models import Thread
@@ -16,14 +14,14 @@ class IsThreadParticipant(permissions.BasePermission):
         if isinstance(obj, Thread):
             thread = obj
         else:
-            thread = getattr(obj, 'thread', None)
+            thread = getattr(obj, "thread", None)
             if thread is None:
                 return False
         user = request.user
         if not user or not user.is_authenticated:
             return False
-        collaborator_user_id = getattr(thread.collaborator, 'user_id', None)
-        agent_user_id = getattr(thread.agent, 'user_id', None)
+        collaborator_user_id = getattr(thread.collaborator, "user_id", None)
+        agent_user_id = getattr(thread.agent, "user_id", None)
         return user.id in {collaborator_user_id, agent_user_id}
 
     def has_permission(self, request, view):

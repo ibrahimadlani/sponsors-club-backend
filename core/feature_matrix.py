@@ -20,146 +20,146 @@ class FeatureRequirement:
 
 
 AGENT_FEATURES = {
-    'messaging_initiate': FeatureRequirement(
-        key='messaging_tier',
-        allowed_values=('limited', 'pro_plus', 'enterprise'),
-        label='Messaging (initiate threads)',
+    "messaging_initiate": FeatureRequirement(
+        key="messaging_tier",
+        allowed_values=("limited", "pro_plus", "enterprise"),
+        label="Messaging (initiate threads)",
         description=(
-            'Allows an agent to initiate new messaging threads with collaborators.'
+            "Allows an agent to initiate new messaging threads with collaborators."
         ),
         denied_message=(
-            'Messaging upgrade required: switch to Agent Pro+ '
-            '(messaging_tier=pro_plus) to open new conversations.'
+            "Messaging upgrade required: switch to Agent Pro+ "
+            "(messaging_tier=pro_plus) to open new conversations."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/agent',
-        recommended_plans=('Agent Pro+', 'Agent Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/agent",
+        recommended_plans=("Agent Pro+", "Agent Enterprise"),
     ),
-    'subscription_management': FeatureRequirement(
-        key='agent_subscription_management',
-        label='Manage agent subscription',
-        description='Allows an agent to manage their own subscription.',
+    "subscription_management": FeatureRequirement(
+        key="agent_subscription_management",
+        label="Manage agent subscription",
+        description="Allows an agent to manage their own subscription.",
         denied_message=(
-            'Upgrade to an agent subscription plan to manage billing from the dashboard.'
+            "Upgrade to an agent subscription plan to manage billing from the dashboard."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/agent',
+        upgrade_url="https://app.sponsorsclub.com/plans/agent",
     ),
-    'contract_management': FeatureRequirement(
-        key='contract_tools',
-        allowed_values=('enabled',),
-        label='Contract workspace',
-        description='Allows an agent to collaborate on contracts for their athletes.',
+    "contract_management": FeatureRequirement(
+        key="contract_tools",
+        allowed_values=("enabled",),
+        label="Contract workspace",
+        description="Allows an agent to collaborate on contracts for their athletes.",
         denied_message=(
-            'Contract workspace is locked. Upgrade your agent plan '
-            '(contract_tools=enabled) to continue.'
+            "Contract workspace is locked. Upgrade your agent plan "
+            "(contract_tools=enabled) to continue."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/agent',
-        recommended_plans=('Agent Pro+', 'Agent Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/agent",
+        recommended_plans=("Agent Pro+", "Agent Enterprise"),
     ),
-    'notification_center': FeatureRequirement(
-        key='notification_center',
-        label='Notification center',
-        description='Allows an agent to receive in-app notifications and alerts.',
+    "notification_center": FeatureRequirement(
+        key="notification_center",
+        label="Notification center",
+        description="Allows an agent to receive in-app notifications and alerts.",
         denied_message=(
-            'Enable the notification center add-on in your agent plan to view alerts.'
+            "Enable the notification center add-on in your agent plan to view alerts."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/agent',
-        recommended_plans=('Agent Pro+', 'Agent Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/agent",
+        recommended_plans=("Agent Pro+", "Agent Enterprise"),
     ),
-    'athlete_slots': FeatureRequirement(
-        key='max_athletes',
-        label='Athlete roster slots',
-        description='Defines how many athletes an agent can manage simultaneously.',
+    "athlete_slots": FeatureRequirement(
+        key="max_athletes",
+        label="Athlete roster slots",
+        description="Defines how many athletes an agent can manage simultaneously.",
         denied_message=(
-            'Athlete limit reached. Upgrade to Agent Pro or Agency for additional roster slots.'
+            "Athlete limit reached. Upgrade to Agent Pro or Agency for additional roster slots."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/agent',
-        recommended_plans=('Agent Pro', 'Agent Agency'),
+        upgrade_url="https://app.sponsorsclub.com/plans/agent",
+        recommended_plans=("Agent Pro", "Agent Agency"),
     ),
 }
 
 
 COLLABORATOR_FEATURES = {
-    'athlete_stats_all': FeatureRequirement(
-        key='athlete_stats_scope',
-        allowed_values=('all',),
-        label='Athlete statistics (all)',
+    "athlete_stats_all": FeatureRequirement(
+        key="athlete_stats_scope",
+        allowed_values=("all",),
+        label="Athlete statistics (all)",
         description=(
-            'Allows organisation collaborators to view athlete statistics platform-wide.'
+            "Allows organisation collaborators to view athlete statistics platform-wide."
         ),
         denied_message=(
-            'Requires organisation subscription with athlete_stats_scope=all '
-            '(Organisation Pro or higher) to unlock athlete insights.'
+            "Requires organisation subscription with athlete_stats_scope=all "
+            "(Organisation Pro or higher) to unlock athlete insights."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
-    'collaborator_invites': FeatureRequirement(
-        key='collaborator_invites',
-        label='Invite collaborators',
-        description='Allows organisation owners to invite new collaborators.',
+    "collaborator_invites": FeatureRequirement(
+        key="collaborator_invites",
+        label="Invite collaborators",
+        description="Allows organisation owners to invite new collaborators.",
         denied_message=(
-            'Upgrade your organisation plan to invite additional collaborators.'
+            "Upgrade your organisation plan to invite additional collaborators."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
     ),
-    'organisation_subscription_management': FeatureRequirement(
-        key='organisation_subscription_management',
-        label='Manage organisation subscription',
-        description='Allows organisation owners to manage billing and subscriptions.',
+    "organisation_subscription_management": FeatureRequirement(
+        key="organisation_subscription_management",
+        label="Manage organisation subscription",
+        description="Allows organisation owners to manage billing and subscriptions.",
         denied_message=(
-            'Upgrade your organisation plan to manage billing inside Sponsors Club.'
+            "Upgrade your organisation plan to manage billing inside Sponsors Club."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
-    'contract_management': FeatureRequirement(
-        key='contract_tools',
-        allowed_values=('enabled',),
-        label='Contract workspace',
-        description='Allows organisation owners to negotiate and sign contracts with athletes.',
+    "contract_management": FeatureRequirement(
+        key="contract_tools",
+        allowed_values=("enabled",),
+        label="Contract workspace",
+        description="Allows organisation owners to negotiate and sign contracts with athletes.",
         denied_message=(
-            'Unlock the contract workspace by upgrading to Organisation Pro '
-            '(contract_tools=enabled).'
+            "Unlock the contract workspace by upgrading to Organisation Pro "
+            "(contract_tools=enabled)."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
-    'notification_center': FeatureRequirement(
-        key='notification_center',
-        label='Notification center',
-        description='Allows collaborators to receive in-app notifications and alerts.',
+    "notification_center": FeatureRequirement(
+        key="notification_center",
+        label="Notification center",
+        description="Allows collaborators to receive in-app notifications and alerts.",
         denied_message=(
-            'Upgrade your organisation plan to receive notifications in Sponsors Club.'
+            "Upgrade your organisation plan to receive notifications in Sponsors Club."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
-    'follow_slots': FeatureRequirement(
-        key='max_follows',
-        label='Tracked athletes',
-        description='Controls how many athletes the organisation can follow from the marketplace.',
+    "follow_slots": FeatureRequirement(
+        key="max_follows",
+        label="Tracked athletes",
+        description="Controls how many athletes the organisation can follow from the marketplace.",
         denied_message=(
-            'Follow limit reached. Upgrade your organisation plan to track more athletes.'
+            "Follow limit reached. Upgrade your organisation plan to track more athletes."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
-    'collaborator_slots': FeatureRequirement(
-        key='max_collaborators',
-        label='Collaborator seats',
+    "collaborator_slots": FeatureRequirement(
+        key="max_collaborators",
+        label="Collaborator seats",
         description=(
-            'Defines how many teammates can collaborate under the organisation workspace.'
+            "Defines how many teammates can collaborate under the organisation workspace."
         ),
         denied_message=(
-            'Collaborator limit reached. Upgrade your organisation plan to add more teammates.'
+            "Collaborator limit reached. Upgrade your organisation plan to add more teammates."
         ),
-        upgrade_url='https://app.sponsorsclub.com/plans/organisation',
-        recommended_plans=('Organisation Pro', 'Organisation Enterprise'),
+        upgrade_url="https://app.sponsorsclub.com/plans/organisation",
+        recommended_plans=("Organisation Pro", "Organisation Enterprise"),
     ),
 }
 
 
 FEATURE_MATRIX = {
-    'agent': AGENT_FEATURES,
-    'collaborator': COLLABORATOR_FEATURES,
+    "agent": AGENT_FEATURES,
+    "collaborator": COLLABORATOR_FEATURES,
 }

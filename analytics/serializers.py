@@ -1,7 +1,5 @@
 """Serializers backing analytics endpoints."""
 
-# pylint: disable=missing-class-docstring,too-few-public-methods
-
 from rest_framework import serializers
 
 from .models import AthleteStat
@@ -13,15 +11,15 @@ class AthleteStatSerializer(serializers.ModelSerializer):
     class Meta:
         model = AthleteStat
         fields = (
-            'id',
-            'athlete',
-            'metric',
-            'value',
-            'date',
-            'extra',
-            'created_at',
+            "id",
+            "athlete",
+            "metric",
+            "value",
+            "date",
+            "extra",
+            "created_at",
         )
-        read_only_fields = ('id', 'athlete', 'created_at')
+        read_only_fields = ("id", "athlete", "created_at")
 
 
 class AthleteStatCreateSerializer(serializers.ModelSerializer):
@@ -29,10 +27,10 @@ class AthleteStatCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AthleteStat
-        fields = ('metric', 'value', 'date', 'extra')
+        fields = ("metric", "value", "date", "extra")
 
     def validate(self, attrs):
-        attrs.setdefault('extra', {})
+        attrs.setdefault("extra", {})
         return attrs
 
 
@@ -44,11 +42,11 @@ class AthleteStatAggregateSerializer(serializers.Serializer):
     date = serializers.DateField()
     extra = serializers.JSONField()
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
-        raise NotImplementedError('Aggregate serializer is read-only.')
+    def create(self, validated_data):
+        raise NotImplementedError("Aggregate serializer is read-only.")
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
-        raise NotImplementedError('Aggregate serializer is read-only.')
+    def update(self, instance, validated_data):
+        raise NotImplementedError("Aggregate serializer is read-only.")
 
 
 class AthleteStatsBatchRequestSerializer(serializers.Serializer):
@@ -63,8 +61,8 @@ class AthleteStatsBatchRequestSerializer(serializers.Serializer):
         allow_empty=False,
     )
 
-    def create(self, validated_data):  # pylint: disable=unused-argument
-        raise NotImplementedError('Batch request serializer is read-only.')
+    def create(self, validated_data):
+        raise NotImplementedError("Batch request serializer is read-only.")
 
-    def update(self, instance, validated_data):  # pylint: disable=unused-argument
-        raise NotImplementedError('Batch request serializer is read-only.')
+    def update(self, instance, validated_data):
+        raise NotImplementedError("Batch request serializer is read-only.")

@@ -6,8 +6,8 @@ from rest_framework.routers import DefaultRouter
 from .views import ContractsViewSet
 
 router = DefaultRouter()
-router.register(r'contracts', ContractsViewSet, basename='contract')
+router.register(r"contracts", ContractsViewSet, basename="contract")
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]
