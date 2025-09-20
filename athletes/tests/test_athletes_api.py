@@ -200,6 +200,45 @@ def test_sport_serializer(sport):
 
 
 @pytest.mark.django_db
+def test_my_athletes_view_returns_only_owned_athletes(
+    api_client, agent_user, athlete, sport, other_agent_user
+):
+    Athlete.objects.create(
+        sport=sport,
+        agent=other_agent_user.agent_profile,
+        full_name="Jane Smith",
+        birth_date=date(1992, 2, 2),
+        nationality="US",
+        bio="Other bio",
+        social_links={"twitter": "jane_smith"},
+    )
+
+    api_client.force_authenticate(agent_user)
+    url = reverse("my-athletes")
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == str(athlete.id)
+
+
+@pytest.mark.django_db
+def test_my_athletes_view_denies_non_agent_access(api_client, user_model):
+    collaborator = user_model.objects.create_user(
+        email="collab@example.com",
+        password="pass1234",
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+
+    api_client.force_authenticate(collaborator)
+    url = reverse("my-athletes")
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_athlete_list_requires_authentication(athlete):
     client = APIClient()
     url = reverse("athlete-list")
