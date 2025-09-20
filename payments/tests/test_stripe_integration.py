@@ -17,6 +17,7 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
     """Checkout session creation should call Stripe with scope metadata."""
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+    settings.STRIPE_SECRET_KEY = "sk_test_dummy"
 
     plan = SubscriptionPlan.objects.get(code="agent-pro")
     plan.stripe_product_id = "prod_test_123"
@@ -90,6 +91,7 @@ def test_checkout_session_creation_creates_missing_price(
     """When no matching price exists, the integration should create one automatically."""
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+    settings.STRIPE_SECRET_KEY = "sk_test_dummy"
 
     plan = SubscriptionPlan.objects.get(code="agent-pro")
     plan.stripe_product_id = "prod_test_123"
@@ -155,6 +157,7 @@ def test_checkout_session_creation_recovers_from_missing_product(
     """If the configured product is missing, it should be recreated automatically."""
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+    settings.STRIPE_SECRET_KEY = "sk_test_dummy"
 
     plan = SubscriptionPlan.objects.get(code="agent-pro")
     plan.stripe_product_id = "prod_missing"
@@ -288,3 +291,39 @@ def test_webhook_synchronises_subscription(api_client, agent_user, settings, mon
         subscription_payload["current_period_end"], tz=datetime_timezone.utc
     )
     assert subscription.current_period_end == expected_end
+
+
+@pytest.mark.django_db
+def test_checkout_session_fails_without_stripe_secret_key(
+    api_client, agent_user, settings
+):
+    """Missing Stripe configuration should return a service unavailable error."""
+
+    settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+    settings.STRIPE_SECRET_KEY = ""
+
+    plan = SubscriptionPlan.objects.get(code="agent-pro")
+    plan.stripe_product_id = "prod_test_123"
+    plan.stripe_price_id = ""
+    plan.save(update_fields=["stripe_product_id", "stripe_price_id", "updated_at"])
+
+    client = api_client
+    client.force_authenticate(user=agent_user)
+
+    payload = {
+        "plan_id": str(plan.id),
+        "agent_id": str(agent_user.agent_profile.id),
+        "success_url": "https://example.com/success?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": "https://example.com/cancel",
+    }
+
+    response = client.post(
+        reverse("payments-stripe-checkout"),
+        data=payload,
+        format="json",
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Stripe integration is not configured. Please contact support."
+    )

@@ -34,7 +34,7 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
+stripe.api_key = settings.STRIPE_SECRET_KEY or None
 if getattr(settings, "STRIPE_API_VERSION", None):
     stripe.api_version = settings.STRIPE_API_VERSION
 stripe.max_network_retries = 2
@@ -42,6 +42,21 @@ stripe.max_network_retries = 2
 
 class StripePlanConfigurationError(Exception):
     """Raised when a subscription plan lacks Stripe configuration."""
+
+
+class StripeConfigurationError(Exception):
+    """Raised when the Stripe integration is not properly configured."""
+
+
+def _require_stripe_secret_key() -> str:
+    """Ensure a Stripe secret key is configured before making API calls."""
+
+    secret_key = getattr(settings, "STRIPE_SECRET_KEY", "") or ""
+    if not secret_key:
+        raise StripeConfigurationError(
+            "Stripe integration is not configured. Please contact support."
+        )
+    return secret_key
 
 
 def _decimal_to_cents(amount: Decimal) -> int:
@@ -136,6 +151,8 @@ def _select_matching_price(
 
 def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
     """Ensure the plan is associated with an active Stripe price."""
+
+    _require_stripe_secret_key()
 
     if plan.stripe_price_id:
         return plan.stripe_price_id
@@ -383,6 +400,12 @@ class StripeCheckoutSessionView(APIView):
 
         try:
             price_id = ensure_plan_price_id(plan)
+        except StripeConfigurationError as exc:
+            logger.warning("Stripe configuration error when creating checkout: %s", exc)
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except StripePlanConfigurationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -422,6 +445,7 @@ class StripeCheckoutSessionView(APIView):
             session_payload["customer_email"] = request.user.email
 
         try:
+            _require_stripe_secret_key()
             session = stripe.checkout.Session.create(**session_payload)
         except StripeError as exc:  # pragma: no cover - network failures
             logger.exception(
@@ -612,6 +636,7 @@ class StripeWebhookView(APIView):
                 )
             else:
                 try:
+                    _require_stripe_secret_key()
                     subscription_object = stripe.Subscription.retrieve(subscription_id)
                 except StripeError as exc:  # pragma: no cover - network failures
                     logger.exception(
@@ -620,6 +645,14 @@ class StripeWebhookView(APIView):
                     return Response(
                         {"detail": "Unable to retrieve subscription."},
                         status=status.HTTP_502_BAD_GATEWAY,
+                    )
+                except StripeConfigurationError as exc:
+                    logger.warning(
+                        "Stripe configuration error when handling webhook: %s", exc
+                    )
+                    return Response(
+                        {"detail": str(exc)},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
                     )
                 subscription_payload = to_plain_dict(subscription_object)
                 sync_subscription_from_payload(subscription_payload, metadata)
