@@ -1,14 +1,19 @@
 """Views powering the payments API."""
 
 import logging
-from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone as datetime_timezone
+from typing import Any, Dict, Iterable, Optional
 
+import stripe
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from stripe.error import InvalidRequestError, SignatureVerificationError, StripeError
 
-from organisations.models import Collaborator
+from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile
 
 from core.feature_matrix import AGENT_FEATURES, COLLABORATOR_FEATURES
@@ -20,12 +25,346 @@ from core.permissions import (
 
 from .models import Subscription, SubscriptionPlan
 from .serializers import (
+    StripeCheckoutSessionSerializer,
     SubscriptionCreateSerializer,
     SubscriptionPlanSerializer,
     SubscriptionSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY or None
+if getattr(settings, "STRIPE_API_VERSION", None):
+    stripe.api_version = settings.STRIPE_API_VERSION
+stripe.max_network_retries = 2
+
+
+class StripePlanConfigurationError(Exception):
+    """Raised when a subscription plan lacks Stripe configuration."""
+
+
+class StripeConfigurationError(Exception):
+    """Raised when the Stripe integration is not properly configured."""
+
+
+def _require_stripe_secret_key() -> str:
+    """Ensure a Stripe secret key is configured before making API calls."""
+
+    secret_key = getattr(settings, "STRIPE_SECRET_KEY", "") or ""
+    if not secret_key:
+        raise StripeConfigurationError(
+            "Stripe integration is not configured. Please contact support."
+        )
+    return secret_key
+
+
+def _decimal_to_cents(amount: Decimal) -> int:
+    """Convert a decimal amount to minor currency units (cents)."""
+
+    quantized = (amount or Decimal("0")).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    return int((quantized * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _ensure_plan_product(plan: SubscriptionPlan) -> str:
+    """Ensure a Stripe product exists for the given plan."""
+
+    if plan.stripe_product_id:
+        try:
+            product = stripe.Product.retrieve(plan.stripe_product_id)
+            product_id = getattr(product, "id", None) or (
+                product.get("id") if isinstance(product, dict) else None
+            )
+            if product_id:
+                return product_id
+        except InvalidRequestError as exc:
+            if getattr(exc, "code", "") != "resource_missing":
+                raise StripePlanConfigurationError(
+                    "Unable to verify the Stripe product for this plan."
+                ) from exc
+        except StripeError as exc:  # pragma: no cover - defensive logging path
+            raise StripePlanConfigurationError(
+                "Unable to verify the Stripe product for this plan."
+            ) from exc
+
+    try:
+        product = stripe.Product.create(
+            name=plan.name,
+            metadata={
+                "plan_id": str(plan.id),
+                "plan_code": plan.code,
+            },
+        )
+    except StripeError as exc:  # pragma: no cover - defensive logging path
+        raise StripePlanConfigurationError(
+            "Unable to create a Stripe product for this plan."
+        ) from exc
+
+    product_id = getattr(product, "id", None) or (
+        product.get("id") if isinstance(product, dict) else None
+    )
+    if not product_id:
+        raise StripePlanConfigurationError(
+            "Unable to determine the Stripe product identifier for this plan."
+        )
+
+    plan.stripe_product_id = product_id
+    plan.save(update_fields=["stripe_product_id", "updated_at"])
+    return product_id
+
+
+def _select_matching_price(
+    prices: Iterable[Any], plan: SubscriptionPlan
+) -> Optional[str]:
+    """Return the identifier of a price that matches the plan amount and currency."""
+
+    target_currency = (plan.currency or "").lower()
+    expected_amount = _decimal_to_cents(plan.price)
+
+    for price_obj in prices:
+        price_dict = to_plain_dict(price_obj)
+        currency = (
+            price_dict.get("currency") or getattr(price_obj, "currency", "")
+        ).lower()
+        if currency != target_currency:
+            continue
+
+        amount = price_dict.get("unit_amount")
+        if amount is None:
+            amount = getattr(price_obj, "unit_amount", None)
+        unit_amount_decimal = price_dict.get("unit_amount_decimal") or getattr(
+            price_obj, "unit_amount_decimal", None
+        )
+        if amount is None and unit_amount_decimal is not None:
+            try:
+                amount = int(Decimal(str(unit_amount_decimal)))
+            except (ArithmeticError, ValueError):  # pragma: no cover - invalid payload
+                continue
+
+        if amount == expected_amount:
+            price_id = price_dict.get("id") or getattr(price_obj, "id", None)
+            if price_id:
+                return price_id
+    return None
+
+
+def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
+    """Ensure the plan is associated with an active Stripe price."""
+
+    _require_stripe_secret_key()
+
+    if plan.stripe_price_id:
+        return plan.stripe_price_id
+
+    product_id = _ensure_plan_product(plan)
+
+    try:
+        prices = stripe.Price.list(
+            product=product_id,
+            active=True,
+            type="recurring",
+            limit=10,
+        )
+    except StripeError as exc:  # pragma: no cover - defensive logging path
+        raise StripePlanConfigurationError(
+            "Unable to fetch price information from Stripe."
+        ) from exc
+
+    price_data = getattr(prices, "data", None) or []
+    price_id = _select_matching_price(price_data, plan)
+
+    if price_id is None and price_data:
+        # A recurring price exists but does not match the configured amount; fall back to
+        # creating a dedicated price to ensure checkout consistency.
+        logger.warning(
+            "Plan %s has mismatched Stripe prices; creating a dedicated price.",
+            plan.code,
+        )
+
+    if price_id is None:
+        try:
+            created_price = stripe.Price.create(
+                product=product_id,
+                currency=(plan.currency or "").lower(),
+                unit_amount=_decimal_to_cents(plan.price),
+                recurring={"interval": "month"},
+                nickname=plan.name,
+                metadata={
+                    "plan_id": str(plan.id),
+                    "plan_code": plan.code,
+                },
+            )
+        except StripeError as exc:  # pragma: no cover - defensive logging path
+            raise StripePlanConfigurationError(
+                "Unable to create a Stripe price for this plan."
+            ) from exc
+
+        price_id = getattr(created_price, "id", None) or (
+            created_price.get("id") if isinstance(created_price, dict) else None
+        )
+
+    if not price_id:
+        raise StripePlanConfigurationError(
+            "Unable to determine the Stripe price identifier for this plan."
+        )
+
+    plan.stripe_price_id = price_id
+    plan.save(update_fields=["stripe_price_id", "updated_at"])
+    return price_id
+
+
+def timestamp_to_datetime(timestamp: Optional[Any]) -> Optional[datetime]:
+    """Convert a Stripe timestamp to an aware datetime."""
+
+    if timestamp in (None, ""):
+        return None
+    try:
+        return datetime.fromtimestamp(int(timestamp), tz=datetime_timezone.utc)
+    except (TypeError, ValueError, OSError):  # pragma: no cover - invalid payload guard
+        return None
+
+
+def to_plain_dict(payload: Any) -> Dict[str, Any]:
+    """Convert Stripe objects to dictionaries for easier handling."""
+
+    if isinstance(payload, dict):
+        return payload
+    if hasattr(payload, "to_dict"):
+        return payload.to_dict()
+    if hasattr(payload, "__dict__"):
+        return vars(payload)
+    return {}
+
+
+def resolve_subscription_plan(
+    data_object: Dict[str, Any], metadata: Dict[str, Any]
+) -> Optional[SubscriptionPlan]:
+    """Resolve the subscription plan matching the Stripe payload."""
+
+    plan_id = metadata.get("plan_id")
+    if plan_id:
+        plan = SubscriptionPlan.objects.filter(id=plan_id).first()
+        if plan:
+            return plan
+
+    price_id = None
+    items = data_object.get("items") or {}
+    items_data = (
+        items.get("data") if isinstance(items, dict) else getattr(items, "data", [])
+    )
+    if items_data:
+        first_item = items_data[0]
+        price = (
+            first_item.get("price")
+            if isinstance(first_item, dict)
+            else getattr(first_item, "price", None)
+        )
+        price_id = (
+            price.get("id") if isinstance(price, dict) else getattr(price, "id", None)
+        )
+
+    if price_id:
+        return SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
+    return None
+
+
+def sync_subscription_from_payload(
+    data_object: Dict[str, Any],
+    fallback_metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[Subscription]:
+    """Create or update a subscription from Stripe webhook data."""
+
+    metadata = data_object.get("metadata") or fallback_metadata or {}
+    subscription_id = data_object.get("id")
+    if not subscription_id:
+        logger.warning("Stripe webhook missing subscription id: %s", data_object)
+        return None
+
+    plan = resolve_subscription_plan(data_object, metadata)
+    if not plan:
+        logger.warning(
+            "Stripe subscription %s does not match a configured plan.",
+            subscription_id,
+        )
+        return None
+
+    scope = metadata.get("scope")
+    scope_id = metadata.get("scope_id")
+    organisation: Optional[Organisation] = None
+    agent_profile: Optional[AgentProfile] = None
+
+    if scope == "organisation" and scope_id:
+        organisation = Organisation.objects.filter(id=scope_id).first()
+    elif scope == "agent" and scope_id:
+        agent_profile = AgentProfile.objects.filter(id=scope_id).first()
+
+    subscription = Subscription.objects.filter(
+        stripe_subscription_id=subscription_id
+    ).first()
+
+    status_value = data_object.get("status")
+    if status_value not in dict(Subscription.Status.choices):
+        status_value = Subscription.Status.INCOMPLETE
+
+    start_at = timestamp_to_datetime(data_object.get("current_period_start"))
+    current_period_end = timestamp_to_datetime(data_object.get("current_period_end"))
+
+    if subscription is None:
+        if not organisation and not agent_profile:
+            logger.warning(
+                "Unable to determine scope for new Stripe subscription %s.",
+                subscription_id,
+            )
+            return None
+
+        subscription = Subscription.objects.create(
+            organisation=organisation,
+            agent=agent_profile,
+            plan=plan,
+            status=status_value,
+            start_at=start_at or timezone.now(),
+            current_period_end=current_period_end or timezone.now(),
+            stripe_customer_id=data_object.get("customer", ""),
+            stripe_subscription_id=subscription_id,
+        )
+        return subscription
+
+    update_fields = []
+
+    if organisation and subscription.organisation_id != getattr(
+        organisation, "id", None
+    ):
+        subscription.organisation = organisation
+        subscription.agent = None
+        update_fields.extend(["organisation", "agent"])
+    if agent_profile and subscription.agent_id != getattr(agent_profile, "id", None):
+        subscription.agent = agent_profile
+        subscription.organisation = None
+        update_fields.extend(["agent", "organisation"])
+    if subscription.plan_id != plan.id:
+        subscription.plan = plan
+        update_fields.append("plan")
+    if subscription.status != status_value:
+        subscription.status = status_value
+        update_fields.append("status")
+
+    if start_at and subscription.start_at != start_at:
+        subscription.start_at = start_at
+        update_fields.append("start_at")
+    if current_period_end and subscription.current_period_end != current_period_end:
+        subscription.current_period_end = current_period_end
+        update_fields.append("current_period_end")
+
+    stripe_customer_id = data_object.get("customer", "")
+    if stripe_customer_id and subscription.stripe_customer_id != stripe_customer_id:
+        subscription.stripe_customer_id = stripe_customer_id
+        update_fields.append("stripe_customer_id")
+
+    if update_fields:
+        subscription.save(
+            update_fields=list(dict.fromkeys(update_fields + ["updated_at"]))
+        )
+    return subscription
 
 
 class PlanListView(APIView):
@@ -39,6 +378,99 @@ class PlanListView(APIView):
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by("price")
         serializer = SubscriptionPlanSerializer(plans, many=True)
         return Response(serializer.data)
+
+
+class StripeCheckoutSessionView(APIView):
+    """Initiate a Stripe Checkout session for a subscription plan."""
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        """Create a Stripe Checkout session tied to the requested plan."""
+
+        del args, kwargs
+
+        serializer = StripeCheckoutSessionSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        plan: SubscriptionPlan = serializer.validated_data["plan"]
+        organisation = serializer.validated_data.get("organisation")
+        agent_profile = serializer.validated_data.get("agent_profile")
+        success_url: str = serializer.validated_data["success_url"]
+        cancel_url: str = serializer.validated_data["cancel_url"]
+
+        try:
+            price_id = ensure_plan_price_id(plan)
+        except StripeConfigurationError as exc:
+            logger.warning("Stripe configuration error when creating checkout: %s", exc)
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except StripePlanConfigurationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        metadata: Dict[str, str] = {
+            "plan_id": str(plan.id),
+            "plan_code": plan.code,
+            "user_id": str(request.user.id),
+        }
+
+        if organisation:
+            metadata["scope"] = "organisation"
+            metadata["scope_id"] = str(organisation.id)
+        elif agent_profile:
+            metadata["scope"] = "agent"
+            metadata["scope_id"] = str(agent_profile.id)
+
+        if request.user.email:
+            metadata["user_email"] = request.user.email
+
+        session_payload: Dict[str, Any] = {
+            "mode": "subscription",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "line_items": [
+                {
+                    "price": price_id,
+                    "quantity": 1,
+                }
+            ],
+            "metadata": metadata,
+            "subscription_data": {"metadata": metadata},
+            "allow_promotion_codes": True,
+            "client_reference_id": str(request.user.id),
+        }
+
+        if request.user.email:
+            session_payload["customer_email"] = request.user.email
+
+        try:
+            _require_stripe_secret_key()
+            session = stripe.checkout.Session.create(**session_payload)
+        except StripeError:  # pragma: no cover - network failures
+            logger.exception(
+                "Failed to create Stripe checkout session for plan %s", plan.code
+            )
+            return Response(
+                {"detail": "Unable to create Stripe Checkout session."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        response_payload = {
+            "id": session.get("id")
+            if isinstance(session, dict)
+            else getattr(session, "id", None),
+            "url": session.get("url")
+            if isinstance(session, dict)
+            else getattr(session, "url", None),
+            "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
+            "plan": SubscriptionPlanSerializer(plan).data,
+        }
+        return Response(response_payload, status=status.HTTP_200_OK)
 
 
 class SubscriptionCreateView(APIView):
@@ -165,42 +597,88 @@ class StripeWebhookView(APIView):
 
         del args, kwargs
 
-        event_type = request.data.get("type")
-        data_object = request.data.get("data", {}).get("object", {})
-        subscription_id = data_object.get("id") or data_object.get("subscription")
-        status_update = data_object.get("status")
+        webhook_secret = settings.STRIPE_WEBHOOK_SECRET
+        signature = request.META.get("HTTP_STRIPE_SIGNATURE", "")
 
-        if not subscription_id:
-            logger.warning(
-                "Stripe webhook received without subscription id: %s",
-                request.data,
-            )
+        if webhook_secret:
+            try:
+                event = stripe.Webhook.construct_event(
+                    payload=request.body,
+                    sig_header=signature,
+                    secret=webhook_secret,
+                )
+            except ValueError:
+                logger.warning("Received invalid JSON payload from Stripe webhook.")
+                return Response(
+                    {"detail": "Invalid payload."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except SignatureVerificationError:
+                logger.warning("Stripe webhook signature verification failed.")
+                return Response(
+                    {"detail": "Invalid signature."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            event = request.data
+
+        event_dict = to_plain_dict(event)
+        event_type = event_dict.get("type")
+        data_object = to_plain_dict(event_dict.get("data", {})).get("object", {})
+        data_object = to_plain_dict(data_object)
+
+        if not event_type:
+            logger.warning("Stripe webhook missing event type: %s", event_dict)
             return Response(
-                {"detail": "Missing subscription id."},
+                {"detail": "Event type missing."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        subscription = Subscription.objects.filter(
-            stripe_subscription_id=subscription_id,
-        ).first()
-        if not subscription:
-            logger.warning("Stripe subscription %s not found.", subscription_id)
-            return Response(
-                {"detail": "Subscription not tracked."}, status=status.HTTP_200_OK
-            )
+        if event_type == "checkout.session.completed":
+            subscription_id = data_object.get("subscription")
+            metadata = data_object.get("metadata") or {}
+            if not subscription_id:
+                logger.info(
+                    "Checkout session completed without subscription id: %s",
+                    data_object,
+                )
+            else:
+                try:
+                    _require_stripe_secret_key()
+                    subscription_object = stripe.Subscription.retrieve(subscription_id)
+                except StripeError:  # pragma: no cover - network failures
+                    logger.exception(
+                        "Failed to retrieve Stripe subscription %s", subscription_id
+                    )
+                    return Response(
+                        {"detail": "Unable to retrieve subscription."},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
+                except StripeConfigurationError as exc:
+                    logger.warning(
+                        "Stripe configuration error when handling webhook: %s", exc
+                    )
+                    return Response(
+                        {"detail": str(exc)},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                subscription_payload = to_plain_dict(subscription_object)
+                sync_subscription_from_payload(subscription_payload, metadata)
+        elif event_type in {
+            "customer.subscription.created",
+            "customer.subscription.updated",
+            "customer.subscription.deleted",
+        }:
+            if not data_object:
+                logger.warning(
+                    "Subscription event received without data: %s", event_dict
+                )
+                return Response(
+                    {"detail": "Subscription data missing."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            sync_subscription_from_payload(data_object)
+        else:
+            logger.info("Received unhandled Stripe event %s", event_type)
 
-        if status_update and status_update in dict(Subscription.Status.choices):
-            subscription.status = status_update
-        if data_object.get("current_period_end"):
-            subscription.current_period_end = datetime.fromtimestamp(
-                data_object["current_period_end"],
-                tz=timezone.utc,
-            )
-        subscription.save(update_fields=["status", "current_period_end", "updated_at"])
-
-        logger.info(
-            "Processed Stripe webhook %s for subscription %s",
-            event_type,
-            subscription_id,
-        )
         return Response({"detail": "Processed."}, status=status.HTTP_200_OK)

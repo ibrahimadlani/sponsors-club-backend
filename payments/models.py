@@ -51,6 +51,9 @@ class Subscription(BaseModel):
         PAST_DUE = "past_due", "Past Due"
         CANCELED = "canceled", "Canceled"
         INCOMPLETE = "incomplete", "Incomplete"
+        TRIALING = "trialing", "Trialing"
+        INCOMPLETE_EXPIRED = "incomplete_expired", "Incomplete Expired"
+        UNPAID = "unpaid", "Unpaid"
 
     organisation = models.ForeignKey(
         Organisation,
