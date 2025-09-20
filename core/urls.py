@@ -27,6 +27,11 @@ urlpatterns = [
         TemplateView.as_view(template_name="poc/messaging.html"),
         name="poc-messaging",
     ),
+    path(
+        "poc/subscriptions/",
+        TemplateView.as_view(template_name="poc/subscriptions.html"),
+        name="poc-subscriptions",
+    ),
 ]
 
 if getattr(settings, "DRF_YASG_ENABLED", False):
