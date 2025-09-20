@@ -1,5 +1,7 @@
 """Serializers for payment plans and subscriptions."""
 
+from datetime import timezone as datetime_timezone
+
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -62,8 +64,8 @@ class SubscriptionCreateSerializer(serializers.Serializer):
     """Validate and persist new subscriptions."""
 
     plan_id = serializers.UUIDField()
-    organisation_id = serializers.UUIDField(required=False)
-    agent_id = serializers.UUIDField(required=False)
+    organisation_id = serializers.UUIDField(required=False, allow_null=True)
+    agent_id = serializers.UUIDField(required=False, allow_null=True)
     stripe_customer_id = serializers.CharField(required=False, allow_blank=True)
     stripe_subscription_id = serializers.CharField(required=False, allow_blank=True)
 
@@ -187,13 +189,13 @@ class SubscriptionCreateSerializer(serializers.Serializer):
 
         start_at = parse_datetime(start_at_raw) if start_at_raw else None
         if start_at and start_at.tzinfo is None:
-            start_at = timezone.make_aware(start_at, timezone.utc)
+            start_at = timezone.make_aware(start_at, datetime_timezone.utc)
 
         current_period_end = (
             parse_datetime(current_period_end_raw) if current_period_end_raw else None
         )
         if current_period_end and current_period_end.tzinfo is None:
-            current_period_end = timezone.make_aware(current_period_end, timezone.utc)
+            current_period_end = timezone.make_aware(current_period_end, datetime_timezone.utc)
 
         subscription = Subscription.objects.create(
             organisation=organisation,
@@ -211,3 +213,32 @@ class SubscriptionCreateSerializer(serializers.Serializer):
         """Updates are not supported for this serializer."""
 
         raise NotImplementedError("Subscription updates are not supported.")
+
+
+class StripeCheckoutSessionSerializer(serializers.Serializer):
+    """Validate payload for initiating a Stripe Checkout session."""
+
+    plan_id = serializers.UUIDField()
+    organisation_id = serializers.UUIDField(required=False, allow_null=True)
+    agent_id = serializers.UUIDField(required=False, allow_null=True)
+    success_url = serializers.URLField()
+    cancel_url = serializers.URLField()
+
+    def validate(self, attrs):
+        """Reuse subscription validation to resolve plan and scope."""
+
+        subscription_serializer = SubscriptionCreateSerializer(
+            data={
+                "plan_id": attrs["plan_id"],
+                "organisation_id": attrs.get("organisation_id"),
+                "agent_id": attrs.get("agent_id"),
+            },
+            context=self.context,
+        )
+        subscription_serializer.is_valid(raise_exception=True)
+
+        validated = subscription_serializer.validated_data
+        attrs["plan"] = validated["plan"]
+        attrs["organisation"] = validated.get("organisation")
+        attrs["agent_profile"] = validated.get("agent_profile")
+        return attrs
