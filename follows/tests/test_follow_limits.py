@@ -1,5 +1,4 @@
-"""Integration tests for follows endpoints."""
-
+"""Follow feature limit behaviours."""
 
 from datetime import date
 

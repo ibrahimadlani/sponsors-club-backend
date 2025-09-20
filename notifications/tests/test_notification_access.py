@@ -1,5 +1,4 @@
-"""Integration tests for notification endpoints."""
-
+"""Notification access control checks."""
 
 import pytest
 from django.urls import reverse

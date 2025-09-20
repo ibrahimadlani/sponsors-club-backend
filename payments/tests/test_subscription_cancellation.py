@@ -1,4 +1,4 @@
-"""Integration tests for payments API endpoints."""
+"""Payment subscription cancellation scenarios."""
 
 import pytest
 from django.urls import reverse
