@@ -2,22 +2,38 @@
 
 from django.urls import path
 
-from .views import AthleteStatsBatchView, AthleteStatsTimeseriesView, AthleteStatsView
+from .views import (
+    AthleteComparisonView,
+    AthleteDailyStatsView,
+    AthleteStatsSummaryView,
+    FetchAccountStatsView,
+    SyncAllAccountsView,
+)
 
 urlpatterns = [
     path(
-        "athletes/<uuid:athlete_id>/stats/",
-        AthleteStatsView.as_view(),
-        name="athlete-stats",
+        "analytics/athletes/<uuid:athlete_id>/stats/",
+        AthleteDailyStatsView.as_view(),
+        name="athlete-daily-stats",
     ),
     path(
-        "athletes/<uuid:athlete_id>/stats/timeseries/",
-        AthleteStatsTimeseriesView.as_view(),
-        name="athlete-stats-timeseries",
+        "analytics/athletes/<uuid:athlete_id>/stats/summary/",
+        AthleteStatsSummaryView.as_view(),
+        name="athlete-daily-stats-summary",
     ),
     path(
-        "analytics/athletes/batch/",
-        AthleteStatsBatchView.as_view(),
-        name="analytics-athletes-batch",
+        "analytics/athletes/<uuid:athlete_id>/compare/<uuid:other_id>/",
+        AthleteComparisonView.as_view(),
+        name="athlete-stats-compare",
+    ),
+    path(
+        "analytics/accounts/<uuid:account_id>/fetch/",
+        FetchAccountStatsView.as_view(),
+        name="analytics-account-fetch",
+    ),
+    path(
+        "analytics/accounts/sync_all/",
+        SyncAllAccountsView.as_view(),
+        name="analytics-accounts-sync-all",
     ),
 ]
