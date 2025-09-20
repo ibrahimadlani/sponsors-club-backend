@@ -451,7 +451,7 @@ class StripeCheckoutSessionView(APIView):
         try:
             _require_stripe_secret_key()
             session = stripe.checkout.Session.create(**session_payload)
-        except StripeError as exc:  # pragma: no cover - network failures
+        except StripeError:  # pragma: no cover - network failures
             logger.exception(
                 "Failed to create Stripe checkout session for plan %s", plan.code
             )
@@ -646,7 +646,7 @@ class StripeWebhookView(APIView):
                 try:
                     _require_stripe_secret_key()
                     subscription_object = stripe.Subscription.retrieve(subscription_id)
-                except StripeError as exc:  # pragma: no cover - network failures
+                except StripeError:  # pragma: no cover - network failures
                     logger.exception(
                         "Failed to retrieve Stripe subscription %s", subscription_id
                     )
