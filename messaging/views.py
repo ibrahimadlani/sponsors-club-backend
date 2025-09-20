@@ -123,9 +123,25 @@ class MessageReadView(APIView):
             ),
             id=message_id,
         )
-        self.check_object_permissions(request, message)
-        if not message.is_read:
-            message.is_read = True
-            message.save(update_fields=("is_read", "updated_at"))
-        serializer = MessageSerializer(message, context={"request": request})
-        return Response(serializer.data)
+        if not message:
+            return Response(
+                {"detail": "Message not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not IsThreadParticipant().has_object_permission(request, self, message):
+            return Response(
+                {"detail": "Access denied."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if message.sender_id == request.user.id:
+            return Response(
+                {"detail": "Only the message recipient may update read status."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = MessageReadSerializer(message, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(MessageSerializer(message).data)
+      

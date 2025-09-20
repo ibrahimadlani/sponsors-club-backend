@@ -1,8 +1,10 @@
 """Views for athlete CRUD operations and sport listings."""
 
-from rest_framework import permissions, viewsets
+from rest_framework import generics, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from core.permissions import get_agent_profile
 
 from .models import Athlete, Sport
 from .permissions import CanViewAthlete, IsAgentUser, IsAthleteOwner, IsCollaboratorUser
@@ -39,6 +41,23 @@ class AthleteViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """Persist changes to an existing athlete instance."""
         serializer.save()
+
+
+class MyAthletesView(generics.ListAPIView):
+    """List the athletes owned by the authenticated agent."""
+
+    serializer_class = AthleteSerializer
+    permission_classes = (permissions.IsAuthenticated, IsAgentUser)
+
+    def get_queryset(self):
+        """Return the queryset restricted to the agent's own athletes."""
+
+        agent_profile = get_agent_profile(self.request.user)
+        if agent_profile is None:
+            return Athlete.objects.none()
+        return Athlete.objects.filter(agent=agent_profile).select_related(
+            "sport", "agent__user"
+        )
 
 
 class SportListView(APIView):

@@ -16,7 +16,7 @@ except ImportError as exc:  # pragma: no cover - import error is handled explici
         "Faker is required to run this command. Install it with `pip install Faker`."
     ) from exc
 
-from analytics.models import AthleteStat
+from analytics.models import AthleteSocialAccount, DailyStats, SocialPlatform
 from athletes.models import Athlete, Sport
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile, User
@@ -211,22 +211,43 @@ class Command(BaseCommand):
         return athletes_created
 
     def _create_athlete_stats(self, faker: Faker, athletes: list[Athlete]) -> None:
-        """Create a minimal set of analytics stats per athlete for variety."""
+        """Create demo social accounts and populate daily stats."""
+
         if not athletes:
             return
 
-        metrics = [
-            AthleteStat.Metric.FOLLOWERS,
-            AthleteStat.Metric.ENGAGEMENT,
-            AthleteStat.Metric.RANK,
-        ]
+        platforms = {
+            choice: SocialPlatform.objects.get_or_create(name=choice)[0]
+            for choice, _ in SocialPlatform.Platform.choices
+        }
+
         for athlete in athletes:
-            for metric in metrics:
-                AthleteStat.objects.create(
-                    athlete=athlete,
-                    metric=metric,
-                    value=Decimal(
-                        faker.pydecimal(left_digits=3, right_digits=2, positive=True)
-                    ),
-                    date=date.today() - timedelta(days=faker.random_int(min=0, max=30)),
+            platform_choice = faker.random_element(list(platforms.keys()))
+            account = AthleteSocialAccount.objects.create(
+                athlete=athlete,
+                platform=platforms[platform_choice],
+                username=faker.user_name(),
+                external_id=faker.uuid4(),
+                is_active=True,
+            )
+            for offset in range(5):
+                stat_date = date.today() - timedelta(days=offset)
+                followers = faker.random_int(min=5_000, max=250_000)
+                DailyStats.objects.create(
+                    account=account,
+                    date=stat_date,
+                    followers=followers,
+                    following=faker.random_int(min=100, max=10_000),
+                    posts_count=faker.random_int(min=0, max=5),
+                    likes=faker.random_int(min=0, max=20_000),
+                    comments=faker.random_int(min=0, max=3_000),
+                    shares=faker.random_int(min=0, max=5_000),
+                    views=faker.random_int(min=0, max=200_000),
+                    watch_time=round(random.uniform(10.0, 800.0), 2),
+                    top_post={
+                        "post_id": faker.uuid4(),
+                        "likes": faker.random_int(min=0, max=10_000),
+                        "comments": faker.random_int(min=0, max=1_000),
+                        "engagement_rate": round(random.uniform(0.5, 15.0), 2),
+                    },
                 )

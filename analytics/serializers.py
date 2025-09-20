@@ -1,68 +1,104 @@
-"""Serializers backing analytics endpoints."""
+"""Serializers backing social media analytics endpoints."""
 
 from rest_framework import serializers
 
-from .models import AthleteStat
+from athletes.serializers import AthletePublicSerializer
+
+from .models import AthleteSocialAccount, DailyStats, SocialPlatform
 
 
-class AthleteStatSerializer(serializers.ModelSerializer):
-    """Serialize athlete statistic records for read operations."""
+class SocialPlatformSerializer(serializers.ModelSerializer):
+    """Serialize social platform definitions."""
 
     class Meta:
-        model = AthleteStat
+        model = SocialPlatform
+        fields = ("id", "name", "base_url", "created_at", "updated_at")
+        read_only_fields = fields
+
+
+class AthleteSocialAccountSerializer(serializers.ModelSerializer):
+    """Serialize social account details alongside athlete and platform."""
+
+    platform = SocialPlatformSerializer(read_only=True)
+    athlete = AthletePublicSerializer(read_only=True)
+
+    class Meta:
+        model = AthleteSocialAccount
         fields = (
             "id",
             "athlete",
-            "metric",
-            "value",
-            "date",
-            "extra",
+            "platform",
+            "username",
+            "external_id",
+            "access_token",
+            "is_active",
             "created_at",
+            "updated_at",
         )
-        read_only_fields = ("id", "athlete", "created_at")
+        read_only_fields = (
+            "id",
+            "athlete",
+            "platform",
+            "created_at",
+            "updated_at",
+        )
 
 
-class AthleteStatCreateSerializer(serializers.ModelSerializer):
-    """Validate incoming payloads for creating athlete stats."""
+class DailyStatsSerializer(serializers.ModelSerializer):
+    """Expose raw daily metrics for an athlete social account."""
+
+    account = AthleteSocialAccountSerializer(read_only=True)
 
     class Meta:
-        model = AthleteStat
-        fields = ("metric", "value", "date", "extra")
+        model = DailyStats
+        fields = (
+            "id",
+            "account",
+            "date",
+            "followers",
+            "following",
+            "posts_count",
+            "likes",
+            "comments",
+            "shares",
+            "views",
+            "watch_time",
+            "engagement_rate",
+            "top_post",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
 
-    def validate(self, attrs):
-        attrs.setdefault("extra", {})
-        return attrs
+
+class TopPostSerializer(serializers.Serializer):
+    """Represent the top performing post for a summary response."""
+
+    post_id = serializers.CharField()
+    likes = serializers.IntegerField()
+    comments = serializers.IntegerField()
+    engagement_rate = serializers.FloatField()
 
 
-class AthleteStatAggregateSerializer(serializers.Serializer):
-    """Represent aggregated datapoints returned by analytics endpoints."""
-
-    metric = serializers.CharField()
-    value = serializers.DecimalField(max_digits=12, decimal_places=2)
+class GraphPointSerializer(serializers.Serializer):
     date = serializers.DateField()
-    extra = serializers.JSONField()
-
-    def create(self, validated_data):
-        raise NotImplementedError("Aggregate serializer is read-only.")
-
-    def update(self, instance, validated_data):
-        raise NotImplementedError("Aggregate serializer is read-only.")
+    followers = serializers.IntegerField()
+    engagement_rate = serializers.FloatField()
 
 
-class AthleteStatsBatchRequestSerializer(serializers.Serializer):
-    """Parse batch statistics query parameters."""
+class DailyStatsSummarySerializer(serializers.Serializer):
+    """Aggregate summary payload for an athlete and platform."""
 
-    athlete_ids = serializers.ListField(
-        child=serializers.UUIDField(),
-        allow_empty=False,
-    )
-    metrics = serializers.ListField(
-        child=serializers.CharField(),
-        allow_empty=False,
-    )
+    athlete_id = serializers.UUIDField()
+    platform = serializers.CharField()
+    period = serializers.CharField()
+    summary = serializers.DictField(child=serializers.FloatField(), allow_empty=True)
+    top_post = TopPostSerializer(allow_null=True, required=False)
+    graph_data = GraphPointSerializer(many=True)
 
-    def create(self, validated_data):
-        raise NotImplementedError("Batch request serializer is read-only.")
+    def to_representation(self, instance):
+        """Allow passing dictionaries directly without strict serializer models."""
 
-    def update(self, instance, validated_data):
-        raise NotImplementedError("Batch request serializer is read-only.")
+        if isinstance(instance, dict):
+            return instance
+        return super().to_representation(instance)
