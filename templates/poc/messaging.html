@@ -263,6 +263,7 @@
     </header>
     <div id="root"></div>
 </main>
+{% verbatim %}
 <script type="text/babel" data-presets="env,react">
 const { useCallback, useEffect, useMemo, useState } = React;
 
@@ -851,5 +852,6 @@ function MessageTesterApp() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<MessageTesterApp />);
 </script>
+{% endverbatim %}
 </body>
 </html>
