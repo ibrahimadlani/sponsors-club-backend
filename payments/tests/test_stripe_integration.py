@@ -27,7 +27,7 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
 
     class DummyPriceList:
         def __init__(self):
-            self.data = [type("Price", (), {"id": "price_123"})()]
+            self.data = [type("Price", (), {"id": "price_123", "currency": "eur", "unit_amount": 5000})()]
 
     def fake_price_list(**kwargs):
         captured_payload["price_list_kwargs"] = kwargs
@@ -37,6 +37,11 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
         captured_payload["session_kwargs"] = kwargs
         return {"id": "cs_test_123", "url": "https://stripe.test/checkout/cs_test_123"}
 
+    def fake_product_retrieve(product_id):
+        assert product_id == "prod_test_123"
+        return {"id": product_id}
+
+    monkeypatch.setattr(stripe.Product, "retrieve", fake_product_retrieve)
     monkeypatch.setattr(stripe.Price, "list", fake_price_list)
     monkeypatch.setattr(stripe.checkout.Session, "create", fake_session_create)
 
@@ -67,6 +72,7 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
     price_kwargs = captured_payload["price_list_kwargs"]
     assert price_kwargs["product"] == "prod_test_123"
     assert price_kwargs["type"] == "recurring"
+    assert price_kwargs["limit"] == 10
 
     session_kwargs = captured_payload["session_kwargs"]
     metadata = session_kwargs["metadata"]
@@ -75,6 +81,148 @@ def test_checkout_session_creation_sets_metadata(api_client, agent_user, setting
     assert metadata["scope_id"] == str(agent_user.agent_profile.id)
     assert session_kwargs["line_items"][0]["price"] == "price_123"
     assert session_kwargs["subscription_data"]["metadata"]["plan_code"] == plan.code
+
+
+@pytest.mark.django_db
+def test_checkout_session_creation_creates_missing_price(
+    api_client, agent_user, settings, monkeypatch
+):
+    """When no matching price exists, the integration should create one automatically."""
+
+    settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+
+    plan = SubscriptionPlan.objects.get(code="agent-pro")
+    plan.stripe_product_id = "prod_test_123"
+    plan.stripe_price_id = ""
+    plan.save(update_fields=["stripe_product_id", "stripe_price_id", "updated_at"])
+
+    captured = {}
+
+    class DummyPriceList:
+        def __init__(self):
+            self.data = []
+
+    def fake_product_retrieve(product_id):
+        assert product_id == "prod_test_123"
+        return {"id": product_id}
+
+    def fake_price_list(**kwargs):
+        captured["price_list_kwargs"] = kwargs
+        return DummyPriceList()
+
+    def fake_price_create(**kwargs):
+        captured["price_create_kwargs"] = kwargs
+        return {"id": "price_created"}
+
+    def fake_session_create(**kwargs):
+        captured["session_kwargs"] = kwargs
+        return {"id": "cs_test_456", "url": "https://stripe.test/cs_test_456"}
+
+    monkeypatch.setattr(stripe.Product, "retrieve", fake_product_retrieve)
+    monkeypatch.setattr(stripe.Price, "list", fake_price_list)
+    monkeypatch.setattr(stripe.Price, "create", fake_price_create)
+    monkeypatch.setattr(stripe.checkout.Session, "create", fake_session_create)
+
+    client = api_client
+    client.force_authenticate(user=agent_user)
+
+    payload = {
+        "plan_id": str(plan.id),
+        "agent_id": str(agent_user.agent_profile.id),
+        "success_url": "https://example.com/success?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": "https://example.com/cancel",
+    }
+
+    response = client.post(
+        reverse("payments-stripe-checkout"),
+        data=payload,
+        format="json",
+    )
+
+    assert response.status_code == 200
+    plan.refresh_from_db()
+    assert plan.stripe_price_id == "price_created"
+
+    assert captured["price_create_kwargs"]["product"] == "prod_test_123"
+    assert captured["price_create_kwargs"]["currency"] == "eur"
+    assert captured["price_create_kwargs"]["unit_amount"] == 5000
+
+
+@pytest.mark.django_db
+def test_checkout_session_creation_recovers_from_missing_product(
+    api_client, agent_user, settings, monkeypatch
+):
+    """If the configured product is missing, it should be recreated automatically."""
+
+    settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
+
+    plan = SubscriptionPlan.objects.get(code="agent-pro")
+    plan.stripe_product_id = "prod_missing"
+    plan.stripe_price_id = ""
+    plan.save(update_fields=["stripe_product_id", "stripe_price_id", "updated_at"])
+
+    captured = {}
+
+    class DummyPriceList:
+        def __init__(self):
+            self.data = []
+
+    def fake_product_retrieve(product_id):
+        raise stripe.error.InvalidRequestError(
+            message="No such product",
+            param="product",
+            code="resource_missing",
+            http_body="",
+            http_status=404,
+            json_body=None,
+            headers={},
+        )
+
+    def fake_product_create(**kwargs):
+        captured["product_create_kwargs"] = kwargs
+        return {"id": "prod_new"}
+
+    def fake_price_list(**kwargs):
+        captured["price_list_kwargs"] = kwargs
+        return DummyPriceList()
+
+    def fake_price_create(**kwargs):
+        captured["price_create_kwargs"] = kwargs
+        return {"id": "price_new"}
+
+    def fake_session_create(**kwargs):
+        captured["session_kwargs"] = kwargs
+        return {"id": "cs_test_789", "url": "https://stripe.test/cs_test_789"}
+
+    monkeypatch.setattr(stripe.Product, "retrieve", fake_product_retrieve)
+    monkeypatch.setattr(stripe.Product, "create", fake_product_create)
+    monkeypatch.setattr(stripe.Price, "list", fake_price_list)
+    monkeypatch.setattr(stripe.Price, "create", fake_price_create)
+    monkeypatch.setattr(stripe.checkout.Session, "create", fake_session_create)
+
+    client = api_client
+    client.force_authenticate(user=agent_user)
+
+    payload = {
+        "plan_id": str(plan.id),
+        "agent_id": str(agent_user.agent_profile.id),
+        "success_url": "https://example.com/success?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": "https://example.com/cancel",
+    }
+
+    response = client.post(
+        reverse("payments-stripe-checkout"),
+        data=payload,
+        format="json",
+    )
+
+    assert response.status_code == 200
+    plan.refresh_from_db()
+    assert plan.stripe_product_id == "prod_new"
+    assert plan.stripe_price_id == "price_new"
+
+    assert captured["product_create_kwargs"]["name"] == plan.name
+    assert captured["price_create_kwargs"]["product"] == "prod_new"
 
 
 @pytest.mark.django_db

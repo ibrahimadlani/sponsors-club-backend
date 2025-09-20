@@ -1,8 +1,9 @@
 """Views powering the payments API."""
 
 import logging
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone as datetime_timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import stripe
 from django.conf import settings
@@ -10,7 +11,7 @@ from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from stripe.error import SignatureVerificationError, StripeError
+from stripe.error import InvalidRequestError, SignatureVerificationError, StripeError
 
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile
@@ -43,22 +44,110 @@ class StripePlanConfigurationError(Exception):
     """Raised when a subscription plan lacks Stripe configuration."""
 
 
+def _decimal_to_cents(amount: Decimal) -> int:
+    """Convert a decimal amount to minor currency units (cents)."""
+
+    quantized = (amount or Decimal("0")).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    return int((quantized * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _ensure_plan_product(plan: SubscriptionPlan) -> str:
+    """Ensure a Stripe product exists for the given plan."""
+
+    if plan.stripe_product_id:
+        try:
+            product = stripe.Product.retrieve(plan.stripe_product_id)
+            product_id = getattr(product, "id", None) or (
+                product.get("id") if isinstance(product, dict) else None
+            )
+            if product_id:
+                return product_id
+        except InvalidRequestError as exc:
+            if getattr(exc, "code", "") != "resource_missing":
+                raise StripePlanConfigurationError(
+                    "Unable to verify the Stripe product for this plan."
+                ) from exc
+        except StripeError as exc:  # pragma: no cover - defensive logging path
+            raise StripePlanConfigurationError(
+                "Unable to verify the Stripe product for this plan."
+            ) from exc
+
+    try:
+        product = stripe.Product.create(
+            name=plan.name,
+            metadata={
+                "plan_id": str(plan.id),
+                "plan_code": plan.code,
+            },
+        )
+    except StripeError as exc:  # pragma: no cover - defensive logging path
+        raise StripePlanConfigurationError(
+            "Unable to create a Stripe product for this plan."
+        ) from exc
+
+    product_id = getattr(product, "id", None) or (
+        product.get("id") if isinstance(product, dict) else None
+    )
+    if not product_id:
+        raise StripePlanConfigurationError(
+            "Unable to determine the Stripe product identifier for this plan."
+        )
+
+    plan.stripe_product_id = product_id
+    plan.save(update_fields=["stripe_product_id", "updated_at"])
+    return product_id
+
+
+def _select_matching_price(
+    prices: Iterable[Any], plan: SubscriptionPlan
+) -> Optional[str]:
+    """Return the identifier of a price that matches the plan amount and currency."""
+
+    target_currency = (plan.currency or "").lower()
+    expected_amount = _decimal_to_cents(plan.price)
+
+    for price_obj in prices:
+        price_dict = to_plain_dict(price_obj)
+        currency = (
+            price_dict.get("currency")
+            or getattr(price_obj, "currency", "")
+        ).lower()
+        if currency != target_currency:
+            continue
+
+        amount = price_dict.get("unit_amount")
+        if amount is None:
+            amount = getattr(price_obj, "unit_amount", None)
+        unit_amount_decimal = price_dict.get("unit_amount_decimal") or getattr(
+            price_obj, "unit_amount_decimal", None
+        )
+        if amount is None and unit_amount_decimal is not None:
+            try:
+                amount = int(Decimal(str(unit_amount_decimal)))
+            except (ArithmeticError, ValueError):  # pragma: no cover - invalid payload
+                continue
+
+        if amount == expected_amount:
+            price_id = price_dict.get("id") or getattr(price_obj, "id", None)
+            if price_id:
+                return price_id
+    return None
+
+
 def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
     """Ensure the plan is associated with an active Stripe price."""
 
     if plan.stripe_price_id:
         return plan.stripe_price_id
-    if not plan.stripe_product_id:
-        raise StripePlanConfigurationError(
-            "Plan is not configured with a Stripe product identifier."
-        )
+
+    product_id = _ensure_plan_product(plan)
 
     try:
         prices = stripe.Price.list(
-            product=plan.stripe_product_id,
+            product=product_id,
             active=True,
             type="recurring",
-            limit=1,
+            limit=10,
         )
     except StripeError as exc:  # pragma: no cover - defensive logging path
         raise StripePlanConfigurationError(
@@ -66,15 +155,38 @@ def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
         ) from exc
 
     price_data = getattr(prices, "data", None) or []
-    if not price_data:
-        raise StripePlanConfigurationError(
-            "No active recurring price configured on Stripe for this plan."
+    price_id = _select_matching_price(price_data, plan)
+
+    if price_id is None and price_data:
+        # A recurring price exists but does not match the configured amount; fall back to
+        # creating a dedicated price to ensure checkout consistency.
+        logger.warning(
+            "Plan %s has mismatched Stripe prices; creating a dedicated price.",
+            plan.code,
         )
 
-    price_obj = price_data[0]
-    price_id = getattr(price_obj, "id", None) or (
-        price_obj.get("id") if isinstance(price_obj, dict) else None
-    )
+    if price_id is None:
+        try:
+            created_price = stripe.Price.create(
+                product=product_id,
+                currency=(plan.currency or "").lower(),
+                unit_amount=_decimal_to_cents(plan.price),
+                recurring={"interval": "month"},
+                nickname=plan.name,
+                metadata={
+                    "plan_id": str(plan.id),
+                    "plan_code": plan.code,
+                },
+            )
+        except StripeError as exc:  # pragma: no cover - defensive logging path
+            raise StripePlanConfigurationError(
+                "Unable to create a Stripe price for this plan."
+            ) from exc
+
+        price_id = getattr(created_price, "id", None) or (
+            created_price.get("id") if isinstance(created_price, dict) else None
+        )
+
     if not price_id:
         raise StripePlanConfigurationError(
             "Unable to determine the Stripe price identifier for this plan."
@@ -103,6 +215,8 @@ def to_plain_dict(payload: Any) -> Dict[str, Any]:
         return payload
     if hasattr(payload, "to_dict"):
         return payload.to_dict()
+    if hasattr(payload, "__dict__"):
+        return vars(payload)
     return {}
 
 
