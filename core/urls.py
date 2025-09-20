@@ -12,7 +12,7 @@ urlpatterns = [
     path("api/", include("organisations.urls")),
     path("api/", include("athletes.urls")),
     path("api/", include("follows.urls")),
-    path("api/messaging/", include("messaging.urls")),
+    path("api/", include("messaging.urls")),
     path("api/", include("contracts.urls")),
     path("api/", include("analytics.urls")),
     path("api/payments/", include("payments.urls")),

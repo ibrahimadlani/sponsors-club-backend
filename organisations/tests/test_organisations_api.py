@@ -172,22 +172,22 @@ def test_organisation_create_serializer_rejects_agent(factory, user_model):
 def test_organisation_create_serializer_rejects_agent(factory, user_model):
     """Serializer validation fails for agent accounts."""
     user = user_model.objects.create_user(
-        email='agent-creator@test.com',
-        password='pass1234',
+        email="agent-creator@test.com",
+        password="pass1234",
         account_type=user_model.AccountType.AGENT,
     )
-    request = factory.post('/api/organisations/')
+    request = factory.post("/api/organisations/")
     request.user = user
     serializer = OrganisationCreateSerializer(
         data={
-            'name': 'Blocked Org',
-            'sector': 'Tech',
-            'size': Organisation.Size.SMALL,
-            'budget_min': 1000,
-            'budget_max': 2000,
-            'country': 'FR',
+            "name": "Blocked Org",
+            "sector": "Tech",
+            "size": Organisation.Size.SMALL,
+            "budget_min": 1000,
+            "budget_max": 2000,
+            "country": "FR",
         },
-        context={'request': request},
+        context={"request": request},
     )
     assert serializer.is_valid(), serializer.errors
     with pytest.raises(serializers.ValidationError):

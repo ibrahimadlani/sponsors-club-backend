@@ -4,6 +4,7 @@
 # Test runners and coverage reporting
 pytest==8.4.2  # Primary Python test runner
 pytest-django==4.11.1  # Django-specific pytest helpers
+pytest-asyncio==0.23.7  # Asyncio support for pytest used by Channels tests
 pytest-cov==7.0.0  # pytest plugin integrating coverage
 coverage==7.10.6  # Coverage metrics for test suites
 
