@@ -5,7 +5,7 @@ from rest_framework import permissions
 from users.models import AgentProfile
 
 
-class IsAgentOrStaff(permissions.BasePermission):  # pylint: disable=too-few-public-methods
+class IsAgentOrStaff(permissions.BasePermission):
     """Allow only agent users or staff to perform write operations."""
 
     def has_permission(self, request, view):
@@ -17,6 +17,6 @@ class IsAgentOrStaff(permissions.BasePermission):  # pylint: disable=too-few-pub
             return True
         try:
             request.user.agent_profile
-        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]  # pylint: disable=no-member
+        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
             return False
         return True

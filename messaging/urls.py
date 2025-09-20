@@ -6,18 +6,18 @@ from rest_framework.routers import DefaultRouter
 from .views import MessageReadView, ThreadMessagesView, ThreadViewSet
 
 router = DefaultRouter()
-router.register(r'threads', ThreadViewSet, basename='messaging-thread')
+router.register(r"threads", ThreadViewSet, basename="messaging-thread")
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
     path(
-        'threads/<uuid:thread_id>/messages/',
+        "threads/<uuid:thread_id>/messages/",
         ThreadMessagesView.as_view(),
-        name='thread-messages',
+        name="thread-messages",
     ),
     path(
-        'messages/<uuid:message_id>/read/',
+        "messages/<uuid:message_id>/read/",
         MessageReadView.as_view(),
-        name='message-read',
+        name="message-read",
     ),
 ]

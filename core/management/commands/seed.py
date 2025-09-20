@@ -1,7 +1,5 @@
 """Populate the database with sample data using Faker."""
 
-# pylint: disable=no-member
-
 from __future__ import annotations
 
 import random
@@ -18,7 +16,7 @@ except ImportError as exc:  # pragma: no cover - import error is handled explici
         "Faker is required to run this command. Install it with `pip install Faker`."
     ) from exc
 
-from analytics.models import AthleteStat
+from analytics.models import AthleteSocialAccount, DailyStats, SocialPlatform
 from athletes.models import Athlete, Sport
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile, User
@@ -37,46 +35,46 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--agents',
+            "--agents",
             type=int,
             default=5,
-            help='Number of agent users to create.',
+            help="Number of agent users to create.",
         )
         parser.add_argument(
-            '--organisations',
+            "--organisations",
             type=int,
             default=5,
-            help='Number of organisations to create.',
+            help="Number of organisations to create.",
         )
         parser.add_argument(
-            '--sports',
+            "--sports",
             type=int,
             default=6,
-            help='Number of sports to create.',
+            help="Number of sports to create.",
         )
         parser.add_argument(
-            '--athletes',
+            "--athletes",
             type=int,
             default=15,
-            help='Number of athletes to create.',
+            help="Number of athletes to create.",
         )
         parser.add_argument(
-            '--seed',
+            "--seed",
             type=int,
             default=None,
-            help='Optional Faker seed for reproducibility.',
+            help="Optional Faker seed for reproducibility.",
         )
 
     def handle(self, *args, **options):
         faker = Faker()
-        if options['seed'] is not None:
-            Faker.seed(options['seed'])
-            random.seed(options['seed'])
+        if options["seed"] is not None:
+            Faker.seed(options["seed"])
+            random.seed(options["seed"])
 
-        agents = options['agents']
-        organisations = options['organisations']
-        sports = options['sports']
-        athletes = options['athletes']
+        agents = options["agents"]
+        organisations = options["organisations"]
+        sports = options["sports"]
+        athletes = options["athletes"]
 
         with transaction.atomic():
             agent_profiles = self._create_agents(faker, agents)
@@ -110,7 +108,7 @@ class Command(BaseCommand):
         for _ in range(count):
             email = faker.unique.email()
             full_name = faker.name()
-            first_name, _, last_name = full_name.partition(' ')
+            first_name, _, last_name = full_name.partition(" ")
             user = User.objects.create_user(
                 email=email,
                 password=DEFAULT_PASSWORD,
@@ -149,7 +147,8 @@ class Command(BaseCommand):
         for _ in range(count):
             email = faker.unique.email()
             full_name = faker.name()
-            first_name, _, last_name = full_name.partition(' ')
+            first_name, _, last_name = full_name.partition(" ")
+
             owner = User.objects.create_user(
                 email=email,
                 password=DEFAULT_PASSWORD,
@@ -164,7 +163,7 @@ class Command(BaseCommand):
                 size=random.choice([choice[0] for choice in Organisation.Size.choices]),
                 budget_min=Decimal(faker.random_int(min=1000, max=5000)),
                 budget_max=Decimal(faker.random_int(min=6000, max=20000)),
-                country=faker.country_code(representation='alpha-2'),
+                country=faker.country_code(representation="alpha-2"),
                 description=faker.paragraph(nb_sentences=4),
                 website=faker.url(),
             )
@@ -198,11 +197,11 @@ class Command(BaseCommand):
                 agent=agent,
                 full_name=faker.name(),
                 birth_date=date.today() - timedelta(days=birth_years * 365),
-                nationality=faker.country_code(representation='alpha-2'),
+                nationality=faker.country_code(representation="alpha-2"),
                 bio=faker.paragraph(nb_sentences=3),
                 social_links={
-                    'instagram': faker.user_name(),
-                    'twitter': faker.user_name(),
+                    "instagram": faker.user_name(),
+                    "twitter": faker.user_name(),
                 },
                 is_self_represented=False,
                 followers_count_cached=faker.random_int(min=5_000, max=200_000),
@@ -212,20 +211,43 @@ class Command(BaseCommand):
         return athletes_created
 
     def _create_athlete_stats(self, faker: Faker, athletes: list[Athlete]) -> None:
-        """Create a minimal set of analytics stats per athlete for variety."""
+        """Create demo social accounts and populate daily stats."""
+
         if not athletes:
             return
 
-        metrics = [
-            AthleteStat.Metric.FOLLOWERS,
-            AthleteStat.Metric.ENGAGEMENT,
-            AthleteStat.Metric.RANK,
-        ]
+        platforms = {
+            choice: SocialPlatform.objects.get_or_create(name=choice)[0]
+            for choice, _ in SocialPlatform.Platform.choices
+        }
+
         for athlete in athletes:
-            for metric in metrics:
-                AthleteStat.objects.create(
-                    athlete=athlete,
-                    metric=metric,
-                    value=Decimal(faker.pydecimal(left_digits=3, right_digits=2, positive=True)),
-                    date=date.today() - timedelta(days=faker.random_int(min=0, max=30)),
+            platform_choice = faker.random_element(list(platforms.keys()))
+            account = AthleteSocialAccount.objects.create(
+                athlete=athlete,
+                platform=platforms[platform_choice],
+                username=faker.user_name(),
+                external_id=faker.uuid4(),
+                is_active=True,
+            )
+            for offset in range(5):
+                stat_date = date.today() - timedelta(days=offset)
+                followers = faker.random_int(min=5_000, max=250_000)
+                DailyStats.objects.create(
+                    account=account,
+                    date=stat_date,
+                    followers=followers,
+                    following=faker.random_int(min=100, max=10_000),
+                    posts_count=faker.random_int(min=0, max=5),
+                    likes=faker.random_int(min=0, max=20_000),
+                    comments=faker.random_int(min=0, max=3_000),
+                    shares=faker.random_int(min=0, max=5_000),
+                    views=faker.random_int(min=0, max=200_000),
+                    watch_time=round(random.uniform(10.0, 800.0), 2),
+                    top_post={
+                        "post_id": faker.uuid4(),
+                        "likes": faker.random_int(min=0, max=10_000),
+                        "comments": faker.random_int(min=0, max=1_000),
+                        "engagement_rate": round(random.uniform(0.5, 15.0), 2),
+                    },
                 )
