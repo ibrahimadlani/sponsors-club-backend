@@ -148,6 +148,7 @@ class Command(BaseCommand):
             email = faker.unique.email()
             full_name = faker.name()
             first_name, _, last_name = full_name.partition(" ")
+
             owner = User.objects.create_user(
                 email=email,
                 password=DEFAULT_PASSWORD,
