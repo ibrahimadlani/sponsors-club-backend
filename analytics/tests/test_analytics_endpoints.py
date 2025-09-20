@@ -94,7 +94,9 @@ def test_stats_list_returns_paginated_data(agent_user, social_account):
     _create_stats(social_account)
     client = APIClient()
     client.force_authenticate(user=agent_user)
-    url = reverse("athlete-daily-stats", kwargs={"athlete_id": social_account.athlete.id})
+    url = reverse(
+        "athlete-daily-stats", kwargs={"athlete_id": social_account.athlete.id}
+    )
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
     assert response.data["count"] == 3
@@ -132,4 +134,7 @@ def test_compare_endpoint(agent_user, social_account, comparison_account):
     )
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["primary"]["totals"]["followers"] > response.data["secondary"]["totals"]["followers"]
+    assert (
+        response.data["primary"]["totals"]["followers"]
+        > response.data["secondary"]["totals"]["followers"]
+    )

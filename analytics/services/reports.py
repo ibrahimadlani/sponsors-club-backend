@@ -130,7 +130,9 @@ def latest_metrics(account: AthleteSocialAccount) -> Optional[DailyStats]:
     return account.daily_stats.order_by("-date").first()
 
 
-def _platform_snapshot(account: AthleteSocialAccount, stat: DailyStats) -> Dict[str, float]:
+def _platform_snapshot(
+    account: AthleteSocialAccount, stat: DailyStats
+) -> Dict[str, float]:
     return {
         "followers": float(stat.followers),
         "engagement_rate": round(float(stat.engagement_rate), 2),

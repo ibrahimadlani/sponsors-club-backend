@@ -27,7 +27,9 @@ def fetch_account_stats(account_id) -> Optional[DailyStats]:
         return None
 
     logger.info(
-        "Fetching stats for %s on %s", account.username, account.platform.get_name_display()
+        "Fetching stats for %s on %s",
+        account.username,
+        account.platform.get_name_display(),
     )
     # TODO: Integrate with TikTok/Instagram/Facebook/YouTube API clients.
     # The returned DailyStats instance (or None) allows callers to inspect the
