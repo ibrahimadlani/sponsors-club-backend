@@ -30,7 +30,7 @@ def unseed_clauses(apps, _schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("contracts", "0001_initial"),
+        ("contracts", "0002_repair_clausetemplate_schema"),
     ]
 
     operations = [migrations.RunPython(seed_clauses, unseed_clauses)]
