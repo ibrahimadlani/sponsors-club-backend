@@ -328,18 +328,29 @@ function MessageTesterApp() {
         setLog((current) => [entry, ...current].slice(0, 25));
     }, []);
 
+    const csrfToken = useMemo(() => {
+        if (typeof document === "undefined") {
+            return null;
+        }
+        const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }, []);
+
     const buildHeaders = useCallback(
-        (hasBody = false) => {
+        (method = "GET", hasBody = false) => {
             const headers = { Accept: "application/json" };
             if (hasBody) {
                 headers["Content-Type"] = "application/json";
+            }
+            if (csrfToken && !/^(GET|HEAD|OPTIONS|TRACE)$/i.test(method)) {
+                headers["X-CSRFToken"] = csrfToken;
             }
             if (token) {
                 headers.Authorization = `Bearer ${token}`;
             }
             return headers;
         },
-        [token]
+        [csrfToken, token]
     );
 
     const callApi = useCallback(
@@ -358,7 +369,11 @@ function MessageTesterApp() {
             }
             const requestInit = {
                 method,
-                headers: buildHeaders(body !== undefined && !(body instanceof FormData)),
+                headers: buildHeaders(
+                    method,
+                    body !== undefined && !(body instanceof FormData)
+                ),
+                credentials: "include",
             };
             if (body !== undefined) {
                 requestInit.body = body instanceof FormData ? body : JSON.stringify(body);
