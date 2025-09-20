@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "django_filters",
     "core.apps.CoreConfig",
@@ -57,6 +58,7 @@ if DRF_YASG_ENABLED:
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -145,6 +147,24 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
 }
+
+
+def _load_cors_origins() -> list[str]:
+    raw_origins = os.environ.get("CORS_ALLOWED_ORIGINS")
+    if raw_origins:
+        return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+    # Local development defaults cover both Vite (5173) and CRA (3000) dev servers.
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+
+CORS_ALLOWED_ORIGINS = _load_cors_origins()
+CORS_ALLOW_CREDENTIALS = True
 
 
 AUTH_USER_MODEL = "users.User"

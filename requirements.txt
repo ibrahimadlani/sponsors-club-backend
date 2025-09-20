@@ -10,6 +10,10 @@ tzdata==2025.2  # Bundled tzdata for minimal Docker images without system zonein
 django-filter==25.1  # Queryset filtering integration for DRF
 djangorestframework==3.16.1  # Core REST API framework
 djangorestframework_simplejwt==5.5.1  # JWT authentication backend for DRF
+django-cors-headers==4.6.0  # CORS middleware enabling the React playground to call the API
+channels==4.2.0  # ASGI support for WebSocket consumers
+channels-redis==4.2.0  # Redis-backed channel layer for scalable WebSockets
+daphne==4.1.2  # ASGI server used by Channels test utilities
 drf-yasg==1.21.10  # OpenAPI schema generation for interactive docs
 uritemplate==4.2.0  # URL template expansion required by drf-yasg
 PyJWT==2.10.1  # Explicit pin aligned with SimpleJWT to avoid compatibility drift
