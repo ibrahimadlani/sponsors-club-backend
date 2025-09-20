@@ -1,22 +1,103 @@
-"""Serializers handling contract creation, clauses, and status updates."""
+"""Serializers handling contract creation, clause management, and revisions."""
+
+from __future__ import annotations
+
+from typing import Any
 
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from athletes.models import Athlete
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile
 
-from core.feature_matrix import COLLABORATOR_FEATURES
-from core.permissions import collaborator_meets_requirement, requirement_denied_payload
+from .models import ClauseTemplate, Contract, ContractClause, ContractFile, ContractRevision
 
-from .models import (
-    ClauseTemplate,
-    Contract,
-    ContractClause,
-    ContractStatusHistory,
-    ContractVersion,
+CONTRACT_PARTY_FIELDS = [
+    "organisation_name",
+    "organisation_legal_name",
+    "organisation_type",
+    "organisation_registration_number",
+    "organisation_tax_id",
+    "organisation_address",
+    "organisation_country",
+    "organisation_representative",
+    "organisation_representative_title",
+    "athlete_name",
+    "athlete_birthdate",
+    "athlete_birthplace",
+    "athlete_address",
+    "athlete_nationality",
+    "athlete_sport",
+    "athlete_team",
+    "athlete_license_number",
+    "agent_name",
+    "agent_address",
+    "agent_registration_id",
+]
+
+CONTRACT_DURATION_FIELDS = [
+    "start_date",
+    "end_date",
+    "contract_duration_months",
+    "renewal_terms",
+    "termination_date",
+    "notice_period_days",
+    "event_calendar",
+]
+
+CONTRACT_ATHLETE_OBLIGATION_FIELDS = [
+    "number_of_events",
+    "event_types_required",
+    "posts_per_month",
+    "stories_per_month",
+    "video_mentions",
+    "hashtags_required",
+    "equipment_usage",
+    "sector_exclusivity",
+    "competitions_mandatory",
+    "performance_goals",
+    "training_commitment",
+    "injury_notification_delay",
+]
+
+CONTRACT_ORGANISATION_FIELDS = [
+    "equipment_provided",
+    "support_logistics",
+    "insurance_details",
+    "media_exposure",
+    "promotion_channels",
+    "brand_guidelines",
+]
+
+CONTRACT_FINANCE_FIELDS = [
+    "total_amount",
+    "currency",
+    "payment_schedule",
+    "payment_method",
+    "bonus_amount",
+    "bonus_conditions",
+    "royalty_rate",
+    "royalty_base",
+    "penalty_amount",
+]
+
+CONTRACT_IP_FIELDS = [
+    "image_rights_scope",
+    "duration_years",
+    "territory",
+    "media_types_allowed",
+    "exclusivity_level",
+    "license_transfer_terms",
+]
+
+CONTRACT_DATA_FIELDS = (
+    CONTRACT_PARTY_FIELDS
+    + CONTRACT_DURATION_FIELDS
+    + CONTRACT_ATHLETE_OBLIGATION_FIELDS
+    + CONTRACT_ORGANISATION_FIELDS
+    + CONTRACT_FINANCE_FIELDS
+    + CONTRACT_IP_FIELDS
 )
 
 
@@ -36,13 +117,6 @@ class AgentSummarySerializer(serializers.ModelSerializer):
         ref_name = "ContractsAgentSummary"
 
 
-class AthleteSummarySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Athlete
-        fields = ("id", "full_name", "sport_id")
-        ref_name = "ContractsAthleteSummary"
-
-
 class CollaboratorSummarySerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
@@ -52,223 +126,199 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
         ref_name = "ContractsCollaboratorSummary"
 
 
-class ClauseTemplateSummarySerializer(serializers.ModelSerializer):
+class ClauseTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClauseTemplate
-        fields = ("id", "identifier", "title", "type", "mandatory", "version")
+        fields = ("id", "title", "category", "is_mandatory", "version", "placeholders")
 
 
 class ContractClauseSerializer(serializers.ModelSerializer):
-    template = ClauseTemplateSummarySerializer(read_only=True)
+    template = ClauseTemplateSerializer(read_only=True)
 
     class Meta:
         model = ContractClause
         fields = (
             "id",
             "template",
-            "values",
-            "order_index",
+            "title",
+            "content",
+            "position",
+            "is_mandatory",
+            "is_modified",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
 
 
-class ContractStatusHistorySerializer(serializers.ModelSerializer):
-    changed_by_email = serializers.SerializerMethodField()
+class ContractRevisionSerializer(serializers.ModelSerializer):
+    proposed_by_email = serializers.EmailField(source="proposed_by.email", read_only=True)
+    clauses_changed = ContractClauseSerializer(many=True, read_only=True)
 
     class Meta:
-        model = ContractStatusHistory
+        model = ContractRevision
         fields = (
             "id",
-            "from_status",
-            "to_status",
-            "changed_by",
-            "changed_by_email",
-            "changed_at",
-            "reason",
+            "proposed_by",
+            "proposed_by_email",
+            "comment",
+            "accepted",
+            "clauses_changed",
+            "created_at",
         )
         read_only_fields = fields
 
-    def get_changed_by_email(self, obj):
-        """Return the email address of the user who performed the change."""
 
-        return getattr(obj.changed_by, "email", None)
+class ContractFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractFile
+        fields = ("id", "pdf", "created_at")
+        read_only_fields = fields
 
 
-class ContractSerializer(serializers.ModelSerializer):
+class ContractDetailSerializer(serializers.ModelSerializer):
     organisation = OrganisationSummarySerializer(read_only=True)
-    athlete = AthleteSummarySerializer(read_only=True)
-    created_by = CollaboratorSummarySerializer(read_only=True)
+    agent = AgentSummarySerializer(read_only=True)
+    initiated_by = CollaboratorSummarySerializer(read_only=True)
     clauses = ContractClauseSerializer(many=True, read_only=True)
-    status_history = serializers.SerializerMethodField()
+    revisions = ContractRevisionSerializer(many=True, read_only=True)
+    file = ContractFileSerializer(read_only=True)
 
     class Meta:
         model = Contract
         fields = (
             "id",
             "organisation",
-            "athlete",
-            "created_by",
+            "agent",
+            "initiated_by",
             "status",
-            "start_date",
-            "end_date",
-            "amount",
-            "currency",
+            "title",
+            "effective_date",
+            "expiration_date",
+            *CONTRACT_DATA_FIELDS,
             "created_at",
             "updated_at",
             "clauses",
-            "status_history",
+            "revisions",
+            "file",
         )
         read_only_fields = fields
 
-    def get_status_history(self, obj):
-        """Serialize the status history ordered by most recent first."""
 
-        history = obj.status_history.order_by("-changed_at")
-        return ContractStatusHistorySerializer(history, many=True).data
+class ContractListSerializer(serializers.ModelSerializer):
+    organisation = OrganisationSummarySerializer(read_only=True)
+    agent = AgentSummarySerializer(read_only=True)
 
-
-class ContractClauseInputSerializer(serializers.Serializer):
-    template_id = serializers.UUIDField()
-    order_index = serializers.IntegerField(min_value=0, required=False, default=0)
-    values = serializers.JSONField(required=False)
-
-    def create(self, validated_data):
-        """Disallow DRF from attempting to create instances for input serializer."""
-
-        raise NotImplementedError("ContractClauseInputSerializer is input-only.")
-
-    def update(self, instance, validated_data):
-        """Disallow DRF from updating instances for input serializer."""
-
-        raise NotImplementedError("ContractClauseInputSerializer is input-only.")
+    class Meta:
+        model = Contract
+        fields = (
+            "id",
+            "title",
+            "organisation",
+            "agent",
+            "status",
+            "effective_date",
+            "expiration_date",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
 
 
 class ContractCreateSerializer(serializers.ModelSerializer):
     organisation_id = serializers.UUIDField(write_only=True)
-    athlete_id = serializers.UUIDField(write_only=True)
-    clauses = ContractClauseInputSerializer(many=True, required=False)
+    agent_id = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = Contract
         fields = (
             "organisation_id",
-            "athlete_id",
-            "start_date",
-            "end_date",
-            "amount",
-            "currency",
-            "clauses",
+            "agent_id",
+            "title",
+            "effective_date",
+            "expiration_date",
+            *CONTRACT_DATA_FIELDS,
         )
 
-    def validate(self, attrs):
-        """Attach foreign key instances and enforce workspace permissions."""
-
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         request = self.context["request"]
         user = request.user
-        organisation_id = attrs["organisation_id"]
-        athlete_id = attrs["athlete_id"]
+
+        organisation_id = attrs.pop("organisation_id")
+        agent_id = attrs.pop("agent_id")
 
         organisation = Organisation.objects.filter(id=organisation_id).first()
         if not organisation:
-            raise serializers.ValidationError(
-                {"organisation_id": "Organisation not found."}
-            )
-        athlete = Athlete.objects.select_related("agent").filter(id=athlete_id).first()
-        if not athlete:
-            raise serializers.ValidationError({"athlete_id": "Athlete not found."})
+            raise serializers.ValidationError({"organisation_id": "Organisation not found."})
 
         collaborator = Collaborator.objects.filter(
             organisation=organisation,
             user=user,
         ).first()
-        if not collaborator or collaborator.role != Collaborator.Role.OWNER:
-            raise PermissionDenied("Only organisation owners may create contracts.")
+        if not collaborator:
+            raise PermissionDenied("You must be a collaborator of the organisation.")
 
-        requirement = COLLABORATOR_FEATURES["contract_management"]
-        if not collaborator_meets_requirement(user, requirement):
-            payload = requirement_denied_payload(
-                requirement,
-                "Upgrade required to access the contract workspace.",
-            )
-            raise PermissionDenied(payload)
+        agent = AgentProfile.objects.filter(id=agent_id).first()
+        if not agent:
+            raise serializers.ValidationError({"agent_id": "Agent not found."})
 
         attrs["organisation"] = organisation
-        attrs["athlete"] = athlete
-        attrs["created_by"] = collaborator
+        attrs["agent"] = agent
+        attrs["initiated_by"] = collaborator
         return attrs
 
     @transaction.atomic
-    def create(self, validated_data):
-        organisation = validated_data.pop("organisation")
-        athlete = validated_data.pop("athlete")
-        created_by = validated_data.pop("created_by")
-        clauses_data = validated_data.pop("clauses", [])
-        validated_data.pop("organisation_id", None)
-        validated_data.pop("athlete_id", None)
+    def create(self, validated_data: dict[str, Any]) -> Contract:
+        return Contract.objects.create(**validated_data)
 
-        resolved_clauses = []
-        for clause_data in clauses_data:
-            template = ClauseTemplate.objects.filter(
-                id=clause_data["template_id"]
-            ).first()
+
+class ContractClauseCreateSerializer(serializers.Serializer):
+    template_id = serializers.UUIDField(required=False, allow_null=True)
+    title = serializers.CharField(required=False, allow_blank=True)
+    content = serializers.CharField(required=False, allow_blank=True)
+    position = serializers.IntegerField(required=False, default=0)
+    is_mandatory = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        template = None
+        template_id = attrs.get("template_id")
+        if template_id:
+            template = ClauseTemplate.objects.filter(id=template_id).first()
             if not template:
-                message = f"Clause template {clause_data['template_id']} not found."
-                raise serializers.ValidationError({"clauses": message})
-            resolved_clauses.append((template, clause_data))
-
-        contract = Contract.objects.create(
-            organisation=organisation,
-            athlete=athlete,
-            created_by=created_by,
-            **validated_data,
-        )
-
-        for template, clause_data in resolved_clauses:
-            ContractClause.objects.create(
-                contract=contract,
-                template=template,
-                values=clause_data.get("values", {}),
-                order_index=clause_data.get("order_index", 0),
-            )
-
-        return contract
+                raise serializers.ValidationError({"template_id": "Clause template not found."})
+            attrs.setdefault("title", template.title)
+            attrs.setdefault("content", template.content)
+            attrs.setdefault("is_mandatory", template.is_mandatory)
+            attrs["template"] = template
+        if not attrs.get("title"):
+            raise serializers.ValidationError({"title": "This field is required."})
+        if not attrs.get("content"):
+            raise serializers.ValidationError({"content": "This field is required."})
+        return attrs
 
 
-class ContractStatusUpdateSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=Contract.Status.choices)
-    reason = serializers.CharField(required=False, allow_blank=True)
-
-    def create(self, validated_data):
-        """Prevent creation; serializer is used only for validation."""
-
-        raise NotImplementedError("ContractStatusUpdateSerializer is read-only.")
-
-    def update(self, instance, validated_data):
-        """Prevent updates; serializer is used only for validation."""
-
-        raise NotImplementedError("ContractStatusUpdateSerializer is read-only.")
-
-
-class ContractVersionSerializer(serializers.ModelSerializer):
+class ContractClauseUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ContractVersion
-        fields = ("id", "version_number", "snapshot", "created_at")
-        read_only_fields = fields
+        model = ContractClause
+        fields = ("title", "content", "position")
 
 
-class ContractClauseUpsertSerializer(serializers.Serializer):
-    template_id = serializers.UUIDField()
-    order_index = serializers.IntegerField(min_value=0, required=False, default=0)
-    values = serializers.JSONField(required=False)
+class ContractRevisionCreateSerializer(serializers.Serializer):
+    clauses = serializers.ListField(
+        child=serializers.UUIDField(), required=False, allow_empty=True
+    )
+    comment = serializers.CharField(required=False, allow_blank=True)
 
-    def create(self, validated_data):
-        """Prevent creation attempts for this utility serializer."""
-
-        raise NotImplementedError("ContractClauseUpsertSerializer is utility-only.")
-
-    def update(self, instance, validated_data):
-        """Prevent update attempts for this utility serializer."""
-
-        raise NotImplementedError("ContractClauseUpsertSerializer is utility-only.")
+    def create(self, validated_data: dict[str, Any]) -> ContractRevision:
+        contract: Contract = self.context["contract"]
+        request = self.context["request"]
+        revision = ContractRevision.objects.create(
+            contract=contract,
+            proposed_by=request.user,
+            comment=validated_data.get("comment", ""),
+        )
+        clause_ids = validated_data.get("clauses", [])
+        if clause_ids:
+            clauses = contract.clauses.filter(id__in=clause_ids)
+            revision.clauses_changed.set(clauses)
+        return revision

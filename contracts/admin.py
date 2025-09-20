@@ -1,80 +1,50 @@
-"""Admin registrations for contract templates, versions, and status history."""
+"""Admin registrations for contract management models."""
 
 from django.contrib import admin
 
-from .models import (
-    ClauseTemplate,
-    Contract,
-    ContractClause,
-    ContractStatusHistory,
-    ContractVersion,
-)
+from .models import ClauseTemplate, Contract, ContractClause, ContractFile, ContractRevision
 
 
 @admin.register(ClauseTemplate)
 class ClauseTemplateAdmin(admin.ModelAdmin):
-    """Display clause templates with version and activation filters."""
+    """Display clause templates with filtering on category and mandatory flag."""
 
-    list_display = (
-        "identifier",
-        "title",
-        "type",
-        "version",
-        "mandatory",
-        "is_active",
-    )
-    list_filter = ("type", "mandatory", "is_active")
-    search_fields = ("identifier", "title")
+    list_display = ("title", "category", "version", "is_mandatory")
+    list_filter = ("category", "is_mandatory")
+    search_fields = ("title", "content")
 
 
 class ContractClauseInline(admin.TabularInline):
-    """Inline editor for contract clauses."""
+    """Inline editor for clauses attached to a contract."""
 
     model = ContractClause
     extra = 0
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    """Expose contracts with key metadata and clause inline editing."""
+    """Expose contract metadata and allow inline clause editing."""
 
-    list_display = (
-        "organisation",
-        "athlete",
-        "status",
-        "start_date",
-        "end_date",
-        "amount",
-        "currency",
-    )
-    list_filter = ("status", "currency", "organisation")
-    search_fields = ("organisation__name", "athlete__full_name")
+    list_display = ("title", "organisation", "agent", "status", "effective_date")
+    list_filter = ("status", "organisation")
+    search_fields = ("title", "organisation__name", "agent__display_name")
     inlines = [ContractClauseInline]
 
 
-@admin.register(ContractVersion)
-class ContractVersionAdmin(admin.ModelAdmin):
-    """Allow inspection of stored contract versions."""
+@admin.register(ContractRevision)
+class ContractRevisionAdmin(admin.ModelAdmin):
+    """Allow staff to inspect revision history between parties."""
 
-    list_display = ("contract", "version_number", "created_at")
-    list_filter = ("version_number",)
-    search_fields = ("contract__organisation__name", "contract__athlete__full_name")
+    list_display = ("contract", "proposed_by", "accepted", "created_at")
+    list_filter = ("accepted",)
+    search_fields = ("contract__title", "proposed_by__email")
+    filter_horizontal = ("clauses_changed",)
 
 
-@admin.register(ContractStatusHistory)
-class ContractStatusHistoryAdmin(admin.ModelAdmin):
-    """List contract status transitions with audit details."""
+@admin.register(ContractFile)
+class ContractFileAdmin(admin.ModelAdmin):
+    """Expose generated PDF exports for download."""
 
-    list_display = (
-        "contract",
-        "from_status",
-        "to_status",
-        "changed_by",
-        "changed_at",
-    )
-    list_filter = ("to_status",)
-    search_fields = (
-        "contract__organisation__name",
-        "contract__athlete__full_name",
-        "changed_by__email",
-    )
+    list_display = ("contract", "created_at")
+    search_fields = ("contract__title",)
