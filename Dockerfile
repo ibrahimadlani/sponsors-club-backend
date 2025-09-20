@@ -21,7 +21,7 @@ RUN python -m venv /py \
         --disabled-password \
         --no-create-home \
         django-user \
-    && chmod +x /app/entrypoint.sh /app/migrate.sh
+    && chmod +x /app/scripts/entrypoint.sh /app/scripts/migrate.sh
 
 ENV PATH="/py/bin:$PATH"
 
@@ -29,4 +29,4 @@ USER django-user
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]

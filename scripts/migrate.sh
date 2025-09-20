@@ -1,14 +1,21 @@
 #!/bin/sh
+
+# Fail fast if any command errors to avoid applying partial migrations.
 set -e
 
+# Run commands from the Django project root inside the container.
 cd /app/
 
-# Collect static files if needed
+# Collect static files if the deployment requires it. Disabled by default to
+# keep the script lean for environments that manage static assets separately.
 # /py/bin/python manage.py collectstatic --noinput
 
+# Generate any new migration files and apply outstanding migrations.
 /py/bin/python manage.py makemigrations
 /py/bin/python manage.py migrate --noinput
 
+# Optionally create or update a superuser using environment-provided
+# credentials. This block is idempotent and safe to run multiple times.
 /py/bin/python manage.py shell <<'PYTHON'
 from django.contrib.auth import get_user_model
 import os
