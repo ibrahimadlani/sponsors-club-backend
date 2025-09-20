@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: ["main", "dev"]
 
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
-  test-and-build:
+  build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +21,41 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.dev.txt
+
+      - name: Validate project imports
+        run: python -m compileall .
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
 
       - name: Install dependencies
         run: |
@@ -25,21 +63,50 @@ jobs:
           pip install -r requirements.dev.txt
 
       - name: Check formatting with Ruff
-        run: |
-          ruff format --check .
+        run: ruff format --check .
 
       - name: Run Ruff lint
+        run: ruff check .
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
+
+      - name: Install dependencies
         run: |
-          ruff check .
+          python -m pip install --upgrade pip
+          pip install -r requirements.dev.txt
 
       - name: Run database migrations
-        run: |
-          python manage.py migrate --noinput
+        run: python manage.py migrate --noinput
 
       - name: Run tests
-        run: |
-          pytest --disable-warnings --maxfail=1
+        run: pytest --disable-warnings --maxfail=1
+
+  containerize:
+    name: Containerize
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: |
-          docker build -t sponsors-club-backend:ci .
+        run: docker build -t sponsors-club-backend:ci .
