@@ -29,6 +29,13 @@
             gap: 32px;
             padding: 40px;
         }
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
         header h1 {
             margin: 0;
             font-size: clamp(1.6rem, 2.4vw, 2.2rem);
@@ -37,6 +44,13 @@
         header p {
             margin: 6px 0 0;
             color: #475569;
+        }
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: flex-end;
         }
         section {
             background: white;
@@ -186,6 +200,15 @@
             color: white;
         }
         .button.secondary { background: rgba(15, 23, 42, 0.08); color: #1e293b; }
+        .button.ghost {
+            background: transparent;
+            color: #1d4ed8;
+            border: 1px solid rgba(37, 99, 235, 0.35);
+        }
+        .button.ghost:hover {
+            background: rgba(37, 99, 235, 0.12);
+            color: #1e3a8a;
+        }
         footer {
             display: flex;
             flex-wrap: wrap;
@@ -217,7 +240,10 @@
             <h1 id="contractTitle">Contrat en validation…</h1>
             <p id="contractMeta">Connexion à l'API…</p>
         </div>
-        <span class="status-text" id="pageStatus">Chargement en cours…</span>
+        <div class="header-actions">
+            <button type="button" class="button ghost" id="loginButton">Changer de compte</button>
+            <span class="status-text" id="pageStatus">Chargement en cours…</span>
+        </div>
     </header>
 
     <section>
@@ -266,6 +292,7 @@
 <script>
 (function() {
     const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
     const params = new URLSearchParams(window.location.search);
     const contractId = params.get('contractId');
 
@@ -285,6 +312,7 @@
     const fileMeta = document.getElementById('fileMeta');
     const downloadFile = document.getElementById('downloadFile');
     const openEditor = document.getElementById('openEditor');
+    const loginButton = document.getElementById('loginButton');
 
     const state = {
         contract: null,
@@ -297,6 +325,16 @@
             { value: 'terminated', label: 'Terminé' },
         ],
     };
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
 
     function readCookie(name) {
         const cookies = document.cookie ? document.cookie.split(';') : [];

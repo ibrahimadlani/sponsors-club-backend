@@ -31,8 +31,12 @@
             background: #f8fafc;
             box-shadow: 0 36px 88px rgba(15, 23, 42, 0.28);
         }
+        header {
+            display: grid;
+            gap: 18px;
+        }
         header h1 {
-            margin: 0 0 12px;
+            margin: 0;
             font-size: clamp(1.7rem, 2.6vw, 2.4rem);
             color: #111827;
         }
@@ -40,6 +44,29 @@
             margin: 0;
             color: #475569;
             line-height: 1.6;
+        }
+        .header-top {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .login-button {
+            padding: 12px 20px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.35);
+            background: white;
+            color: #1d4ed8;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+        }
+        .login-button:hover {
+            background: #eff6ff;
+            color: #1e3a8a;
+            box-shadow: none;
+            transform: none;
         }
         section {
             background: white;
@@ -210,7 +237,10 @@
 <body>
 <main>
     <header>
-        <h1>Pilotage des contrats</h1>
+        <div class="header-top">
+            <h1>Pilotage des contrats</h1>
+            <button type="button" class="login-button" id="loginButton">Changer de compte</button>
+        </div>
         <p>Simulez l'onboarding d'une nouvelle collaboration entre une organisation sportive et un agent SponsorsClub. Cette page permet de démarrer un nouveau contrat et de visualiser rapidement les étapes clés du pipeline.</p>
         <div class="context" id="identitySummary">Authentifiez-vous via la sandbox pour charger vos organisations.</div>
     </header>
@@ -276,6 +306,7 @@
 <script>
 (function() {
     const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
     const state = {
         statuses: [],
         organisations: [],
@@ -297,7 +328,18 @@
     const contractsEmpty = document.getElementById('contractsEmpty');
     const createStatus = document.getElementById('createStatus');
     const identitySummary = document.getElementById('identitySummary');
+    const loginButton = document.getElementById('loginButton');
     const defaultContractsEmptyMessage = contractsEmpty ? contractsEmpty.textContent : '';
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
 
     function readCookie(name) {
         const cookies = document.cookie ? document.cookie.split(';') : [];

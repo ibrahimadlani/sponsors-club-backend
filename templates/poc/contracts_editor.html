@@ -48,6 +48,13 @@
             font-size: 0.9rem;
             color: #475569;
         }
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            justify-content: flex-end;
+        }
         .pill {
             display: inline-flex;
             align-items: center;
@@ -154,10 +161,21 @@
             transition: transform 0.16s ease, box-shadow 0.16s ease;
         }
         .button.secondary { background: rgba(15, 23, 42, 0.08); color: #1e293b; }
+        .button.ghost {
+            background: transparent;
+            color: #1d4ed8;
+            border: 1px solid rgba(37, 99, 235, 0.35);
+        }
         .button.danger { background: #dc2626; }
         .button:hover {
             transform: translateY(-1px);
             box-shadow: 0 16px 32px rgba(37, 99, 235, 0.28);
+        }
+        .button.ghost:hover {
+            background: rgba(37, 99, 235, 0.1);
+            color: #1e3a8a;
+            transform: none;
+            box-shadow: none;
         }
         .status-text {
             font-size: 0.85rem;
@@ -205,7 +223,10 @@
             <h1 id="contractTitle">Contrat en chargement…</h1>
             <div class="meta" id="contractMeta"></div>
         </div>
-        <span class="pill" id="contractStatus">Statut inconnu</span>
+        <div class="header-actions">
+            <button type="button" class="button ghost" id="loginButton">Changer de compte</button>
+            <span class="pill" id="contractStatus">Statut inconnu</span>
+        </div>
     </header>
 
     <section>
@@ -252,6 +273,7 @@
 <script>
 (function() {
     const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
     const params = new URLSearchParams(window.location.search);
     const contractId = params.get('contractId');
 
@@ -268,11 +290,22 @@
     const addClauseStatus = document.getElementById('addClauseStatus');
     const goToReview = document.getElementById('goToReview');
     const reviewLink = document.getElementById('reviewLink');
+    const loginButton = document.getElementById('loginButton');
 
     const state = {
         contract: null,
         templates: [],
     };
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
 
     function readCookie(name) {
         const cookies = document.cookie ? document.cookie.split(';') : [];
