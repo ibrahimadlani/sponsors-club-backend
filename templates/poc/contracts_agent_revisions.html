@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Espace agent • Révisions de contrats • SponsorsClub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.25), transparent 55%),
+                        radial-gradient(circle at 80% 0%, rgba(99,102,241,0.25), transparent 45%),
+                        #0f172a;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+        main {
+            width: min(1180px, 100%);
+            background: #f8fafc;
+            border-radius: 28px;
+            box-shadow: 0 42px 120px rgba(15, 23, 42, 0.45);
+            display: grid;
+            gap: 28px;
+            padding: clamp(28px, 3vw, 40px);
+        }
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            margin: 0;
+            font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+            color: #0f172a;
+        }
+        header p {
+            margin: 6px 0 0;
+            color: #475569;
+        }
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button,
+        .ghost-link {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        button.primary {
+            background: linear-gradient(120deg, #2563eb, #1d4ed8);
+            color: white;
+            box-shadow: 0 18px 36px rgba(37, 99, 235, 0.35);
+        }
+        button.primary:hover { transform: translateY(-2px); }
+        .ghost-link {
+            background: rgba(148, 163, 184, 0.16);
+            color: #1f2937;
+        }
+        .ghost-link:hover { transform: translateY(-2px); }
+        section {
+            background: white;
+            border-radius: 24px;
+            padding: clamp(22px, 2.5vw, 28px);
+            display: grid;
+            gap: 18px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+        }
+        .identity-card {
+            display: grid;
+            gap: 10px;
+            align-items: flex-start;
+            color: #1f2937;
+        }
+        .identity-card strong {
+            font-size: 1.05rem;
+        }
+        .identity-card span {
+            color: #475569;
+        }
+        .identity-card.error {
+            color: #b91c1c;
+        }
+        label {
+            display: grid;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        select,
+        textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: #f9fbff;
+            font: inherit;
+            color: inherit;
+        }
+        textarea { resize: vertical; min-height: 140px; }
+        .contract-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .contract-head h2 {
+            margin: 0;
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            color: #0f172a;
+        }
+        .contract-head p {
+            margin: 6px 0 0;
+            color: #475569;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #0369a1;
+            background: rgba(14, 165, 233, 0.14);
+        }
+        .status-pill[data-status="negotiation"] {
+            background: rgba(249, 115, 22, 0.18);
+            color: #c2410c;
+        }
+        .status-pill[data-status="agreement"],
+        .status-pill[data-status="active"] {
+            background: rgba(22, 163, 74, 0.18);
+            color: #047857;
+        }
+        .status-pill[data-status="terminated"],
+        .status-pill[data-status="expired"] {
+            background: rgba(148, 163, 184, 0.22);
+            color: #475569;
+        }
+        .contract-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+        .clause-list {
+            display: grid;
+            gap: 12px;
+        }
+        .clause-item {
+            display: grid;
+            gap: 10px;
+            padding: 18px;
+            border-radius: 18px;
+            background: #eef2ff;
+            border: 1px solid rgba(79, 70, 229, 0.18);
+        }
+        .clause-item.mandatory { background: #f1f5f9; }
+        .clause-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+        }
+        .clause-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .badge.mandatory {
+            background: rgba(30, 64, 175, 0.16);
+            color: #1e3a8a;
+        }
+        .badge.optional {
+            background: rgba(16, 185, 129, 0.18);
+            color: #047857;
+        }
+        .badge.modified {
+            background: rgba(249, 115, 22, 0.18);
+            color: #c2410c;
+        }
+        .clause-body {
+            display: grid;
+            gap: 10px;
+            color: #334155;
+        }
+        .clause-body p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .form-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .status-text {
+            font-size: 0.9rem;
+            color: #475569;
+        }
+        .status-text.error { color: #b91c1c; }
+        .status-text.success { color: #15803d; }
+        .empty {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .timeline {
+            display: grid;
+            gap: 14px;
+        }
+        .revision-card {
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fdf4ff;
+            padding: 20px;
+            display: grid;
+            gap: 12px;
+        }
+        .revision-card header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .revision-card header strong {
+            color: #4c1d95;
+        }
+        .revision-card time {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .revision-card.accepted {
+            background: #dcfce7;
+            border-color: rgba(22, 163, 74, 0.28);
+        }
+        .revision-card.accepted header strong {
+            color: #065f46;
+        }
+        .revision-card ul {
+            margin: 0;
+            padding-left: 18px;
+            color: #475569;
+        }
+        .actions-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        @media (max-width: 720px) {
+            body { padding: 16px; }
+            main { padding: 24px; gap: 24px; }
+            .contract-info { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <h1>Espace agent • Révisions de contrats</h1>
+            <p>Visualisez vos contrats assignés et proposez des ajustements de clauses en quelques clics.</p>
+        </div>
+        <div class="header-actions">
+            <a class="ghost-link" href="/poc/contracts/">Tableau collaborateur</a>
+            <button type="button" class="primary" id="loginButton">Changer de compte</button>
+        </div>
+    </header>
+
+    <section class="identity-card" id="identitySummary">
+        <strong>Chargement de votre profil…</strong>
+        <span>Connectez-vous via la sandbox SponsorsClub pour accéder aux contrats.</span>
+    </section>
+
+    <section>
+        <div class="contract-head">
+            <div>
+                <h2 id="contractTitle">Sélectionnez un contrat</h2>
+                <p id="contractSubtitle">Choisissez un contrat dans la liste pour afficher ses clauses et proposer une révision.</p>
+            </div>
+            <span class="status-pill" id="contractStatus" data-status="">Statut inconnu</span>
+        </div>
+        <label for="contractSelect">
+            Contrats suivis
+            <select id="contractSelect">
+                <option value="">Aucun contrat disponible</option>
+            </select>
+        </label>
+        <ul class="contract-info" id="contractInfo"></ul>
+        <div class="actions-row">
+            <button type="button" class="ghost-link" id="refreshButton">Actualiser les données</button>
+            <a class="ghost-link" id="openEditor" href="#" target="_blank" rel="noopener">Ouvrir dans l’éditeur</a>
+            <a class="ghost-link" id="openReview" href="#" target="_blank" rel="noopener">Vue validation</a>
+        </div>
+    </section>
+
+    <section>
+        <h2>Proposer une révision</h2>
+        <p>Sélectionnez les clauses à discuter avec l’organisation et ajoutez un commentaire pour contextualiser vos demandes.</p>
+        <div id="clausesEmpty" class="empty">Sélectionnez un contrat pour afficher ses clauses.</div>
+        <form id="revisionForm" class="grid" style="gap: 20px;">
+            <div class="clause-list" id="clausesList"></div>
+            <label for="commentInput">
+                Commentaire (optionnel)
+                <textarea id="commentInput" placeholder="Expliquez vos suggestions ou fournissez des précisions."></textarea>
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="primary">Envoyer la révision</button>
+                <span class="status-text" id="formStatus"></span>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <h2>Historique des révisions</h2>
+        <div id="revisionsEmpty" class="empty">Aucune révision enregistrée pour ce contrat.</div>
+        <div class="timeline" id="revisionsTimeline"></div>
+    </section>
+</main>
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
+
+    const state = {
+        contracts: [],
+        selectedContractId: null,
+        selectedContract: null,
+        revisions: [],
+        me: null,
+        roles: null,
+    };
+
+    const loginButton = document.getElementById('loginButton');
+    const identitySummary = document.getElementById('identitySummary');
+    const contractSelect = document.getElementById('contractSelect');
+    const contractTitle = document.getElementById('contractTitle');
+    const contractSubtitle = document.getElementById('contractSubtitle');
+    const contractStatus = document.getElementById('contractStatus');
+    const contractInfo = document.getElementById('contractInfo');
+    const clausesList = document.getElementById('clausesList');
+    const clausesEmpty = document.getElementById('clausesEmpty');
+    const revisionForm = document.getElementById('revisionForm');
+    const commentInput = document.getElementById('commentInput');
+    const formStatus = document.getElementById('formStatus');
+    const revisionsTimeline = document.getElementById('revisionsTimeline');
+    const revisionsEmpty = document.getElementById('revisionsEmpty');
+    const refreshButton = document.getElementById('refreshButton');
+    const openEditor = document.getElementById('openEditor');
+    const openReview = document.getElementById('openReview');
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedContractId = params.get('contractId');
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
+
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => loadSelectedContract());
+    }
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = {
+            method,
+            headers,
+            credentials: 'same-origin',
+        };
+
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        const token = window.localStorage.getItem(ACCESS_KEY);
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (error) {
+                payload = text;
+            }
+        }
+        return { ok: response.ok, status: response.status, data: payload };
+    }
+
+    function setStatus(element, message, variant) {
+        if (!element) {
+            return;
+        }
+        element.textContent = message || '';
+        element.classList.remove('error', 'success');
+        if (variant) {
+            element.classList.add(variant);
+        }
+    }
+
+    function formatDateTime(value) {
+        if (!value) {
+            return '—';
+        }
+        const date = new Date(value);
+        return date.toLocaleString('fr-FR', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        });
+    }
+
+    function formatDate(value) {
+        if (!value) {
+            return '—';
+        }
+        const date = new Date(value);
+        return date.toLocaleDateString('fr-FR', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    }
+
+    function updateIdentitySummary() {
+        if (!identitySummary) {
+            return;
+        }
+        identitySummary.className = 'identity-card';
+        identitySummary.innerHTML = '';
+
+        if (!state.me) {
+            identitySummary.classList.add('error');
+            identitySummary.innerHTML = '<strong>Authentification requise.</strong><span>Connectez-vous depuis la sandbox SponsorsClub pour accéder à vos contrats agent.</span>';
+            return;
+        }
+
+        const heading = document.createElement('strong');
+        const nameParts = [];
+        if (state.me.first_name) {
+            nameParts.push(state.me.first_name);
+        }
+        if (state.me.last_name) {
+            nameParts.push(state.me.last_name);
+        }
+        heading.textContent = nameParts.length ? nameParts.join(' ') : state.me.email;
+        identitySummary.appendChild(heading);
+
+        if (state.me.email) {
+            const emailLine = document.createElement('span');
+            emailLine.textContent = state.me.email;
+            identitySummary.appendChild(emailLine);
+        }
+
+        if (state.roles && state.roles.agent_profile) {
+            const agentLine = document.createElement('span');
+            agentLine.textContent = `Profil agent : ${state.roles.agent_profile.display_name}`;
+            identitySummary.appendChild(agentLine);
+        } else {
+            const infoLine = document.createElement('span');
+            infoLine.textContent = 'Ce compte n\'est pas associé à un profil agent.';
+            identitySummary.appendChild(infoLine);
+        }
+
+        const countLine = document.createElement('span');
+        const contractCount = state.contracts.length;
+        countLine.textContent = contractCount
+            ? `${contractCount} contrat(s) suivi(s) dans cette session.`
+            : 'Aucun contrat assigné pour le moment.';
+        identitySummary.appendChild(countLine);
+    }
+
+    function getSelectedContractFromList() {
+        if (!state.selectedContractId) {
+            return null;
+        }
+        return state.contracts.find((contract) => contract.id === state.selectedContractId) || null;
+    }
+
+    function populateContractSelect() {
+        if (!contractSelect) {
+            return;
+        }
+        contractSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = state.contracts.length
+            ? 'Sélectionnez un contrat'
+            : 'Aucun contrat disponible';
+        placeholder.disabled = state.contracts.length > 0;
+        placeholder.selected = !state.selectedContractId;
+        contractSelect.appendChild(placeholder);
+
+        for (const contract of state.contracts) {
+            const option = document.createElement('option');
+            option.value = contract.id;
+            option.textContent = `${contract.title} • ${contract.status_label}`;
+            if (contract.id === state.selectedContractId) {
+                option.selected = true;
+                placeholder.selected = false;
+            }
+            contractSelect.appendChild(option);
+        }
+    }
+
+    function updateContractMeta() {
+        if (!contractTitle || !contractStatus || !contractInfo || !contractSubtitle) {
+            return;
+        }
+
+        const contract = state.selectedContract;
+        if (!contract) {
+            contractTitle.textContent = 'Sélectionnez un contrat';
+            contractSubtitle.textContent = 'Choisissez un contrat pour afficher les détails et proposer des révisions.';
+            contractStatus.textContent = 'Statut inconnu';
+            contractStatus.dataset.status = '';
+            contractInfo.innerHTML = '';
+            if (openEditor) {
+                openEditor.href = '#';
+                openEditor.classList.add('ghost-link');
+            }
+            if (openReview) {
+                openReview.href = '#';
+                openReview.classList.add('ghost-link');
+            }
+            return;
+        }
+
+        contractTitle.textContent = contract.title;
+        contractSubtitle.textContent = contract.organisation
+            ? `Organisation : ${contract.organisation.name}`
+            : 'Organisation non renseignée.';
+        contractStatus.textContent = contract.status_label;
+        contractStatus.dataset.status = contract.status;
+
+        const infoItems = [];
+        if (contract.agent) {
+            infoItems.push(`Agent : ${contract.agent.display_name}`);
+        }
+        if (contract.initiated_by) {
+            infoItems.push(`Créé par : ${contract.initiated_by.email}`);
+        }
+        infoItems.push(`Dernière mise à jour : ${formatDateTime(contract.updated_at)}`);
+        if (contract.effective_date) {
+            infoItems.push(`Prise d'effet : ${formatDate(contract.effective_date)}`);
+        }
+        if (contract.expiration_date) {
+            infoItems.push(`Expiration : ${formatDate(contract.expiration_date)}`);
+        }
+
+        contractInfo.innerHTML = '';
+        for (const detail of infoItems) {
+            const item = document.createElement('li');
+            item.textContent = detail;
+            contractInfo.appendChild(item);
+        }
+
+        if (openEditor) {
+            openEditor.href = `/poc/contracts/editor/?contractId=${contract.id}`;
+        }
+        if (openReview) {
+            openReview.href = `/poc/contracts/review/?contractId=${contract.id}`;
+        }
+    }
+
+    function renderClauses() {
+        if (!clausesList || !clausesEmpty) {
+            return;
+        }
+        clausesList.innerHTML = '';
+        const contract = state.selectedContract;
+        if (!contract || !contract.clauses || !contract.clauses.length) {
+            clausesEmpty.style.display = 'block';
+            return;
+        }
+        clausesEmpty.style.display = 'none';
+
+        for (const clause of contract.clauses) {
+            const wrapper = document.createElement('label');
+            wrapper.className = 'clause-item';
+            if (clause.is_mandatory) {
+                wrapper.classList.add('mandatory');
+            }
+
+            const header = document.createElement('div');
+            header.className = 'clause-header';
+
+            const title = document.createElement('strong');
+            title.textContent = clause.title;
+            header.appendChild(title);
+
+            const badges = document.createElement('div');
+            badges.style.display = 'flex';
+            badges.style.flexWrap = 'wrap';
+            badges.style.gap = '8px';
+
+            const typeBadge = document.createElement('span');
+            typeBadge.className = `badge ${clause.is_mandatory ? 'mandatory' : 'optional'}`;
+            typeBadge.textContent = clause.is_mandatory ? 'Obligatoire' : 'Optionnelle';
+            badges.appendChild(typeBadge);
+
+            if (clause.is_modified) {
+                const modifiedBadge = document.createElement('span');
+                modifiedBadge.className = 'badge modified';
+                modifiedBadge.textContent = 'Modifiée';
+                badges.appendChild(modifiedBadge);
+            }
+
+            header.appendChild(badges);
+            wrapper.appendChild(header);
+
+            const body = document.createElement('div');
+            body.className = 'clause-body';
+
+            if (clause.template && clause.template.title) {
+                const templateLine = document.createElement('span');
+                templateLine.textContent = `Modèle : ${clause.template.title}`;
+                body.appendChild(templateLine);
+            }
+
+            if (clause.content) {
+                const content = document.createElement('p');
+                content.textContent = clause.content;
+                body.appendChild(content);
+            }
+
+            wrapper.appendChild(body);
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = clause.id;
+            checkbox.name = 'clauseIds';
+            checkbox.style.alignSelf = 'flex-start';
+            wrapper.appendChild(checkbox);
+
+            clausesList.appendChild(wrapper);
+        }
+    }
+
+    function renderRevisions() {
+        if (!revisionsTimeline || !revisionsEmpty) {
+            return;
+        }
+        revisionsTimeline.innerHTML = '';
+        const revisions = state.revisions || [];
+        if (!revisions.length) {
+            revisionsEmpty.style.display = 'block';
+            return;
+        }
+        revisionsEmpty.style.display = 'none';
+
+        const ordered = [...revisions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        for (const revision of ordered) {
+            const card = document.createElement('article');
+            card.className = 'revision-card';
+            if (revision.accepted) {
+                card.classList.add('accepted');
+            }
+
+            const header = document.createElement('header');
+            const author = document.createElement('strong');
+            author.textContent = revision.proposed_by ? revision.proposed_by.email : 'Auteur inconnu';
+            header.appendChild(author);
+
+            const timestamp = document.createElement('time');
+            timestamp.dateTime = revision.created_at;
+            timestamp.textContent = formatDateTime(revision.created_at);
+            header.appendChild(timestamp);
+            card.appendChild(header);
+
+            const comment = document.createElement('p');
+            comment.style.margin = '0';
+            comment.style.color = '#334155';
+            comment.textContent = revision.comment ? revision.comment : 'Aucun commentaire fourni.';
+            card.appendChild(comment);
+
+            if (revision.clauses_changed && revision.clauses_changed.length) {
+                const clauseList = document.createElement('ul');
+                for (const clause of revision.clauses_changed) {
+                    const item = document.createElement('li');
+                    item.textContent = clause.title;
+                    clauseList.appendChild(item);
+                }
+                card.appendChild(clauseList);
+            }
+
+            revisionsTimeline.appendChild(card);
+        }
+    }
+
+    async function loadIdentity() {
+        try {
+            const [meResponse, rolesResponse] = await Promise.all([
+                apiRequest({ url: '/api/users/me/' }),
+                apiRequest({ url: '/api/users/me/roles/' }),
+            ]);
+
+            state.me = meResponse.ok ? meResponse.data : null;
+            state.roles = rolesResponse.ok ? rolesResponse.data : null;
+        } catch (error) {
+            console.error(error);
+            state.me = null;
+            state.roles = null;
+        } finally {
+            updateIdentitySummary();
+        }
+    }
+
+    function updateContractCache(contract) {
+        const index = state.contracts.findIndex((item) => item.id === contract.id);
+        if (index >= 0) {
+            state.contracts[index] = contract;
+        } else {
+            state.contracts.push(contract);
+        }
+        populateContractSelect();
+        updateIdentitySummary();
+    }
+
+    async function loadContracts() {
+        try {
+            const response = await apiRequest({ url: '/api/contracts/' });
+            if (response.ok && Array.isArray(response.data)) {
+                state.contracts = response.data;
+                if (requestedContractId && response.data.find((item) => item.id === requestedContractId)) {
+                    state.selectedContractId = requestedContractId;
+                } else if (!state.selectedContractId && response.data.length) {
+                    state.selectedContractId = response.data[0].id;
+                } else if (state.selectedContractId) {
+                    const stillPresent = response.data.find((item) => item.id === state.selectedContractId);
+                    if (!stillPresent) {
+                        state.selectedContractId = response.data.length ? response.data[0].id : null;
+                    }
+                }
+            } else if (response.status === 401) {
+                setStatus(formStatus, 'Session expirée. Merci de vous reconnecter.', 'error');
+                state.contracts = [];
+                state.selectedContractId = null;
+            } else {
+                state.contracts = [];
+                state.selectedContractId = null;
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus(formStatus, "Impossible de charger les contrats.", 'error');
+            state.contracts = [];
+            state.selectedContractId = null;
+        } finally {
+            populateContractSelect();
+            updateIdentitySummary();
+            await loadSelectedContract({ silent: true });
+        }
+    }
+
+    async function loadSelectedContract(options = {}) {
+        const { silent = false } = options;
+        if (!state.selectedContractId) {
+            state.selectedContract = null;
+            state.revisions = [];
+            updateContractMeta();
+            renderClauses();
+            renderRevisions();
+            if (!silent) {
+                setStatus(formStatus, 'Aucun contrat sélectionné.', 'error');
+            }
+            return;
+        }
+
+        if (!silent) {
+            setStatus(formStatus, 'Chargement du contrat…');
+        }
+
+        try {
+            const [detailResponse, revisionsResponse] = await Promise.all([
+                apiRequest({ url: `/api/contracts/${state.selectedContractId}/` }),
+                apiRequest({ url: `/api/contracts/${state.selectedContractId}/revisions/` }),
+            ]);
+
+            if (detailResponse.ok) {
+                state.selectedContract = detailResponse.data;
+                updateContractCache(detailResponse.data);
+            } else if (detailResponse.status === 404) {
+                state.selectedContract = null;
+                setStatus(formStatus, 'Contrat introuvable ou non accessible.', 'error');
+            } else if (detailResponse.status === 403) {
+                state.selectedContract = null;
+                setStatus(formStatus, 'Accès refusé à ce contrat.', 'error');
+            }
+
+            if (revisionsResponse.ok && Array.isArray(revisionsResponse.data)) {
+                state.revisions = revisionsResponse.data;
+            } else {
+                state.revisions = [];
+            }
+        } catch (error) {
+            console.error(error);
+            if (!silent) {
+                setStatus(formStatus, 'Erreur lors du chargement du contrat.', 'error');
+            }
+        }
+
+        updateContractMeta();
+        renderClauses();
+        renderRevisions();
+        if (!silent) {
+            setStatus(formStatus, 'Contrat synchronisé.', 'success');
+        }
+    }
+
+    if (contractSelect) {
+        contractSelect.addEventListener('change', async (event) => {
+            const value = event.target.value;
+            state.selectedContractId = value || null;
+            await loadSelectedContract();
+        });
+    }
+
+    if (revisionForm) {
+        revisionForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!state.selectedContractId) {
+                setStatus(formStatus, 'Sélectionnez un contrat avant de proposer une révision.', 'error');
+                return;
+            }
+
+            const checked = Array.from(
+                revisionForm.querySelectorAll('input[type="checkbox"][name="clauseIds"]:checked')
+            ).map((input) => input.value);
+            const comment = commentInput ? commentInput.value.trim() : '';
+
+            if (!checked.length && !comment) {
+                setStatus(formStatus, 'Sélectionnez au moins une clause ou ajoutez un commentaire.', 'error');
+                return;
+            }
+
+            const payload = {};
+            if (checked.length) {
+                payload.clause_ids = checked;
+            }
+            if (comment) {
+                payload.comment = comment;
+            }
+
+            setStatus(formStatus, 'Envoi de la révision…');
+            try {
+                const response = await apiRequest({
+                    url: `/api/contracts/${state.selectedContractId}/revisions/`,
+                    method: 'POST',
+                    data: payload,
+                });
+
+                if (response.ok) {
+                    setStatus(formStatus, 'Révision proposée avec succès.', 'success');
+                    if (commentInput) {
+                        commentInput.value = '';
+                    }
+                    revisionForm
+                        .querySelectorAll('input[type="checkbox"][name="clauseIds"]:checked')
+                        .forEach((input) => {
+                            input.checked = false;
+                        });
+                    await loadSelectedContract({ silent: true });
+                    renderRevisions();
+                } else if (response.status === 403) {
+                    setStatus(formStatus, 'Vous n\'avez pas la permission pour cette action.', 'error');
+                } else if (response.status === 400 && response.data && response.data.detail) {
+                    setStatus(formStatus, response.data.detail, 'error');
+                } else {
+                    setStatus(formStatus, 'La révision n\'a pas pu être envoyée.', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                setStatus(formStatus, 'Erreur réseau. Veuillez réessayer.', 'error');
+            }
+        });
+    }
+
+    (async function initialise() {
+        await loadIdentity();
+        await loadContracts();
+    })();
+})();
+</script>
+</body>
+</html>

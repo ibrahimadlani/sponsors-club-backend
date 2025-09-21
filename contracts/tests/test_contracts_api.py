@@ -384,6 +384,7 @@ def test_agent_validation_flow(
         format="json",
     )
     assert forbidden.status_code == status.HTTP_403_FORBIDDEN
+    assert forbidden.content == b""
 
     owner_client.patch(
         status_url,
