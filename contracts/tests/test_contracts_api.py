@@ -1,74 +1,182 @@
-"""Integration tests for contract API behaviour."""
+"""Integration tests covering the contracts workflow."""
 
-from datetime import date
-
-import pytest
+from django.core.files.base import ContentFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from athletes.models import Athlete, Sport
+import pytest
+
+from organisations.models import Collaborator
+from users.models import User
+
+from contracts.models import ClauseTemplate, Contract, ContractFile, ContractRevision
 
 
 @pytest.fixture
-def contract_client(owner_user):
+def owner_client(owner_user) -> APIClient:
     client = APIClient()
-    client.force_authenticate(user=owner_user)
+    client.force_authenticate(owner_user)
     return client
 
 
 @pytest.fixture
-def contract_sport():
-    return Sport.objects.create(name="Rugby", discipline="Team Sport")
+def agent_client(agent_user) -> APIClient:
+    client = APIClient()
+    client.force_authenticate(agent_user)
+    return client
 
 
 @pytest.fixture
-def contract_athlete(agent_user, contract_sport):
-    return Athlete.objects.create(
-        sport=contract_sport,
-        agent=agent_user.agent_profile,
-        full_name="Contract Athlete",
-        birth_date=date(1995, 5, 5),
-        nationality="FR",
-        is_self_represented=False,
+def mandatory_clause_template():
+    return ClauseTemplate.objects.create(
+        category=ClauseTemplate.Category.OBLIGATIONS,
+        title="Confidentialité",
+        content="L'agent {{agent_name}} respecte la confidentialité.",
+        placeholders=["agent_name"],
+        is_mandatory=True,
+        version=1,
     )
 
 
-@pytest.mark.django_db
-def test_contract_create_success(
-    contract_client, organisations_setup, contract_athlete
+@pytest.fixture
+def optional_clause_template():
+    return ClauseTemplate.objects.create(
+        category=ClauseTemplate.Category.FINANCE,
+        title="Paiement",
+        content="Paiement de {{amount}} euros.",
+        placeholders=["amount"],
+        is_mandatory=False,
+        version=1,
+    )
+
+
+@pytest.fixture
+def created_contract(
+    owner_client,
+    organisations_setup,
+    agent_user,
+    mandatory_clause_template,
 ):
     organisation = organisations_setup["organisation"]
     url = reverse("contract-list")
     payload = {
         "organisation_id": str(organisation.id),
-        "athlete_id": str(contract_athlete.id),
-        "currency": "EUR",
-        "amount": "10000.00",
+        "agent_id": str(agent_user.agent_profile.id),
+        "title": "Sponsoring 2025",
     }
-    response = contract_client.post(url, payload, format="json")
+    response = owner_client.post(url, payload, format="json")
+    assert response.status_code == status.HTTP_201_CREATED
+    contract_id = response.json()["id"]
+    return Contract.objects.get(id=contract_id)
+
+
+@pytest.mark.django_db
+def test_create_contract_includes_mandatory_clauses(created_contract):
+    clauses = created_contract.clauses.all()
+    assert clauses.count() == 1
+    assert clauses.first().is_mandatory is True
+
+
+@pytest.mark.django_db
+def test_add_optional_clause_visible(
+    owner_client,
+    created_contract,
+    optional_clause_template,
+):
+    url = reverse("contract-add-clause", args=[created_contract.id])
+    response = owner_client.post(
+        url, {"template_id": str(optional_clause_template.id)}, format="json"
+    )
     assert response.status_code == status.HTTP_201_CREATED
 
+    detail_url = reverse("contract-detail", args=[created_contract.id])
+    detail = owner_client.get(detail_url)
+    assert detail.status_code == status.HTTP_200_OK
+    clause_titles = [clause["title"] for clause in detail.json()["clauses"]]
+    assert optional_clause_template.title in clause_titles
+
 
 @pytest.mark.django_db
-def test_contract_create_denied_without_feature(
-    contract_client,
+def test_agent_proposes_revision(
+    agent_client,
+    created_contract,
+    optional_clause_template,
+    owner_client,
+):
+    # Collaborator adds an optional clause which the agent proposes to modify
+    owner_client.post(
+        reverse("contract-add-clause", args=[created_contract.id]),
+        {"template_id": str(optional_clause_template.id)},
+        format="json",
+    )
+    clause = created_contract.clauses.filter(is_mandatory=False).first()
+
+    revision_url = reverse("contract-create-revision", args=[created_contract.id])
+    response = agent_client.post(
+        revision_url,
+        {"clause_ids": [str(clause.id)], "comment": "Proposition de mise à jour"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert ContractRevision.objects.filter(contract=created_contract).count() == 1
+
+
+@pytest.mark.django_db
+def test_owner_validates_contract_status(owner_client, created_contract):
+    status_url = reverse("contract-change-status", args=[created_contract.id])
+
+    response = owner_client.patch(
+        status_url, {"status": Contract.Status.NEGOTIATION}, format="json"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.NEGOTIATION
+
+    response = owner_client.patch(
+        status_url, {"status": Contract.Status.AGREEMENT}, format="json"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.AGREEMENT
+
+
+@pytest.mark.django_db
+def test_non_owner_cannot_change_status(
+    created_contract,
     organisations_setup,
-    contract_athlete,
+    user_model,
 ):
     organisation = organisations_setup["organisation"]
-    subscription = organisation.subscriptions.first()
-    plan = subscription.plan
-    plan.features["contract_tools"] = "disabled"
-    plan.save(update_fields=["features"])
+    member = user_model.objects.create_user(
+        email="member@test.com",
+        password="pass1234",
+        account_type=User.AccountType.COLLABORATOR,
+    )
+    Collaborator.objects.create(
+        user=member,
+        organisation=organisation,
+        role=Collaborator.Role.MEMBER,
+        job_title="Manager",
+    )
+    client = APIClient()
+    client.force_authenticate(member)
 
-    url = reverse("contract-list")
-    payload = {
-        "organisation_id": str(organisation.id),
-        "athlete_id": str(contract_athlete.id),
-        "currency": "EUR",
-        "amount": "10000.00",
-    }
-    response = contract_client.post(url, payload, format="json")
+    status_url = reverse("contract-change-status", args=[created_contract.id])
+    response = client.patch(
+        status_url, {"status": Contract.Status.NEGOTIATION}, format="json"
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json()["required_feature"] == "contract_tools"
+
+
+@pytest.mark.django_db
+def test_export_pdf_downloadable(owner_client, created_contract):
+    ContractFile.objects.create(
+        contract=created_contract,
+        pdf=ContentFile(b"PDF", name="contrat.pdf"),
+    )
+
+    export_url = reverse("contract-export-pdf", args=[created_contract.id])
+    response = owner_client.get(export_url)
+    assert response.status_code == status.HTTP_200_OK
+    assert "attachment; filename=\"contrat.pdf\"" in response["Content-Disposition"]
