@@ -104,17 +104,11 @@ class ContractViewSet(
         if not self._can_edit_clauses(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
 
-        serializer = ContractClauseCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        clause = ContractClause.objects.create(
-            contract=contract,
-            template=data.get("template"),
-            title=data["title"],
-            content=data["content"],
-            is_mandatory=data.get("is_mandatory", False),
-            is_modified=False,
+        serializer = ContractClauseCreateSerializer(
+            data=request.data, context={"contract": contract}
         )
+        serializer.is_valid(raise_exception=True)
+        clause = serializer.save()
         output = ContractClauseSerializer(clause)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -130,13 +124,11 @@ class ContractViewSet(
             instance=clause, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        clause.is_modified = True
-        clause.save(update_fields=["is_modified", "updated_at", "title", "content"])
+        clause = serializer.save()
         output = ContractClauseSerializer(clause)
         return Response(output.data)
 
-    @action(detail=True, methods=["delete"], url_path="clauses/(?P<clause_id>[^/.]+)")
+    @update_clause.mapping.delete
     def delete_clause(self, request, clause_id=None, *args, **kwargs):
         contract = self.get_object()
         clause = self._get_clause(contract, clause_id)
