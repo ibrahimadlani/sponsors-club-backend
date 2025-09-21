@@ -4,6 +4,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile
@@ -59,7 +60,10 @@ class Contract(BaseModel):
         DRAFT = "draft", "Draft"
         NEGOTIATION = "negotiation", "Negotiation"
         AGREEMENT = "agreement", "Agreement"
+        LEGAL_REVIEW = "legal_review", "Legal review"
+        SIGNING = "signing", "Signing"
         ACTIVE = "active", "Active"
+        EXPIRED = "expired", "Expired"
         TERMINATED = "terminated", "Terminated"
 
     organisation = models.ForeignKey(
@@ -87,6 +91,9 @@ class Contract(BaseModel):
     title = models.CharField(max_length=255)
     effective_date = models.DateField(blank=True, null=True)
     expiration_date = models.DateField(blank=True, null=True)
+    owner_agreed_at = models.DateTimeField(null=True, blank=True)
+    agent_agreed_at = models.DateTimeField(null=True, blank=True)
+    current_version_number = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ("-created_at",)
@@ -113,6 +120,58 @@ class Contract(BaseModel):
                     "is_modified": False,
                 },
             )
+
+    def has_full_agreement(self) -> bool:
+        """Return whether both parties formally agreed."""
+
+        return bool(self.owner_agreed_at and self.agent_agreed_at)
+
+    def record_agreement(self, *, owner: bool = False, agent: bool = False) -> bool:
+        """Persist an agreement timestamp for the relevant actor.
+
+        Returns ``True`` if any timestamp changed.
+        """
+
+        changed = False
+        now = timezone.now()
+
+        if owner and not self.owner_agreed_at:
+            self.owner_agreed_at = now
+            changed = True
+
+        if agent and not self.agent_agreed_at:
+            self.agent_agreed_at = now
+            changed = True
+
+        if changed:
+            self.save(update_fields=[
+                "owner_agreed_at",
+                "agent_agreed_at",
+                "updated_at",
+            ])
+
+        return changed
+
+    def bump_version(
+        self,
+        *,
+        created_by,
+        source_revision=None,
+        notes: str = "",
+    ):
+        """Create a new contract version snapshot and bump the counter."""
+
+        next_number = self.current_version_number + 1
+        version = ContractVersion.objects.create(
+            contract=self,
+            number=next_number,
+            created_by=created_by,
+            source_revision=source_revision,
+            notes=notes,
+        )
+        self.current_version_number = next_number
+        self.save(update_fields=["current_version_number", "updated_at"])
+        return version
 
 
 class ContractClause(BaseModel):
@@ -168,6 +227,137 @@ class ContractRevision(BaseModel):
 
     def __str__(self) -> str:  # pragma: no cover - human readable
         return f"Revision {self.id} on {self.contract.title}"
+
+
+class ContractVersion(BaseModel):
+    """Snapshot of the contract at a specific negotiation step."""
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="versions",
+    )
+    number = models.PositiveIntegerField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="created_contract_versions",
+    )
+    source_revision = models.ForeignKey(
+        "ContractRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resulting_versions",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-number",)
+        unique_together = (("contract", "number"),)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Version {self.number} of {self.contract.title}"
+
+
+class ContractComment(BaseModel):
+    """Free-form annotation tied to a specific contract version and clause."""
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    version = models.ForeignKey(
+        ContractVersion,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    clause = models.ForeignKey(
+        ContractClause,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comments",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="contract_comments",
+    )
+    body = models.TextField()
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Comment by {self.author} on {self.contract.title}"
+
+
+class ContractLegalReview(BaseModel):
+    """Track the legal review lifecycle prior to signature."""
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="legal_review",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="requested_contract_reviews",
+    )
+    notes = models.TextField(blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_contract_reviews",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Legal review for {self.contract.title}"
+
+
+class ContractSigning(BaseModel):
+    """Track DocuSign envelope and signature status."""
+
+    class Status(models.TextChoices):
+        INITIATED = "initiated", "Initiated"
+        COMPLETED = "completed", "Completed"
+        DECLINED = "declined", "Declined"
+        ERROR = "error", "Error"
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="signing",
+    )
+    envelope_id = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.INITIATED,
+    )
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="initiated_contract_signings",
+    )
+    last_payload = models.JSONField(default=dict, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Signing for {self.contract.title}"
 
 
 class ContractFile(BaseModel):

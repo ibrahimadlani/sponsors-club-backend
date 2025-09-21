@@ -14,8 +14,12 @@ from contracts.models import (
     ClauseTemplate,
     Contract,
     ContractClause,
+    ContractComment,
     ContractFile,
+    ContractLegalReview,
     ContractRevision,
+    ContractSigning,
+    ContractVersion,
 )
 
 
@@ -30,6 +34,25 @@ def owner_client(owner_user) -> APIClient:
 def agent_client(agent_user) -> APIClient:
     client = APIClient()
     client.force_authenticate(agent_user)
+    return client
+
+
+@pytest.fixture
+def staff_user(user_model):
+    return user_model.objects.create_user(
+        email="legal@test.com",
+        password="pass1234",
+        first_name="Legal",
+        last_name="User",
+        is_staff=True,
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+
+
+@pytest.fixture
+def staff_client(staff_user) -> APIClient:
+    client = APIClient()
+    client.force_authenticate(staff_user)
     return client
 
 
@@ -154,6 +177,9 @@ def test_contract_creation_flow(owner_client, organisations_setup, agent_user, m
     assert body["organisation"]["id"] == str(organisation.id)
     assert body["agent"]["id"] == str(agent_user.agent_profile.id)
     assert body["signed_file"] is None
+    assert body["owner_agreed_at"] is None
+    assert body["agent_agreed_at"] is None
+    assert body["current_version_number"] == 1
 
     clauses = body["clauses"]
     assert len(clauses) == 1
@@ -161,6 +187,10 @@ def test_contract_creation_flow(owner_client, organisations_setup, agent_user, m
     assert clause_payload["template_id"] == str(mandatory_clause_template.id)
     assert clause_payload["is_mandatory"] is True
     assert clause_payload["is_modified"] is False
+
+    versions = body["versions"]
+    assert len(versions) == 1
+    assert versions[0]["number"] == 1
 
 
 @pytest.fixture
@@ -275,6 +305,37 @@ def test_agent_proposes_revision(
 
 
 @pytest.mark.django_db
+def test_revision_acceptance_creates_new_version(
+    owner_client,
+    created_contract,
+    optional_clause_template,
+):
+    add_url = reverse("contract-add-clause", args=[created_contract.id])
+    owner_client.post(add_url, {"template_id": str(optional_clause_template.id)}, format="json")
+
+    clause = created_contract.clauses.filter(is_mandatory=False).first()
+
+    revision_url = reverse("contract-create-revision", args=[created_contract.id])
+    response = owner_client.post(
+        revision_url,
+        {"clause_ids": [str(clause.id)], "comment": "Mise à jour"},
+        format="json",
+    )
+    revision_id = response.json()["id"]
+
+    accept_url = reverse(
+        "contract-accept-revision",
+        args=[created_contract.id, revision_id],
+    )
+    accept_response = owner_client.post(accept_url, format="json")
+    assert accept_response.status_code == status.HTTP_200_OK
+
+    created_contract.refresh_from_db()
+    assert created_contract.current_version_number == 2
+    assert ContractVersion.objects.filter(contract=created_contract).count() == 2
+
+
+@pytest.mark.django_db
 def test_agent_validation_flow(
     owner_client,
     agent_client,
@@ -302,6 +363,7 @@ def test_agent_validation_flow(
     assert detail_payload["id"] == contract_id
     assert detail_payload["status_label"] == Contract.Status.DRAFT.label
     assert detail_payload["signed_file"] is None
+    assert detail_payload["current_version_number"] == 1
 
     revision_url = reverse("contract-create-revision", args=[contract_id])
     clause_id = detail_response.json()["clauses"][0]["id"]
@@ -322,6 +384,128 @@ def test_agent_validation_flow(
         format="json",
     )
     assert forbidden.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_legal_review_requires_dual_agreement(
+    owner_client,
+    agent_client,
+    created_contract,
+):
+    status_url = reverse("contract-change-status", args=[created_contract.id])
+    owner_client.patch(status_url, {"status": Contract.Status.NEGOTIATION}, format="json")
+
+    agree_url = reverse("contract-agree", args=[created_contract.id])
+    owner_client.post(agree_url, format="json")
+
+    review_url = reverse("contract-create-legal-review", args=[created_contract.id])
+    response = owner_client.post(review_url, {"notes": "Analyse"}, format="json")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    agent_client.post(agree_url, format="json")
+    response = owner_client.post(review_url, {"notes": "Analyse"}, format="json")
+    assert response.status_code == status.HTTP_201_CREATED
+
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.LEGAL_REVIEW
+    assert ContractLegalReview.objects.filter(contract=created_contract).count() == 1
+
+
+@pytest.mark.django_db
+def test_legal_verification_and_signing_flow(
+    owner_client,
+    agent_client,
+    staff_client,
+    created_contract,
+):
+    status_url = reverse("contract-change-status", args=[created_contract.id])
+    owner_client.patch(status_url, {"status": Contract.Status.NEGOTIATION}, format="json")
+
+    agree_url = reverse("contract-agree", args=[created_contract.id])
+    owner_client.post(agree_url, format="json")
+    agent_client.post(agree_url, format="json")
+
+    review_url = reverse("contract-create-legal-review", args=[created_contract.id])
+    owner_client.post(review_url, {"notes": "Analyse"}, format="json")
+
+    verify_url = reverse("contract-verify-legal-review", args=[created_contract.id])
+    verify_response = staff_client.patch(
+        verify_url,
+        {"verification_notes": "OK"},
+        format="json",
+    )
+    assert verify_response.status_code == status.HTTP_200_OK
+
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.SIGNING
+
+    init_url = reverse("contract-init-signing", args=[created_contract.id])
+    init_response = owner_client.post(
+        init_url,
+        {"envelope_id": "env_123"},
+        format="json",
+    )
+    assert init_response.status_code == status.HTTP_201_CREATED
+    signing = ContractSigning.objects.get(contract=created_contract)
+    assert signing.envelope_id == "env_123"
+
+    webhook_url = reverse("contract-signing-webhook")
+    anonymous_client = APIClient()
+    webhook_response = anonymous_client.post(
+        webhook_url,
+        {
+            "contract_id": str(created_contract.id),
+            "envelope_id": "env_123",
+            "status": ContractSigning.Status.COMPLETED,
+            "payload": {"event": "completed"},
+        },
+        format="json",
+    )
+    assert webhook_response.status_code == status.HTTP_200_OK
+
+    created_contract.refresh_from_db()
+    signing.refresh_from_db()
+    assert created_contract.status == Contract.Status.ACTIVE
+    assert signing.status == ContractSigning.Status.COMPLETED
+    assert signing.completed_at is not None
+
+
+@pytest.mark.django_db
+def test_contract_comments_endpoint(owner_client, created_contract):
+    version = ContractVersion.objects.get(contract=created_contract, number=1)
+    list_url = reverse("contract-list-versions", args=[created_contract.id])
+    list_response = owner_client.get(list_url)
+    assert list_response.status_code == status.HTTP_200_OK
+
+    comments_url = reverse(
+        "contract-version-comments", args=[created_contract.id, version.id]
+    )
+    create_response = owner_client.post(
+        comments_url,
+        {"body": "Note interne"},
+        format="json",
+    )
+    assert create_response.status_code == status.HTTP_201_CREATED
+    assert ContractComment.objects.filter(version=version).count() == 1
+
+    list_comments = owner_client.get(comments_url)
+    assert list_comments.status_code == status.HTTP_200_OK
+    assert list_comments.json()[0]["body"] == "Note interne"
+
+
+@pytest.mark.django_db
+def test_expire_endpoint_requires_staff(owner_client, staff_client, created_contract):
+    created_contract.status = Contract.Status.ACTIVE
+    created_contract.save(update_fields=["status"])
+
+    expire_url = reverse("contract-expire", args=[created_contract.id])
+    forbidden = owner_client.post(expire_url, format="json")
+    assert forbidden.status_code == status.HTTP_403_FORBIDDEN
+
+    response = staff_client.post(expire_url, format="json")
+    assert response.status_code == status.HTTP_200_OK
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.EXPIRED
 
 
 @pytest.mark.django_db
@@ -406,3 +590,6 @@ def test_contract_options_endpoint(owner_client, organisations_setup, agent_user
     statuses = {item["value"] for item in payload["statuses"]}
     assert Contract.Status.DRAFT in statuses
     assert Contract.Status.AGREEMENT in statuses
+    assert Contract.Status.LEGAL_REVIEW in statuses
+    assert Contract.Status.SIGNING in statuses
+    assert Contract.Status.EXPIRED in statuses

@@ -1,27 +1,47 @@
 """View layer exposing the contracts API endpoints."""
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import FileResponse, Http404
+from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from organisations.models import Collaborator
 from users.models import AgentProfile
 
-from .models import ClauseTemplate, Contract, ContractClause, ContractFile, ContractRevision
+from .models import (
+    ClauseTemplate,
+    Contract,
+    ContractClause,
+    ContractComment,
+    ContractFile,
+    ContractLegalReview,
+    ContractRevision,
+    ContractSigning,
+    ContractVersion,
+)
 from .serializers import (
     ClauseTemplateSerializer,
     ContractClauseCreateSerializer,
     ContractClauseSerializer,
     ContractClauseUpdateSerializer,
     ContractCreateSerializer,
+    ContractCommentCreateSerializer,
+    ContractCommentSerializer,
+    ContractLegalReviewCreateSerializer,
+    ContractLegalReviewSerializer,
+    ContractLegalReviewVerifySerializer,
     ContractRevisionCreateSerializer,
     ContractRevisionSerializer,
     ContractSerializer,
     ContractStatusSerializer,
+    ContractSigningInitSerializer,
+    ContractSigningSerializer,
+    ContractSigningWebhookSerializer,
+    ContractVersionSerializer,
 )
 
 
@@ -49,11 +69,27 @@ class ContractViewSet(
             return Contract.objects.none()
 
         user = self.request.user
-        queryset = Contract.objects.select_related(
-            "organisation",
-            "agent__user",
-            "initiated_by__user",
-        ).prefetch_related("clauses__template", "revisions__clauses_changed")
+        queryset = (
+            Contract.objects.select_related(
+                "organisation",
+                "agent__user",
+                "initiated_by__user",
+                "legal_review",
+                "signing",
+            )
+            .prefetch_related(
+                "clauses__template",
+                "revisions__clauses_changed",
+                Prefetch(
+                    "versions",
+                    queryset=ContractVersion.objects.order_by("number"),
+                ),
+                Prefetch(
+                    "comments",
+                    queryset=ContractComment.objects.select_related("author", "clause", "version"),
+                ),
+            )
+        )
 
         if user.is_staff or user.is_superuser:
             return queryset
@@ -96,6 +132,8 @@ class ContractViewSet(
         )
         serializer.is_valid(raise_exception=True)
         contract = serializer.save()
+        contract.bump_version(created_by=request.user, notes="Initial version")
+        contract.refresh_from_db()
         output = ContractSerializer(contract, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -226,10 +264,252 @@ class ContractViewSet(
         except ContractRevision.DoesNotExist as exc:
             raise Http404 from exc
 
+        if revision.accepted:
+            serializer = ContractRevisionSerializer(revision)
+            return Response(serializer.data)
+
         revision.accepted = True
         revision.save(update_fields=["accepted", "updated_at"])
+        contract.bump_version(
+            created_by=request.user,
+            source_revision=revision,
+            notes=revision.comment or "",
+        )
+        contract.refresh_from_db()
         serializer = ContractRevisionSerializer(revision)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="agree")
+    def agree(self, request, *args, **kwargs):
+        contract = self.get_object()
+        user = request.user
+
+        is_owner = self._is_owner(user, contract.organisation_id)
+        agent_profile = getattr(user, "agent_profile", None)
+        is_agent = bool(agent_profile and agent_profile == contract.agent)
+
+        if not (is_owner or is_agent):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        if contract.status not in {
+            Contract.Status.NEGOTIATION,
+            Contract.Status.AGREEMENT,
+        }:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        contract.record_agreement(owner=is_owner, agent=is_agent)
+
+        if contract.has_full_agreement() and contract.status == Contract.Status.NEGOTIATION:
+            contract.status = Contract.Status.AGREEMENT
+            contract.save(update_fields=["status", "updated_at"])
+
+        contract.refresh_from_db()
+        serializer = ContractSerializer(contract, context=self.get_serializer_context())
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="legal/review")
+    def create_legal_review(self, request, *args, **kwargs):
+        contract = self.get_object()
+
+        if not self._is_owner(request.user, contract.organisation_id):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        if not contract.has_full_agreement():
+            return Response(
+                {"detail": "Both parties must agree before legal review."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if contract.status not in {
+            Contract.Status.AGREEMENT,
+            Contract.Status.NEGOTIATION,
+        }:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            contract.legal_review
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        except ContractLegalReview.DoesNotExist:
+            pass
+
+        serializer = ContractLegalReviewCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        review = ContractLegalReview.objects.create(
+            contract=contract,
+            requested_by=request.user,
+            notes=serializer.validated_data.get("notes", ""),
+        )
+        contract.status = Contract.Status.LEGAL_REVIEW
+        contract.save(update_fields=["status", "updated_at"])
+        output = ContractLegalReviewSerializer(review)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["patch"], url_path="legal/verify")
+    def verify_legal_review(self, request, *args, **kwargs):
+        contract = self.get_object()
+
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            review = contract.legal_review
+        except ContractLegalReview.DoesNotExist as exc:
+            raise Http404 from exc
+
+        if contract.status != Contract.Status.LEGAL_REVIEW:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ContractLegalReviewVerifySerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        review.verified_by = request.user
+        review.verified_at = timezone.now()
+        review.verification_notes = serializer.validated_data.get("verification_notes", "")
+        review.save(update_fields=["verified_by", "verified_at", "verification_notes", "updated_at"])
+
+        contract.status = Contract.Status.SIGNING
+        contract.save(update_fields=["status", "updated_at"])
+
+        output = ContractLegalReviewSerializer(review)
+        return Response(output.data)
+
+    @action(detail=True, methods=["post"], url_path="signing/init")
+    def init_signing(self, request, *args, **kwargs):
+        contract = self.get_object()
+
+        if not self._is_owner(request.user, contract.organisation_id):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        if contract.status != Contract.Status.SIGNING:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ContractSigningInitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        signing, created = ContractSigning.objects.update_or_create(
+            contract=contract,
+            defaults={
+                "envelope_id": serializer.validated_data["envelope_id"],
+                "initiated_by": request.user,
+                "status": ContractSigning.Status.INITIATED,
+                "last_payload": {},
+                "completed_at": None,
+            },
+        )
+
+        output = ContractSigningSerializer(signing)
+        http_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(output.data, status=http_status)
+
+    @action(detail=True, methods=["get"], url_path="signing/status")
+    def signing_status(self, request, *args, **kwargs):
+        contract = self.get_object()
+        if not self._user_can_view(request.user, contract):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            signing = contract.signing
+        except ContractSigning.DoesNotExist as exc:
+            raise Http404 from exc
+
+        serializer = ContractSigningSerializer(signing)
+        return Response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="signing/webhook",
+        permission_classes=[AllowAny],
+    )
+    def signing_webhook(self, request, *args, **kwargs):
+        serializer = ContractSigningWebhookSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            contract = Contract.objects.get(id=serializer.validated_data["contract_id"])
+        except Contract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            signing = contract.signing
+        except ContractSigning.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if signing.envelope_id != serializer.validated_data["envelope_id"]:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        signing.status = serializer.validated_data["status"]
+        signing.last_payload = serializer.validated_data.get("payload", {})
+
+        if signing.status in {
+            ContractSigning.Status.COMPLETED,
+            ContractSigning.Status.DECLINED,
+            ContractSigning.Status.ERROR,
+        }:
+            signing.completed_at = timezone.now()
+
+        signing.save(update_fields=["status", "last_payload", "completed_at", "updated_at"])
+
+        if signing.status == ContractSigning.Status.COMPLETED:
+            contract.status = Contract.Status.ACTIVE
+            contract.save(update_fields=["status", "updated_at"])
+        elif signing.status == ContractSigning.Status.DECLINED:
+            contract.status = Contract.Status.NEGOTIATION
+            contract.save(update_fields=["status", "updated_at"])
+
+        return Response(ContractSigningSerializer(signing).data)
+
+    @action(detail=True, methods=["post"], url_path="expire")
+    def expire(self, request, *args, **kwargs):
+        contract = self.get_object()
+
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        contract.status = Contract.Status.EXPIRED
+        contract.save(update_fields=["status", "updated_at"])
+
+        serializer = ContractSerializer(contract, context=self.get_serializer_context())
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"], url_path="versions")
+    def list_versions(self, request, *args, **kwargs):
+        contract = self.get_object()
+
+        if not self._user_can_view(request.user, contract):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        versions = contract.versions.all().order_by("number")
+        serializer = ContractVersionSerializer(versions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get", "post"], url_path="versions/(?P<version_id>[^/.]+)/comments")
+    def version_comments(self, request, version_id=None, *args, **kwargs):
+        contract = self.get_object()
+
+        if not self._user_can_view(request.user, contract):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        version = self._get_version(contract, version_id)
+
+        if request.method.lower() == "get":
+            comments = version.comments.select_related("author", "clause").all()
+            serializer = ContractCommentSerializer(comments, many=True)
+            return Response(serializer.data)
+
+        serializer = ContractCommentCreateSerializer(
+            data=request.data,
+            context={
+                "contract": contract,
+                "version": version,
+                "author": request.user,
+            },
+        )
+        serializer.is_valid(raise_exception=True)
+        comment = serializer.save()
+        output = ContractCommentSerializer(comment)
+        return Response(output.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["patch"], url_path="status")
     def change_status(self, request, *args, **kwargs):
@@ -307,17 +587,46 @@ class ContractViewSet(
         except ContractClause.DoesNotExist as exc:
             raise Http404 from exc
 
-    def _is_valid_transition(self, current_status, new_status):
-        order = [
-            Contract.Status.DRAFT,
-            Contract.Status.NEGOTIATION,
-            Contract.Status.AGREEMENT,
-            Contract.Status.ACTIVE,
-            Contract.Status.TERMINATED,
-        ]
+    def _get_version(self, contract, version_id):
         try:
-            current_index = order.index(current_status)
-            new_index = order.index(new_status)
-        except ValueError:  # pragma: no cover - defensive
-            return False
-        return new_index == current_index or new_index == current_index + 1
+            return contract.versions.get(id=version_id)
+        except ContractVersion.DoesNotExist as exc:
+            raise Http404 from exc
+
+    def _is_valid_transition(self, current_status, new_status):
+        transitions = {
+            Contract.Status.DRAFT: {
+                Contract.Status.DRAFT,
+                Contract.Status.NEGOTIATION,
+            },
+            Contract.Status.NEGOTIATION: {
+                Contract.Status.NEGOTIATION,
+                Contract.Status.AGREEMENT,
+            },
+            Contract.Status.AGREEMENT: {
+                Contract.Status.AGREEMENT,
+                Contract.Status.LEGAL_REVIEW,
+            },
+            Contract.Status.LEGAL_REVIEW: {
+                Contract.Status.LEGAL_REVIEW,
+                Contract.Status.SIGNING,
+            },
+            Contract.Status.SIGNING: {
+                Contract.Status.SIGNING,
+                Contract.Status.ACTIVE,
+                Contract.Status.NEGOTIATION,
+            },
+            Contract.Status.ACTIVE: {
+                Contract.Status.ACTIVE,
+                Contract.Status.EXPIRED,
+                Contract.Status.TERMINATED,
+            },
+            Contract.Status.EXPIRED: {
+                Contract.Status.EXPIRED,
+                Contract.Status.TERMINATED,
+            },
+            Contract.Status.TERMINATED: {Contract.Status.TERMINATED},
+        }
+
+        allowed = transitions.get(current_status, set())
+        return new_status in allowed

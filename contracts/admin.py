@@ -6,8 +6,12 @@ from .models import (
     ClauseTemplate,
     Contract,
     ContractClause,
+    ContractComment,
     ContractFile,
+    ContractLegalReview,
     ContractRevision,
+    ContractSigning,
+    ContractVersion,
 )
 
 
@@ -45,3 +49,38 @@ class ContractRevisionAdmin(admin.ModelAdmin):
 class ContractFileAdmin(admin.ModelAdmin):
     list_display = ("contract", "created_at")
     search_fields = ("contract__title",)
+
+
+@admin.register(ContractVersion)
+class ContractVersionAdmin(admin.ModelAdmin):
+    list_display = ("contract", "number", "created_by", "created_at")
+    search_fields = ("contract__title", "created_by__email")
+    ordering = ("-created_at",)
+
+
+@admin.register(ContractComment)
+class ContractCommentAdmin(admin.ModelAdmin):
+    list_display = ("contract", "version", "author", "created_at")
+    search_fields = (
+        "contract__title",
+        "author__email",
+        "body",
+    )
+    list_filter = ("version",)
+
+
+@admin.register(ContractLegalReview)
+class ContractLegalReviewAdmin(admin.ModelAdmin):
+    list_display = ("contract", "requested_by", "verified_by", "created_at")
+    search_fields = (
+        "contract__title",
+        "requested_by__email",
+        "verified_by__email",
+    )
+
+
+@admin.register(ContractSigning)
+class ContractSigningAdmin(admin.ModelAdmin):
+    list_display = ("contract", "envelope_id", "status", "created_at")
+    search_fields = ("contract__title", "envelope_id")
+    list_filter = ("status",)

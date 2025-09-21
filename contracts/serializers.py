@@ -12,8 +12,12 @@ from .models import (
     ClauseTemplate,
     Contract,
     ContractClause,
+    ContractComment,
     ContractFile,
+    ContractLegalReview,
     ContractRevision,
+    ContractSigning,
+    ContractVersion,
 )
 
 
@@ -75,6 +79,87 @@ class ContractClauseSerializer(serializers.ModelSerializer):
         return str(template.id) if template else None
 
 
+class ContractSigningSerializer(serializers.ModelSerializer):
+    initiated_by_email = serializers.EmailField(source="initiated_by.email", read_only=True)
+
+    class Meta:
+        model = ContractSigning
+        fields = (
+            "id",
+            "envelope_id",
+            "status",
+            "initiated_by_email",
+            "last_payload",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "initiated_by_email",
+            "last_payload",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        )
+
+
+class ContractLegalReviewSerializer(serializers.ModelSerializer):
+    requested_by_email = serializers.EmailField(source="requested_by.email", read_only=True)
+    verified_by_email = serializers.EmailField(source="verified_by.email", read_only=True)
+
+    class Meta:
+        model = ContractLegalReview
+        fields = (
+            "id",
+            "notes",
+            "requested_by_email",
+            "verified_by_email",
+            "verified_at",
+            "verification_notes",
+            "created_at",
+            "updated_at",
+        )
+
+
+class ContractVersionSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
+    source_revision_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContractVersion
+        fields = (
+            "id",
+            "number",
+            "notes",
+            "created_by_email",
+            "source_revision_id",
+            "created_at",
+        )
+
+    def get_source_revision_id(self, obj):
+        revision = obj.source_revision
+        return str(revision.id) if revision else None
+
+
+class ContractCommentSerializer(serializers.ModelSerializer):
+    author_email = serializers.EmailField(source="author.email", read_only=True)
+    clause_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContractComment
+        fields = (
+            "id",
+            "body",
+            "author_email",
+            "clause_id",
+            "created_at",
+        )
+
+    def get_clause_id(self, obj):
+        clause = obj.clause
+        return str(clause.id) if clause else None
+
+
 class ContractSerializer(serializers.ModelSerializer):
     organisation = OrganisationSummarySerializer(read_only=True)
     agent = AgentSummarySerializer(read_only=True)
@@ -82,6 +167,9 @@ class ContractSerializer(serializers.ModelSerializer):
     clauses = ContractClauseSerializer(many=True, read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     signed_file = serializers.SerializerMethodField()
+    legal_review = serializers.SerializerMethodField()
+    signing = serializers.SerializerMethodField()
+    versions = ContractVersionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Contract
@@ -95,10 +183,16 @@ class ContractSerializer(serializers.ModelSerializer):
             "title",
             "effective_date",
             "expiration_date",
+            "owner_agreed_at",
+            "agent_agreed_at",
+            "current_version_number",
             "created_at",
             "updated_at",
             "clauses",
             "signed_file",
+            "legal_review",
+            "signing",
+            "versions",
         )
 
     def get_signed_file(self, obj):
@@ -112,6 +206,22 @@ class ContractSerializer(serializers.ModelSerializer):
             "created_at": contract_file.created_at,
             "filename": contract_file.pdf.name.split("/")[-1],
         }
+
+    def get_legal_review(self, obj):
+        try:
+            review = obj.legal_review
+        except ContractLegalReview.DoesNotExist:
+            return None
+
+        return ContractLegalReviewSerializer(review).data
+
+    def get_signing(self, obj):
+        try:
+            signing = obj.signing
+        except ContractSigning.DoesNotExist:
+            return None
+
+        return ContractSigningSerializer(signing).data
 
 
 class ContractCreateSerializer(serializers.ModelSerializer):
@@ -319,4 +429,60 @@ class ContractRevisionCreateSerializer(serializers.Serializer):
         if missing:
             raise serializers.ValidationError("Invalid clause identifiers provided.")
         return list(existing_ids)
+
+
+class ContractCommentCreateSerializer(serializers.ModelSerializer):
+    clause_id = serializers.UUIDField(write_only=True, required=False)
+
+    class Meta:
+        model = ContractComment
+        fields = ("body", "clause_id")
+
+    def validate(self, attrs):
+        contract: Contract = self.context["contract"]
+        clause_id = attrs.pop("clause_id", None)
+        if clause_id is None:
+            attrs["clause"] = None
+            return attrs
+
+        try:
+            clause = contract.clauses.get(id=clause_id)
+        except ContractClause.DoesNotExist as exc:
+            raise serializers.ValidationError({"clause_id": "Clause not found."}) from exc
+
+        attrs["clause"] = clause
+        return attrs
+
+    def create(self, validated_data):
+        contract: Contract = self.context["contract"]
+        version: ContractVersion = self.context["version"]
+        author: User = self.context["author"]
+        return ContractComment.objects.create(
+            contract=contract,
+            version=version,
+            author=author,
+            clause=validated_data.get("clause"),
+            body=validated_data["body"],
+        )
+
+
+class ContractLegalReviewCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractLegalReview
+        fields = ("notes",)
+
+
+class ContractLegalReviewVerifySerializer(serializers.Serializer):
+    verification_notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContractSigningInitSerializer(serializers.Serializer):
+    envelope_id = serializers.CharField(max_length=255)
+
+
+class ContractSigningWebhookSerializer(serializers.Serializer):
+    contract_id = serializers.UUIDField()
+    envelope_id = serializers.CharField(max_length=255)
+    status = serializers.ChoiceField(choices=ContractSigning.Status.choices)
+    payload = serializers.JSONField(required=False)
 
