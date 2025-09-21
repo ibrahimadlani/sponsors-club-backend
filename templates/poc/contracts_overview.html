@@ -49,6 +49,32 @@
             gap: 20px;
             box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
         }
+        header .context {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            display: grid;
+            gap: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        header .context strong {
+            font-size: 1rem;
+            color: #0f172a;
+        }
+        header .context span {
+            color: #1e3a8a;
+            font-weight: 500;
+        }
+        header .context.error {
+            background: rgba(239, 68, 68, 0.14);
+            color: #b91c1c;
+        }
+        header .context.error span {
+            color: inherit;
+        }
         h2 {
             margin: 0;
             font-size: 1.3rem;
@@ -186,6 +212,7 @@
     <header>
         <h1>Pilotage des contrats</h1>
         <p>Simulez l'onboarding d'une nouvelle collaboration entre une organisation sportive et un agent SponsorsClub. Cette page permet de démarrer un nouveau contrat et de visualiser rapidement les étapes clés du pipeline.</p>
+        <div class="context" id="identitySummary">Authentifiez-vous via la sandbox pour charger vos organisations.</div>
     </header>
 
     <section>
@@ -254,6 +281,9 @@
         organisations: [],
         agents: [],
         contracts: [],
+        me: null,
+        roles: null,
+        activeOrganisationId: null,
     };
 
     const createForm = document.getElementById('createContractForm');
@@ -266,6 +296,8 @@
     const contractsTableBody = document.getElementById('contractsTableBody');
     const contractsEmpty = document.getElementById('contractsEmpty');
     const createStatus = document.getElementById('createStatus');
+    const identitySummary = document.getElementById('identitySummary');
+    const defaultContractsEmptyMessage = contractsEmpty ? contractsEmpty.textContent : '';
 
     function readCookie(name) {
         const cookies = document.cookie ? document.cookie.split(';') : [];
@@ -338,7 +370,7 @@
         defaultOption.value = '';
         defaultOption.textContent = placeholder;
         defaultOption.disabled = true;
-        defaultOption.selected = true;
+        defaultOption.selected = !state.activeOrganisationId;
         select.appendChild(defaultOption);
         for (const item of items) {
             const option = document.createElement('option');
@@ -346,6 +378,113 @@
             option.textContent = item.name || item.display_name;
             select.appendChild(option);
         }
+        if (select === organisationSelect) {
+            if (state.activeOrganisationId) {
+                select.value = state.activeOrganisationId;
+                defaultOption.selected = false;
+            } else if (items.length === 1) {
+                const [singleOrganisation] = items;
+                select.value = singleOrganisation.id;
+                defaultOption.selected = false;
+                setActiveOrganisation(singleOrganisation.id, { skipSelectUpdate: true });
+            }
+            select.disabled = items.length <= 1;
+        }
+    }
+
+    function getActiveOrganisation() {
+        if (!state.activeOrganisationId) {
+            return null;
+        }
+        return (
+            state.organisations.find((organisation) => organisation.id === state.activeOrganisationId) || null
+        );
+    }
+
+    function updateIdentitySummary() {
+        if (!identitySummary) {
+            return;
+        }
+
+        identitySummary.className = 'context';
+        identitySummary.innerHTML = '';
+
+        if (!state.me) {
+            identitySummary.classList.add('error');
+            identitySummary.textContent = "Authentifiez-vous via la sandbox pour charger vos organisations.";
+            return;
+        }
+
+        const nameParts = [];
+        if (state.me.first_name) {
+            nameParts.push(state.me.first_name);
+        }
+        if (state.me.last_name) {
+            nameParts.push(state.me.last_name);
+        }
+        const displayName = nameParts.length ? nameParts.join(' ') : state.me.email;
+
+        const heading = document.createElement('strong');
+        heading.textContent = displayName;
+        identitySummary.appendChild(heading);
+
+        if (state.me.email) {
+            const emailLine = document.createElement('span');
+            emailLine.textContent = state.me.email;
+            identitySummary.appendChild(emailLine);
+        }
+
+        const organisation = getActiveOrganisation();
+        const organisationLine = document.createElement('span');
+        organisationLine.textContent = organisation
+            ? `Organisation active : ${organisation.name}`
+            : 'Aucune organisation active.';
+        identitySummary.appendChild(organisationLine);
+
+        const totalCollaborations =
+            state.roles && Array.isArray(state.roles.collaborations)
+                ? state.roles.collaborations.length
+                : 0;
+        const collaborationsLine = document.createElement('span');
+        collaborationsLine.textContent = totalCollaborations
+            ? `${totalCollaborations} organisation(s) liée(s) à ce compte.`
+            : 'Aucune collaboration synchronisée.';
+        identitySummary.appendChild(collaborationsLine);
+    }
+
+    function getVisibleContracts() {
+        if (!state.activeOrganisationId) {
+            return state.contracts;
+        }
+        return state.contracts.filter(
+            (contract) => contract.organisation && contract.organisation.id === state.activeOrganisationId,
+        );
+    }
+
+    function setActiveOrganisation(organisationId, options = {}) {
+        const normalized = organisationId || null;
+        const { skipSelectUpdate = false } = options;
+        const changed = state.activeOrganisationId !== normalized;
+        state.activeOrganisationId = normalized;
+
+        if (!skipSelectUpdate && organisationSelect) {
+            if (normalized) {
+                const candidate = organisationSelect.querySelector(`option[value="${normalized}"]`);
+                if (candidate) {
+                    organisationSelect.value = normalized;
+                }
+            } else {
+                if (organisationSelect.options.length) {
+                    organisationSelect.selectedIndex = 0;
+                }
+            }
+        }
+
+        if (changed) {
+            renderStatusBoard();
+            renderContractsTable();
+        }
+        updateIdentitySummary();
     }
 
     function formatDate(value) {
@@ -372,7 +511,7 @@
         statusEmpty.style.display = 'none';
 
         const counts = new Map();
-        for (const contract of state.contracts) {
+        for (const contract of getVisibleContracts()) {
             counts.set(contract.status, (counts.get(contract.status) || 0) + 1);
         }
 
@@ -411,13 +550,23 @@
             return;
         }
         contractsTableBody.innerHTML = '';
-        if (!state.contracts.length) {
+        const visibleContracts = getVisibleContracts();
+        if (!visibleContracts.length) {
             contractsEmpty.style.display = 'block';
+            if (state.activeOrganisationId) {
+                const organisation = getActiveOrganisation();
+                contractsEmpty.textContent = organisation
+                    ? `Aucun contrat pour ${organisation.name}. Créez un brouillon pour démarrer.`
+                    : 'Aucun contrat pour cette organisation.';
+            } else {
+                contractsEmpty.textContent = defaultContractsEmptyMessage;
+            }
             return;
         }
         contractsEmpty.style.display = 'none';
+        contractsEmpty.textContent = defaultContractsEmptyMessage;
 
-        for (const contract of state.contracts) {
+        for (const contract of visibleContracts) {
             const row = document.createElement('tr');
 
             const titleCell = document.createElement('td');
@@ -480,6 +629,11 @@
                 state.agents = optionsResponse.data.agents || [];
                 populateSelect(organisationSelect, state.organisations, 'Sélectionnez une organisation');
                 populateSelect(agentSelect, state.agents, 'Sélectionnez un agent');
+                updateIdentitySummary();
+                if (state.activeOrganisationId) {
+                    renderStatusBoard();
+                    renderContractsTable();
+                }
             } else if (optionsResponse.status === 401) {
                 setStatus(createStatus, 'Authentifiez-vous via la page de login POC.', 'error');
             }
@@ -501,6 +655,56 @@
             console.error(error);
             setStatus(createStatus, "Impossible de charger l'API.", 'error');
         }
+    }
+
+    async function loadIdentity() {
+        try {
+            const [meResponse, rolesResponse] = await Promise.all([
+                apiRequest({ url: '/api/users/me/' }),
+                apiRequest({ url: '/api/users/me/roles/' }),
+            ]);
+
+            if (meResponse.ok) {
+                state.me = meResponse.data;
+            } else {
+                state.me = null;
+            }
+
+            if (rolesResponse.ok) {
+                state.roles = rolesResponse.data;
+                if (
+                    Array.isArray(state.roles.collaborations) &&
+                    state.roles.collaborations.length
+                ) {
+                    const preferred =
+                        state.roles.collaborations.find((item) => item.role === 'owner') ||
+                        state.roles.collaborations[0];
+                    setActiveOrganisation(preferred.organisation_id, { skipSelectUpdate: true });
+                } else {
+                    setActiveOrganisation(null, { skipSelectUpdate: true });
+                }
+            } else {
+                state.roles = null;
+                setActiveOrganisation(null, { skipSelectUpdate: true });
+            }
+        } catch (error) {
+            console.error(error);
+            state.me = null;
+            state.roles = null;
+            setActiveOrganisation(null, { skipSelectUpdate: true });
+        } finally {
+            updateIdentitySummary();
+        }
+    }
+
+    if (organisationSelect) {
+        organisationSelect.addEventListener('change', (event) => {
+            if (event.target.value) {
+                setActiveOrganisation(event.target.value, { skipSelectUpdate: true });
+            } else {
+                setActiveOrganisation(null, { skipSelectUpdate: true });
+            }
+        });
     }
 
     if (createForm) {
@@ -547,7 +751,10 @@
         });
     }
 
-    loadData();
+    (async function bootstrap() {
+        await loadIdentity();
+        await loadData();
+    })();
 })();
 </script>
 </body>
