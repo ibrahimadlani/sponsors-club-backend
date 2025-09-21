@@ -10,8 +10,9 @@ from rest_framework.response import Response
 
 from organisations.models import Collaborator
 
-from .models import Contract, ContractClause, ContractFile, ContractRevision
+from .models import ClauseTemplate, Contract, ContractClause, ContractFile, ContractRevision
 from .serializers import (
+    ClauseTemplateSerializer,
     ContractClauseCreateSerializer,
     ContractClauseSerializer,
     ContractClauseUpdateSerializer,
@@ -21,6 +22,14 @@ from .serializers import (
     ContractSerializer,
     ContractStatusSerializer,
 )
+
+
+class ClauseTemplateViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Expose the available clause templates for contract drafting."""
+
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ClauseTemplateSerializer
+    queryset = ClauseTemplate.objects.all().order_by("category", "title")
 
 
 class ContractViewSet(

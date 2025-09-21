@@ -98,6 +98,25 @@ def test_add_optional_clause_visible(
 
 
 @pytest.mark.django_db
+def test_list_clause_templates(owner_client, mandatory_clause_template, optional_clause_template):
+    url = reverse("clause-template-list")
+    response = owner_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    titles = {item["title"] for item in payload}
+    assert {mandatory_clause_template.title, optional_clause_template.title} <= titles
+
+
+@pytest.mark.django_db
+def test_agent_can_view_clause_templates(agent_client, mandatory_clause_template):
+    url = reverse("clause-template-list")
+    response = agent_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    titles = [item["title"] for item in response.json()]
+    assert mandatory_clause_template.title in titles
+
+
+@pytest.mark.django_db
 def test_agent_proposes_revision(
     agent_client,
     created_contract,
