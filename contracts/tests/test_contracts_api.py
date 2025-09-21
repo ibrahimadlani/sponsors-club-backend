@@ -30,7 +30,7 @@ def agent_client(agent_user) -> APIClient:
 @pytest.fixture
 def mandatory_clause_template():
     return ClauseTemplate.objects.create(
-        category=ClauseTemplate.Category.OBLIGATIONS,
+        category=ClauseTemplate.Category.LEGAL_OBLIGATIONS,
         title="Confidentialité",
         content="L'agent {{agent_name}} respecte la confidentialité.",
         placeholders=["agent_name"],
@@ -42,7 +42,7 @@ def mandatory_clause_template():
 @pytest.fixture
 def optional_clause_template():
     return ClauseTemplate.objects.create(
-        category=ClauseTemplate.Category.FINANCE,
+        category=ClauseTemplate.Category.FINANCIAL,
         title="Paiement",
         content="Paiement de {{amount}} euros.",
         placeholders=["amount"],

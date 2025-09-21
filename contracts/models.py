@@ -24,12 +24,15 @@ class ClauseTemplate(BaseModel):
     """Reusable clause blueprint that can be attached to contracts."""
 
     class Category(models.TextChoices):
-        OBLIGATIONS = "obligations", "Obligations"
-        FINANCE = "finance", "Finance"
-        INTELLECTUAL_PROPERTY = "ip", "IP"
-        ETHICS = "ethics", "Ethics"
-        CONFIDENTIALITY = "confidentiality", "Confidentiality"
-        TERMINATION = "termination", "Résiliation"
+        LEGAL_OBLIGATIONS = "legal_obligations", "Obligatoires (juridiques)"
+        FINANCIAL = "financial", "Financières"
+        ATHLETE_OBLIGATIONS = "athlete_obligations", "Obligations de l’athlète"
+        ORGANISATION_OBLIGATIONS = "organisation_obligations", "Obligations de l’organisation"
+        INTELLECTUAL_PROPERTY = "intellectual_property", "Propriété intellectuelle"
+        CONFIDENTIALITY = "confidentiality", "Confidentialité"
+        PERFORMANCE = "performance", "Performance"
+        ETHICS_AND_MORALITY = "ethics_morality", "Éthique et moralité"
+        LOGISTICS = "logistics", "Logistique"
         ADMINISTRATIVE = "administrative", "Administratives"
 
     category = models.CharField(max_length=32, choices=Category.choices)
