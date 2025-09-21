@@ -149,9 +149,11 @@ def test_contract_creation_flow(owner_client, organisations_setup, agent_user, m
 
     body = response.json()
     assert body["status"] == Contract.Status.DRAFT
+    assert body["status_label"] == Contract.Status.DRAFT.label
     assert body["title"] == payload["title"]
     assert body["organisation"]["id"] == str(organisation.id)
     assert body["agent"]["id"] == str(agent_user.agent_profile.id)
+    assert body["signed_file"] is None
 
     clauses = body["clauses"]
     assert len(clauses) == 1
@@ -296,7 +298,10 @@ def test_agent_validation_flow(
     detail_url = reverse("contract-detail", args=[contract_id])
     detail_response = agent_client.get(detail_url)
     assert detail_response.status_code == status.HTTP_200_OK
-    assert detail_response.json()["id"] == contract_id
+    detail_payload = detail_response.json()
+    assert detail_payload["id"] == contract_id
+    assert detail_payload["status_label"] == Contract.Status.DRAFT.label
+    assert detail_payload["signed_file"] is None
 
     revision_url = reverse("contract-create-revision", args=[contract_id])
     clause_id = detail_response.json()["clauses"][0]["id"]
@@ -379,3 +384,25 @@ def test_export_pdf_downloadable(owner_client, created_contract):
     disposition = response["Content-Disposition"]
     assert disposition.startswith("attachment; filename=\"")
     assert disposition.endswith(".pdf\"")
+
+    detail_url = reverse("contract-detail", args=[created_contract.id])
+    detail_payload = owner_client.get(detail_url).json()
+    assert detail_payload["signed_file"]["filename"].endswith("contrat.pdf")
+
+
+@pytest.mark.django_db
+def test_contract_options_endpoint(owner_client, organisations_setup, agent_user):
+    url = reverse("contract-options")
+    response = owner_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+
+    payload = response.json()
+    organisations = {item["id"] for item in payload["organisations"]}
+    assert str(organisations_setup["organisation"].id) in organisations
+
+    agent_ids = {item["id"] for item in payload["agents"]}
+    assert str(agent_user.agent_profile.id) in agent_ids
+
+    statuses = {item["value"] for item in payload["statuses"]}
+    assert Contract.Status.DRAFT in statuses
+    assert Contract.Status.AGREEMENT in statuses

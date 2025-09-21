@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from organisations.models import Collaborator
+from users.models import AgentProfile
 
 from .models import ClauseTemplate, Contract, ContractClause, ContractFile, ContractRevision
 from .serializers import (
@@ -80,12 +81,12 @@ class ContractViewSet(
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = ContractSerializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
         contract = self.get_object()
-        serializer = ContractSerializer(contract)
+        serializer = self.get_serializer(contract)
         return Response(serializer.data)
 
     @transaction.atomic
@@ -95,8 +96,45 @@ class ContractViewSet(
         )
         serializer.is_valid(raise_exception=True)
         contract = serializer.save()
-        output = ContractSerializer(contract)
+        output = ContractSerializer(contract, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="options")
+    def options(self, request, *args, **kwargs):
+        """Return helper metadata used by the proof-of-concept UI."""
+
+        collaborator_entries = (
+            Collaborator.objects.filter(user=request.user)
+            .select_related("organisation")
+            .order_by("organisation__name")
+        )
+
+        organisations = []
+        seen = set()
+        for collaborator in collaborator_entries:
+            organisation = collaborator.organisation
+            if organisation.id in seen:
+                continue
+            organisations.append({"id": str(organisation.id), "name": organisation.name})
+            seen.add(organisation.id)
+
+        agents = [
+            {"id": str(agent.id), "display_name": agent.display_name}
+            for agent in AgentProfile.objects.all().order_by("display_name")
+        ]
+
+        statuses = [
+            {"value": value, "label": label}
+            for value, label in Contract.Status.choices
+        ]
+
+        return Response(
+            {
+                "organisations": organisations,
+                "agents": agents,
+                "statuses": statuses,
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="clauses")
     def add_clause(self, request, *args, **kwargs):

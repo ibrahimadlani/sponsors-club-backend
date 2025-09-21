@@ -105,31 +105,26 @@
             background: rgba(148, 163, 184, 0.25);
             color: #1f2937;
         }
-        .checklist {
-            display: grid;
-            gap: 16px;
+        .status-text {
+            font-size: 0.9rem;
+            color: #475569;
         }
-        .check-item {
-            display: flex;
-            gap: 14px;
-            align-items: flex-start;
-            background: #f1f5f9;
+        .status-text.error { color: #b91c1c; }
+        .status-text.success { color: #15803d; }
+        .timeline { display: grid; gap: 16px; }
+        .timeline-entry {
+            display: grid;
+            gap: 6px;
+            padding: 16px;
             border-radius: 18px;
-            padding: 16px 18px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: #fef3c7;
+            border: 1px solid rgba(217, 119, 6, 0.32);
         }
-        .check-item strong { color: #0f172a; }
-        .check-item span {
-            margin-top: 2px;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #2563eb;
+        .timeline-entry:nth-child(even) {
+            background: #ede9fe;
+            border-color: rgba(99, 102, 241, 0.35);
         }
-        .files {
-            display: grid;
-            gap: 16px;
-        }
+        .timeline-entry strong { color: #0f172a; }
         .file-card {
             border-radius: 18px;
             padding: 20px;
@@ -160,23 +155,37 @@
             transform: translateY(-1px);
             box-shadow: 0 16px 28px rgba(67, 56, 202, 0.32);
         }
-        .timeline {
-            display: grid;
-            gap: 16px;
-        }
-        .timeline-entry {
-            display: grid;
-            gap: 6px;
-            padding: 16px;
+        .revision {
             border-radius: 18px;
-            background: #fef3c7;
-            border: 1px solid rgba(217, 119, 6, 0.32);
+            padding: 18px;
+            background: #f1f5f9;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            display: grid;
+            gap: 10px;
         }
-        .timeline-entry:nth-child(even) {
-            background: #ede9fe;
-            border-color: rgba(99, 102, 241, 0.35);
+        .revision header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: space-between;
         }
-        .timeline-entry strong { color: #0f172a; }
+        .revision footer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+        }
+        .button.secondary { background: rgba(15, 23, 42, 0.08); color: #1e293b; }
         footer {
             display: flex;
             flex-wrap: wrap;
@@ -204,109 +213,387 @@
 <body>
 <main>
     <header>
-        <h1>Validation & signature</h1>
-        <p>Dernière étape avant la mise en production du partenariat. Vérifiez les checkpoints, acceptez la révision finale puis déclenchez l'export signé.</p>
+        <div>
+            <h1 id="contractTitle">Contrat en validation…</h1>
+            <p id="contractMeta">Connexion à l'API…</p>
+        </div>
+        <span class="status-text" id="pageStatus">Chargement en cours…</span>
     </header>
 
     <section>
-        <h2>Progression du statut</h2>
-        <div class="status-flow">
-            <div class="step completed">
-                <span>Brouillon</span>
-                <strong>Créé le 9 avril</strong>
-                <p>Clauses obligatoires appliquées automatiquement.</p>
-            </div>
-            <div class="step completed">
-                <span>Négociation</span>
-                <strong>Conclue le 12 avril</strong>
-                <p>Dernière révision acceptée par l'organisation.</p>
-            </div>
-            <div class="step">
-                <span>Accord</span>
-                <strong>En attente de validation owner</strong>
-                <p>L'owner doit confirmer avant signature.</p>
-            </div>
-            <div class="step">
-                <span>Actif</span>
-                <strong>Export DocuSign</strong>
-                <p>Activation automatique des droits une fois signé.</p>
-            </div>
-        </div>
+        <h2>Progression du workflow</h2>
+        <div class="status-flow" id="statusFlow"></div>
+        <div class="status-text" id="statusFlowStatus"></div>
     </section>
 
     <section>
-        <h2>Checklist du propriétaire</h2>
-        <div class="checklist">
-            <div class="check-item">
-                <span></span>
-                <div>
-                    <strong>Vérifier les clauses critiques</strong>
-                    <p>Relisez les sections juridiques, financières et de confidentialité modifiées par l'agent.</p>
-                </div>
+        <h2>Actions disponibles</h2>
+        <form class="owner-actions" id="statusForm">
+            <label style="display:grid; gap:8px;">
+                Avancer le statut
+                <select id="statusSelect"></select>
+            </label>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <button type="submit" class="button">Mettre à jour le statut</button>
+                <span class="status-text" id="statusUpdate"></span>
             </div>
-            <div class="check-item">
-                <span style="background:#047857;"></span>
-                <div>
-                    <strong>Valider la dernière révision</strong>
-                    <p>La proposition du 12 avril inclut l'augmentation de budget et la présence sur 2 événements physiques.</p>
-                </div>
-            </div>
-            <div class="check-item">
-                <span style="background:#1d4ed8;"></span>
-                <div>
-                    <strong>Définir la date d'activation</strong>
-                    <p>Synchroniser la mise en ligne avec la campagne marketing du 1er mai.</p>
-                </div>
-            </div>
-        </div>
-        <div class="owner-actions">
-            <button class="primary">Accepter la révision et passer en accord</button>
-            <button class="secondary">Retour en négociation</button>
-        </div>
+        </form>
+        <button type="button" class="button secondary" id="openEditor">← Revenir à l'éditeur</button>
     </section>
 
     <section>
-        <h2>Documents & export</h2>
-        <div class="files">
-            <div class="file-card">
-                <div>
-                    <div class="name">Contrat SponsorsClub - Version approuvée.pdf</div>
-                    <small>Mise à jour automatique après signature DocuSign.</small>
-                </div>
-                <button>Télécharger</button>
-            </div>
-            <div class="file-card" style="background:#fef2f2; border-color:rgba(248,113,113,0.3);">
-                <div>
-                    <div class="name" style="color:#b91c1c;">Justificatif assurance responsabilité.pdf</div>
-                    <small>Document requis avant activation finale.</small>
-                </div>
-                <button style="background:#b91c1c;">Téléverser</button>
-            </div>
-        </div>
+        <h2>Révisions proposées</h2>
+        <div id="revisionsContainer" class="timeline"></div>
+        <div class="status-text" id="revisionsStatus"></div>
     </section>
 
     <section>
-        <h2>Timeline finale</h2>
-        <div class="timeline">
-            <div class="timeline-entry">
-                <strong>12 avril 2025 • Collaboratrice Owner</strong>
-                <p>Révision acceptée, toutes les clauses critiques validées.</p>
+        <h2>Fichier signé</h2>
+        <div class="file-card" id="fileCard" style="display:none;">
+            <div>
+                <div class="name" id="fileName">Document</div>
+                <div class="status-text" id="fileMeta"></div>
             </div>
-            <div class="timeline-entry">
-                <strong>11 avril 2025 • Agent</strong>
-                <p>Ajout du bonus de performance et des obligations événementielles.</p>
-            </div>
-            <div class="timeline-entry">
-                <strong>10 avril 2025 • Collaborateur</strong>
-                <p>Réorganisation des clauses logistiques & propriété intellectuelle.</p>
-            </div>
+            <button type="button" id="downloadFile">Télécharger</button>
         </div>
+        <div class="status-text" id="fileStatus">Aucun fichier de signature disponible pour le moment.</div>
     </section>
 
     <footer>
-        <a href="/poc/contracts/">← Retour à la vue d'ensemble</a>
-        <a href="/poc/contracts/editor/">Ouvrir l'éditeur de clauses</a>
+        <a href="/poc/contracts/">📊 Retour au tableau de bord</a>
     </footer>
 </main>
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const params = new URLSearchParams(window.location.search);
+    const contractId = params.get('contractId');
+
+    const contractTitle = document.getElementById('contractTitle');
+    const contractMeta = document.getElementById('contractMeta');
+    const pageStatus = document.getElementById('pageStatus');
+    const statusFlow = document.getElementById('statusFlow');
+    const statusFlowStatus = document.getElementById('statusFlowStatus');
+    const statusSelect = document.getElementById('statusSelect');
+    const statusForm = document.getElementById('statusForm');
+    const statusUpdate = document.getElementById('statusUpdate');
+    const revisionsContainer = document.getElementById('revisionsContainer');
+    const revisionsStatus = document.getElementById('revisionsStatus');
+    const fileCard = document.getElementById('fileCard');
+    const fileStatus = document.getElementById('fileStatus');
+    const fileName = document.getElementById('fileName');
+    const fileMeta = document.getElementById('fileMeta');
+    const downloadFile = document.getElementById('downloadFile');
+    const openEditor = document.getElementById('openEditor');
+
+    const state = {
+        contract: null,
+        revisions: [],
+        statuses: [
+            { value: 'draft', label: 'Brouillon' },
+            { value: 'negotiation', label: 'Négociation' },
+            { value: 'agreement', label: 'Accord' },
+            { value: 'active', label: 'Actif' },
+            { value: 'terminated', label: 'Terminé' },
+        ],
+    };
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = { method, headers, credentials: 'same-origin' };
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+        const token = window.localStorage.getItem(ACCESS_KEY);
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (error) {
+                payload = text;
+            }
+        }
+        return { ok: response.ok, status: response.status, data: payload };
+    }
+
+    function setStatus(element, message, variant) {
+        if (!element) {
+            return;
+        }
+        element.textContent = message || '';
+        element.classList.remove('error', 'success');
+        if (variant) {
+            element.classList.add(variant);
+        }
+    }
+
+    function getStatusIndex(value) {
+        return state.statuses.findIndex((item) => item.value === value);
+    }
+
+    function renderContract() {
+        if (!state.contract) {
+            return;
+        }
+        contractTitle.textContent = state.contract.title;
+        const parts = [];
+        if (state.contract.organisation) {
+            parts.push(`Organisation • ${state.contract.organisation.name}`);
+        }
+        if (state.contract.agent) {
+            parts.push(`Agent • ${state.contract.agent.display_name}`);
+        }
+        if (state.contract.updated_at) {
+            const date = new Date(state.contract.updated_at);
+            parts.push(`Mis à jour le ${date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}`);
+        }
+        contractMeta.textContent = parts.join(' · ');
+        setStatus(pageStatus, `Statut actuel : ${state.contract.status_label}`);
+        renderStatusFlow();
+        renderStatusSelect();
+        renderFile();
+    }
+
+    function renderStatusFlow() {
+        statusFlow.innerHTML = '';
+        if (!state.contract) {
+            return;
+        }
+        const currentIndex = getStatusIndex(state.contract.status);
+        for (const [index, item] of state.statuses.entries()) {
+            const step = document.createElement('div');
+            step.className = 'step';
+            if (index <= currentIndex) {
+                step.classList.add('completed');
+            }
+            const span = document.createElement('span');
+            span.textContent = `Étape ${index + 1}`;
+            const strong = document.createElement('strong');
+            strong.textContent = item.label;
+            step.appendChild(span);
+            step.appendChild(strong);
+            statusFlow.appendChild(step);
+        }
+        setStatus(statusFlowStatus, 'Chaque étape doit être validée par un collaborateur owner.');
+    }
+
+    function renderStatusSelect() {
+        if (!statusSelect || !state.contract) {
+            return;
+        }
+        statusSelect.innerHTML = '';
+        const currentIndex = getStatusIndex(state.contract.status);
+        for (const [index, item] of state.statuses.entries()) {
+            const option = document.createElement('option');
+            option.value = item.value;
+            option.textContent = item.label;
+            if (index === currentIndex) {
+                option.selected = true;
+            }
+            if (index < currentIndex || index > currentIndex + 1) {
+                option.disabled = true;
+            }
+            statusSelect.appendChild(option);
+        }
+    }
+
+    function renderRevisions() {
+        revisionsContainer.innerHTML = '';
+        if (!state.revisions.length) {
+            setStatus(revisionsStatus, 'Aucune révision proposée pour ce contrat.');
+            return;
+        }
+        setStatus(revisionsStatus, '');
+        for (const revision of state.revisions) {
+            const entry = document.createElement('div');
+            entry.className = 'revision';
+
+            const header = document.createElement('header');
+            const strong = document.createElement('strong');
+            strong.textContent = revision.proposed_by ? revision.proposed_by.email : 'Utilisateur inconnu';
+            const badge = document.createElement('span');
+            badge.className = 'status-text';
+            if (revision.accepted === true) {
+                badge.textContent = 'Acceptée';
+                badge.classList.add('success');
+            } else if (revision.accepted === false) {
+                badge.textContent = 'Refusée';
+                badge.classList.add('error');
+            } else {
+                badge.textContent = 'En attente';
+            }
+            header.appendChild(strong);
+            header.appendChild(badge);
+            entry.appendChild(header);
+
+            if (revision.comment) {
+                const comment = document.createElement('p');
+                comment.textContent = revision.comment;
+                entry.appendChild(comment);
+            }
+
+            if (revision.clauses_changed && revision.clauses_changed.length) {
+                const list = document.createElement('ul');
+                for (const clause of revision.clauses_changed) {
+                    const item = document.createElement('li');
+                    item.textContent = clause.title;
+                    list.appendChild(item);
+                }
+                entry.appendChild(list);
+            }
+
+            const footer = document.createElement('footer');
+            const created = new Date(revision.created_at);
+            const meta = document.createElement('span');
+            meta.className = 'status-text';
+            meta.textContent = `Proposé le ${created.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+            footer.appendChild(meta);
+
+            if (revision.accepted === null) {
+                const acceptButton = document.createElement('button');
+                acceptButton.type = 'button';
+                acceptButton.className = 'button';
+                acceptButton.textContent = 'Accepter la révision';
+                acceptButton.addEventListener('click', async () => {
+                    const response = await apiRequest({
+                        url: `/api/contracts/${state.contract.id}/revisions/${revision.id}/accept/`,
+                        method: 'POST',
+                    });
+                    if (response.ok) {
+                        await loadRevisions();
+                    } else {
+                        alert(`Impossible d'accepter la révision (statut ${response.status}).`);
+                    }
+                });
+                footer.appendChild(acceptButton);
+            }
+
+            entry.appendChild(footer);
+            revisionsContainer.appendChild(entry);
+        }
+    }
+
+    function renderFile() {
+        if (!fileCard || !state.contract) {
+            return;
+        }
+        if (state.contract.signed_file) {
+            fileCard.style.display = 'flex';
+            fileStatus.style.display = 'none';
+            fileName.textContent = state.contract.signed_file.filename;
+            const created = new Date(state.contract.signed_file.created_at);
+            fileMeta.textContent = `Ajouté le ${created.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+            if (downloadFile) {
+                downloadFile.onclick = () => {
+                    window.open(`/api/contracts/${state.contract.id}/export/`, '_blank');
+                };
+            }
+        } else {
+            fileCard.style.display = 'none';
+            fileStatus.style.display = 'block';
+            fileStatus.textContent = 'Aucun export PDF n\'a encore été importé.';
+        }
+    }
+
+    async function loadContract() {
+        if (!contractId) {
+            setStatus(pageStatus, "Aucun contrat sélectionné. Revenez depuis le tableau de bord.", 'error');
+            return;
+        }
+        const response = await apiRequest({ url: `/api/contracts/${contractId}/` });
+        if (response.ok) {
+            state.contract = response.data;
+            renderContract();
+        } else {
+            setStatus(pageStatus, `Erreur lors du chargement (${response.status}).`, 'error');
+        }
+    }
+
+    async function loadRevisions() {
+        if (!contractId) {
+            return;
+        }
+        const response = await apiRequest({ url: `/api/contracts/${contractId}/revisions/` });
+        if (response.ok) {
+            state.revisions = response.data;
+            renderRevisions();
+        } else {
+            setStatus(revisionsStatus, `Impossible de récupérer les révisions (${response.status}).`, 'error');
+        }
+    }
+
+    async function loadStatuses() {
+        const response = await apiRequest({ url: '/api/contracts/options/' });
+        if (response.ok && response.data.statuses) {
+            state.statuses = response.data.statuses;
+            renderStatusSelect();
+            renderStatusFlow();
+        }
+    }
+
+    if (!contractId) {
+        setStatus(pageStatus, "Aucun contrat sélectionné. Revenez depuis le tableau de bord.", 'error');
+        return;
+    }
+
+    if (openEditor) {
+        openEditor.addEventListener('click', () => {
+            window.location.href = `/poc/contracts/editor/?contractId=${contractId}`;
+        });
+    }
+
+    if (statusForm) {
+        statusForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!statusSelect.value || !state.contract) {
+                return;
+            }
+            setStatus(statusUpdate, 'Mise à jour du statut…');
+            const response = await apiRequest({
+                url: `/api/contracts/${state.contract.id}/status/`,
+                method: 'PATCH',
+                data: { status: statusSelect.value },
+            });
+            if (response.ok) {
+                setStatus(statusUpdate, 'Statut mis à jour.', 'success');
+                await loadContract();
+            } else {
+                setStatus(statusUpdate, `Refusé (${response.status}).`, 'error');
+            }
+        });
+    }
+
+    loadStatuses();
+    loadContract();
+    loadRevisions();
+})();
+</script>
 </body>
 </html>

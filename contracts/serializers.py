@@ -8,7 +8,13 @@ from rest_framework.exceptions import PermissionDenied
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile, User
 
-from .models import ClauseTemplate, Contract, ContractClause, ContractRevision
+from .models import (
+    ClauseTemplate,
+    Contract,
+    ContractClause,
+    ContractFile,
+    ContractRevision,
+)
 
 
 class OrganisationSummarySerializer(serializers.ModelSerializer):
@@ -32,11 +38,14 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
 
 
 class ClauseTemplateSerializer(serializers.ModelSerializer):
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+
     class Meta:
         model = ClauseTemplate
         fields = (
             "id",
             "category",
+            "category_label",
             "title",
             "content",
             "placeholders",
@@ -71,6 +80,8 @@ class ContractSerializer(serializers.ModelSerializer):
     agent = AgentSummarySerializer(read_only=True)
     initiated_by = CollaboratorSummarySerializer(read_only=True)
     clauses = ContractClauseSerializer(many=True, read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    signed_file = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -80,13 +91,27 @@ class ContractSerializer(serializers.ModelSerializer):
             "agent",
             "initiated_by",
             "status",
+            "status_label",
             "title",
             "effective_date",
             "expiration_date",
             "created_at",
             "updated_at",
             "clauses",
+            "signed_file",
         )
+
+    def get_signed_file(self, obj):
+        try:
+            contract_file = obj.file
+        except ContractFile.DoesNotExist:  # pragma: no cover - relationship missing
+            return None
+
+        return {
+            "id": str(contract_file.id),
+            "created_at": contract_file.created_at,
+            "filename": contract_file.pdf.name.split("/")[-1],
+        }
 
 
 class ContractCreateSerializer(serializers.ModelSerializer):
