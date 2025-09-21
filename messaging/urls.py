@@ -1,15 +1,13 @@
-"""URL routing for the messaging application."""
+"""URL routing for messaging API endpoints."""
 
-from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from .views import MessageReadView, ThreadMessagesView, ThreadViewSet
+from .views import MessageReadView, ThreadListView, ThreadMessagesView
 
-router = DefaultRouter()
-router.register(r"threads", ThreadViewSet, basename="messaging-thread")
+app_name = "messaging"
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path("threads/", ThreadListView.as_view(), name="thread-list"),
     path(
         "threads/<uuid:thread_id>/messages/",
         ThreadMessagesView.as_view(),
