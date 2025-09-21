@@ -132,6 +132,35 @@ def test_add_clause_from_template_with_custom_content_marks_modified(
     assert clause.is_modified is True
 
 
+@pytest.mark.django_db
+def test_contract_creation_flow(owner_client, organisations_setup, agent_user, mandatory_clause_template):
+    """End-to-end check that contract creation seeds metadata and mandatory clauses."""
+
+    organisation = organisations_setup["organisation"]
+    url = reverse("contract-list")
+    payload = {
+        "organisation_id": str(organisation.id),
+        "agent_id": str(agent_user.agent_profile.id),
+        "title": "Contrat Test",
+    }
+
+    response = owner_client.post(url, payload, format="json")
+    assert response.status_code == status.HTTP_201_CREATED
+
+    body = response.json()
+    assert body["status"] == Contract.Status.DRAFT
+    assert body["title"] == payload["title"]
+    assert body["organisation"]["id"] == str(organisation.id)
+    assert body["agent"]["id"] == str(agent_user.agent_profile.id)
+
+    clauses = body["clauses"]
+    assert len(clauses) == 1
+    clause_payload = clauses[0]
+    assert clause_payload["template_id"] == str(mandatory_clause_template.id)
+    assert clause_payload["is_mandatory"] is True
+    assert clause_payload["is_modified"] is False
+
+
 @pytest.fixture
 def alternative_clause_template():
     return ClauseTemplate.objects.create(
@@ -241,6 +270,53 @@ def test_agent_proposes_revision(
     )
     assert response.status_code == status.HTTP_201_CREATED
     assert ContractRevision.objects.filter(contract=created_contract).count() == 1
+
+
+@pytest.mark.django_db
+def test_agent_validation_flow(
+    owner_client,
+    agent_client,
+    organisations_setup,
+    agent_user,
+    mandatory_clause_template,
+):
+    """Simulate an agent interacting with a freshly created contract."""
+
+    organisation = organisations_setup["organisation"]
+    create_url = reverse("contract-list")
+    payload = {
+        "organisation_id": str(organisation.id),
+        "agent_id": str(agent_user.agent_profile.id),
+        "title": "Validation Agent",
+    }
+    contract_resp = owner_client.post(create_url, payload, format="json")
+    assert contract_resp.status_code == status.HTTP_201_CREATED
+    contract_id = contract_resp.json()["id"]
+
+    detail_url = reverse("contract-detail", args=[contract_id])
+    detail_response = agent_client.get(detail_url)
+    assert detail_response.status_code == status.HTTP_200_OK
+    assert detail_response.json()["id"] == contract_id
+
+    revision_url = reverse("contract-create-revision", args=[contract_id])
+    clause_id = detail_response.json()["clauses"][0]["id"]
+    response = agent_client.post(
+        revision_url,
+        {
+            "clause_ids": [clause_id],
+            "comment": "Validation de la clause",
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    status_url = reverse("contract-change-status", args=[contract_id])
+    forbidden = agent_client.patch(
+        status_url,
+        {"status": Contract.Status.NEGOTIATION},
+        format="json",
+    )
+    assert forbidden.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
