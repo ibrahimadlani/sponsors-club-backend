@@ -295,13 +295,12 @@ class ContractViewSet(
             Contract.Status.NEGOTIATION,
             Contract.Status.AGREEMENT,
         }:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Le contrat doit être en négociation pour valider l'accord."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         contract.record_agreement(owner=is_owner, agent=is_agent)
-
-        if contract.has_full_agreement() and contract.status == Contract.Status.NEGOTIATION:
-            contract.status = Contract.Status.AGREEMENT
-            contract.save(update_fields=["status", "updated_at"])
 
         contract.refresh_from_db()
         serializer = ContractSerializer(contract, context=self.get_serializer_context())
@@ -523,6 +522,20 @@ class ContractViewSet(
 
         if not self._is_valid_transition(contract.status, new_status):
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if (
+            new_status == Contract.Status.AGREEMENT
+            and not contract.has_full_agreement()
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "Les deux parties doivent enregistrer leur accord avant de "
+                        "passer le contrat en agreement."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         contract.status = new_status
         contract.save(update_fields=["status", "updated_at"])

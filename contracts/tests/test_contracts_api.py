@@ -385,6 +385,22 @@ def test_agent_validation_flow(
     )
     assert forbidden.status_code == status.HTTP_403_FORBIDDEN
 
+    owner_client.patch(
+        status_url,
+        {"status": Contract.Status.NEGOTIATION},
+        format="json",
+    )
+
+    agree_url = reverse("contract-agree", args=[contract_id])
+    owner_response = owner_client.post(agree_url, format="json")
+    assert owner_response.status_code == status.HTTP_200_OK
+    agent_response = agent_client.post(agree_url, format="json")
+    assert agent_response.status_code == status.HTTP_200_OK
+
+    payload_after_agree = agent_response.json()
+    assert payload_after_agree["owner_agreed_at"] is not None
+    assert payload_after_agree["agent_agreed_at"] is not None
+
 
 @pytest.mark.django_db
 def test_legal_review_requires_dual_agreement(
@@ -509,7 +525,7 @@ def test_expire_endpoint_requires_staff(owner_client, staff_client, created_cont
 
 
 @pytest.mark.django_db
-def test_owner_validates_contract_status(owner_client, created_contract):
+def test_owner_validates_contract_status(owner_client, agent_client, created_contract):
     status_url = reverse("contract-change-status", args=[created_contract.id])
 
     response = owner_client.patch(
@@ -518,6 +534,17 @@ def test_owner_validates_contract_status(owner_client, created_contract):
     assert response.status_code == status.HTTP_200_OK
     created_contract.refresh_from_db()
     assert created_contract.status == Contract.Status.NEGOTIATION
+
+    response = owner_client.patch(
+        status_url, {"status": Contract.Status.AGREEMENT}, format="json"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    created_contract.refresh_from_db()
+    assert created_contract.status == Contract.Status.NEGOTIATION
+
+    agree_url = reverse("contract-agree", args=[created_contract.id])
+    owner_client.post(agree_url, format="json")
+    agent_client.post(agree_url, format="json")
 
     response = owner_client.patch(
         status_url, {"status": Contract.Status.AGREEMENT}, format="json"
