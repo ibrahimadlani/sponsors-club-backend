@@ -1,9 +1,9 @@
-"""WebSocket routing configuration for messaging."""
+"""Routing configuration for messaging websocket connections."""
 
-from django.urls import re_path
+from __future__ import annotations
 
-from .consumers import ThreadConsumer
+from typing import List
 
-websocket_urlpatterns = [
-    re_path(r"^ws/threads/(?P<thread_id>[0-9a-fA-F-]{36})/$", ThreadConsumer.as_asgi()),
-]
+from django.urls import URLPattern
+
+websocket_urlpatterns: List[URLPattern] = []

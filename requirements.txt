@@ -19,6 +19,8 @@ uritemplate==4.2.0  # URL template expansion required by drf-yasg
 PyJWT==2.10.1  # Explicit pin aligned with SimpleJWT to avoid compatibility drift
 
 # Application utilities and runtime extras
+channels==4.2.0  # ASGI support for HTTP/WebSocket routing
+daphne==4.1.2  # ASGI server used for local development and testing
 Faker==37.8.0  # Generates sample data for management commands
 pillow==11.3.0  # Image processing for ImageField support
 gunicorn==23.0.0  # Production WSGI server used by the Docker entrypoint
