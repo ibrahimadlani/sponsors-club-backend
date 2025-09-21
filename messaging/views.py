@@ -8,6 +8,7 @@ from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -75,6 +76,7 @@ class ThreadMessagesView(APIView):
 
     permission_classes = (permissions.IsAuthenticated, IsThreadParticipant)
     pagination_class = ThreadMessagesPagination
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def _get_thread(self, request, thread_id):
         thread = get_object_or_404(

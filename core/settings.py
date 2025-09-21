@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "corsheaders",
     "rest_framework",
     "django_filters",
@@ -68,6 +69,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
+ASGI_APPLICATION = "core.asgi.application"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -85,6 +88,21 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "core.wsgi.application"
+
+
+def _build_channel_layer() -> dict[str, object]:
+    """Return the default channel layer configuration."""
+
+    redis_url = os.environ.get("REDIS_URL")
+    if redis_url:
+        return {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [redis_url]},
+        }
+    return {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+
+
+CHANNEL_LAYERS = {"default": _build_channel_layer()}
 
 
 # Database
