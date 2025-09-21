@@ -28,6 +28,12 @@ The project-level router (`core/urls.py`) wires each domain app under the `/api/
 - [Local development setup](setup/local-development.md)
 - [Database seeding](setup/data-seeding.md)
 - [Testing guide](testing.md)
+- [Deployment runbook](operations/deployment.md)
+- [Background jobs & scheduling](operations/background-jobs.md)
 - [Feature entitlements reference](feature-entitlements.md)
+- [Proof-of-concept templates](poc/README.md)
+
+Interactive OpenAPI documentation is available at `/api/docs/` and `/api/redoc/`
+when `DRF_YASG_ENABLED` is set to `true`.
 
 Each guide focuses on actionable steps. Domain- and architecture-specific chapters can build upon this foundation using the same folder structure (`architecture/`, `domain/`, `operations/`, etc.).

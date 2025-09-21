@@ -1,23 +1,22 @@
-# Feature Entitlements & Upgrade Messaging
+# Feature entitlement reference
 
-This API enforces feature flags by account type. Whenever access is denied the
-response body includes:
+This annex complements the [feature entitlement architecture guide](architecture/feature-entitlements.md)
+with concrete payloads returned by the API when a plan check fails and examples of
+the `/users/me/entitlements/` discovery endpoint.
 
-- `detail`: branded explanation of the missing capability and required plan
-- `required_feature`: the plan feature key our backend checks
-- `allowed_values`: optional whitelist of acceptable values
-- `upgrade_url`: deep link to the billing page for upgrades
-- `recommended_plans`: friendly plan names to pitch in-app
+## Denied response contract
+Whenever a feature check blocks an action, the API responds with HTTP 403 and the
+following JSON envelope:
 
-## Agent Features
+| Field | Description |
+| --- | --- |
+| `detail` | Human-readable explanation that can be surfaced in the UI. |
+| `required_feature` | Feature flag key evaluated by the backend. |
+| `allowed_values` | Optional list of accepted values for the entitlement. |
+| `upgrade_url` | Link to the billing or upgrade page clients should open. |
+| `recommended_plans` | Friendly plan names to promote in upgrade messaging. |
 
-| Code | Label | Required Feature | Recommended Plans | Notes |
-| ---- | ----- | ---------------- | ----------------- | ----- |
-| `messaging_initiate` | Messaging (initiate threads) | `messaging_tier` ∈ {`pro_plus`, `enterprise`} | Agent Pro+, Agent Enterprise | Required to open new DM threads. Replying to existing threads stays open to all participants. |
-| `subscription_management` | Manage agent subscription | `agent_subscription_management` | Agent Pro+, Agent Enterprise | Grants access to manage billing from the agent dashboard. |
-
-### Sample denied payload
-
+### Sample payload
 ```json
 {
   "detail": "Messaging upgrade required: switch to Agent Pro+ (messaging_tier=pro_plus) to open new conversations.",
@@ -28,15 +27,19 @@ response body includes:
 }
 ```
 
-## Organisation Collaborator Features
+## Agent features
+| Code | Label | Required feature | Recommended plans | Notes |
+| ---- | ----- | ---------------- | ----------------- | ----- |
+| `messaging_initiate` | Messaging (initiate threads) | `messaging_tier` ∈ {`pro_plus`, `enterprise`} | Agent Pro+, Agent Enterprise | Required to open new DM threads. Replying to existing threads stays open to all participants. |
+| `subscription_management` | Manage agent subscription | `agent_subscription_management` truthy | Agent Pro+, Agent Enterprise | Grants access to manage billing from the agent dashboard. |
 
-| Code | Label | Required Feature | Recommended Plans | Notes |
+## Organisation collaborator features
+| Code | Label | Required feature | Recommended plans | Notes |
 | ---- | ----- | ---------------- | ----------------- | ----- |
 | `athlete_stats_all` | Athlete statistics (all) | `athlete_stats_scope` = `all` | Organisation Pro, Organisation Enterprise | Unlocks platform-wide athlete analytics for collaborators. |
 | `collaborator_invites` | Invite collaborators | `collaborator_invites` truthy | Organisation Pro, Organisation Enterprise | Allows owners to add teammates. |
 
-### Sample denied payload
-
+### Sample payload
 ```json
 {
   "detail": "Requires organisation subscription with athlete_stats_scope=all (Organisation Pro or higher) to unlock athlete insights.",
@@ -47,14 +50,12 @@ response body includes:
 }
 ```
 
-## Surfacing Entitlements
+## Discovering current entitlements
+Use `GET /api/users/me/entitlements/` to obtain the account type and the status of
+each feature. Clients can render upgrade banners directly from the payload.
 
-`GET /users/me/entitlements/` returns the current account type and the list of
-features with `granted` status plus the metadata above so clients can render an
-upgrade prompt inline.
-
-```
-GET /users/me/entitlements/
+```http
+GET /api/users/me/entitlements/
 Authorization: Bearer <token>
 ```
 
@@ -76,4 +77,5 @@ Authorization: Bearer <token>
 }
 ```
 
-Use this endpoint to power upgrade modals or billing callouts in the product.
+Integrate this endpoint into the onboarding flow or settings pages to pre-empt 403
+responses with proactive upgrade messaging.
