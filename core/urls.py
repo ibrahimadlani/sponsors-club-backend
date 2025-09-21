@@ -32,6 +32,21 @@ urlpatterns = [
         TemplateView.as_view(template_name="poc/subscriptions.html"),
         name="poc-subscriptions",
     ),
+    path(
+        "poc/contracts/",
+        TemplateView.as_view(template_name="poc/contracts_overview.html"),
+        name="poc-contracts-overview",
+    ),
+    path(
+        "poc/contracts/editor/",
+        TemplateView.as_view(template_name="poc/contracts_editor.html"),
+        name="poc-contracts-editor",
+    ),
+    path(
+        "poc/contracts/review/",
+        TemplateView.as_view(template_name="poc/contracts_review.html"),
+        name="poc-contracts-review",
+    ),
 ]
 
 if getattr(settings, "DRF_YASG_ENABLED", False):

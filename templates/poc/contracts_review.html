@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Contrat • Validation & signature • SponsorsClub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0b1120;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+        }
+        main {
+            width: min(1180px, 100%);
+            background: #f8fafc;
+            border-radius: 28px;
+            box-shadow: 0 40px 100px rgba(15, 23, 42, 0.45);
+            display: grid;
+            gap: 32px;
+            padding: 40px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+            color: #0f172a;
+        }
+        header p {
+            margin: 6px 0 0;
+            color: #475569;
+        }
+        section {
+            background: white;
+            border-radius: 24px;
+            padding: 28px;
+            display: grid;
+            gap: 20px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #0f172a;
+        }
+        .status-flow {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+        .step {
+            position: relative;
+            padding: 18px;
+            border-radius: 18px;
+            background: #e0f2fe;
+            border: 1px solid rgba(14, 116, 144, 0.25);
+            display: grid;
+            gap: 6px;
+        }
+        .step.completed {
+            background: #dcfce7;
+            border-color: rgba(22, 163, 74, 0.35);
+        }
+        .step span {
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #0369a1;
+            font-weight: 700;
+        }
+        .step.completed span { color: #047857; }
+        .step strong {
+            color: #0f172a;
+            font-size: 1.05rem;
+        }
+        .owner-actions {
+            display: grid;
+            gap: 16px;
+        }
+        .owner-actions button {
+            appearance: none;
+            border: none;
+            border-radius: 16px;
+            padding: 16px 20px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            text-align: left;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        .owner-actions button.primary {
+            background: linear-gradient(120deg, #2563eb, #1d4ed8);
+            color: white;
+            box-shadow: 0 18px 36px rgba(37, 99, 235, 0.32);
+        }
+        .owner-actions button.secondary {
+            background: rgba(148, 163, 184, 0.25);
+            color: #1f2937;
+        }
+        .checklist {
+            display: grid;
+            gap: 16px;
+        }
+        .check-item {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+            background: #f1f5f9;
+            border-radius: 18px;
+            padding: 16px 18px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .check-item strong { color: #0f172a; }
+        .check-item span {
+            margin-top: 2px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2563eb;
+        }
+        .files {
+            display: grid;
+            gap: 16px;
+        }
+        .file-card {
+            border-radius: 18px;
+            padding: 20px;
+            background: #eef2ff;
+            border: 1px solid rgba(79, 70, 229, 0.28);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .file-card .name {
+            font-weight: 600;
+            color: #3730a3;
+        }
+        .file-card button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 20px;
+            font-weight: 600;
+            background: #4338ca;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        .file-card button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 28px rgba(67, 56, 202, 0.32);
+        }
+        .timeline {
+            display: grid;
+            gap: 16px;
+        }
+        .timeline-entry {
+            display: grid;
+            gap: 6px;
+            padding: 16px;
+            border-radius: 18px;
+            background: #fef3c7;
+            border: 1px solid rgba(217, 119, 6, 0.32);
+        }
+        .timeline-entry:nth-child(even) {
+            background: #ede9fe;
+            border-color: rgba(99, 102, 241, 0.35);
+        }
+        .timeline-entry strong { color: #0f172a; }
+        footer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        footer a {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        @media (max-width: 760px) {
+            body { padding: 20px; }
+            main { padding: 28px; }
+            section { padding: 22px; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Validation & signature</h1>
+        <p>Dernière étape avant la mise en production du partenariat. Vérifiez les checkpoints, acceptez la révision finale puis déclenchez l'export signé.</p>
+    </header>
+
+    <section>
+        <h2>Progression du statut</h2>
+        <div class="status-flow">
+            <div class="step completed">
+                <span>Brouillon</span>
+                <strong>Créé le 9 avril</strong>
+                <p>Clauses obligatoires appliquées automatiquement.</p>
+            </div>
+            <div class="step completed">
+                <span>Négociation</span>
+                <strong>Conclue le 12 avril</strong>
+                <p>Dernière révision acceptée par l'organisation.</p>
+            </div>
+            <div class="step">
+                <span>Accord</span>
+                <strong>En attente de validation owner</strong>
+                <p>L'owner doit confirmer avant signature.</p>
+            </div>
+            <div class="step">
+                <span>Actif</span>
+                <strong>Export DocuSign</strong>
+                <p>Activation automatique des droits une fois signé.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Checklist du propriétaire</h2>
+        <div class="checklist">
+            <div class="check-item">
+                <span></span>
+                <div>
+                    <strong>Vérifier les clauses critiques</strong>
+                    <p>Relisez les sections juridiques, financières et de confidentialité modifiées par l'agent.</p>
+                </div>
+            </div>
+            <div class="check-item">
+                <span style="background:#047857;"></span>
+                <div>
+                    <strong>Valider la dernière révision</strong>
+                    <p>La proposition du 12 avril inclut l'augmentation de budget et la présence sur 2 événements physiques.</p>
+                </div>
+            </div>
+            <div class="check-item">
+                <span style="background:#1d4ed8;"></span>
+                <div>
+                    <strong>Définir la date d'activation</strong>
+                    <p>Synchroniser la mise en ligne avec la campagne marketing du 1er mai.</p>
+                </div>
+            </div>
+        </div>
+        <div class="owner-actions">
+            <button class="primary">Accepter la révision et passer en accord</button>
+            <button class="secondary">Retour en négociation</button>
+        </div>
+    </section>
+
+    <section>
+        <h2>Documents & export</h2>
+        <div class="files">
+            <div class="file-card">
+                <div>
+                    <div class="name">Contrat SponsorsClub - Version approuvée.pdf</div>
+                    <small>Mise à jour automatique après signature DocuSign.</small>
+                </div>
+                <button>Télécharger</button>
+            </div>
+            <div class="file-card" style="background:#fef2f2; border-color:rgba(248,113,113,0.3);">
+                <div>
+                    <div class="name" style="color:#b91c1c;">Justificatif assurance responsabilité.pdf</div>
+                    <small>Document requis avant activation finale.</small>
+                </div>
+                <button style="background:#b91c1c;">Téléverser</button>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Timeline finale</h2>
+        <div class="timeline">
+            <div class="timeline-entry">
+                <strong>12 avril 2025 • Collaboratrice Owner</strong>
+                <p>Révision acceptée, toutes les clauses critiques validées.</p>
+            </div>
+            <div class="timeline-entry">
+                <strong>11 avril 2025 • Agent</strong>
+                <p>Ajout du bonus de performance et des obligations événementielles.</p>
+            </div>
+            <div class="timeline-entry">
+                <strong>10 avril 2025 • Collaborateur</strong>
+                <p>Réorganisation des clauses logistiques & propriété intellectuelle.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <a href="/poc/contracts/">← Retour à la vue d'ensemble</a>
+        <a href="/poc/contracts/editor/">Ouvrir l'éditeur de clauses</a>
+    </footer>
+</main>
+</body>
+</html>
