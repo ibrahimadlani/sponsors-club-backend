@@ -37,7 +37,10 @@ def remove_is_mandatory_field(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("contracts", "0001_initial"),
+        (
+            "contracts",
+            "0002_rename_contracts_c_organis_09059c_idx_contract_org_status_idx_and_more",
+        ),
     ]
 
     operations = [
