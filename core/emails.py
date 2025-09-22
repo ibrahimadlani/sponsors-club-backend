@@ -18,7 +18,7 @@ class EmailDeliveryError(RuntimeError):
     """Raised when Amazon SES rejects or fails to deliver a message."""
 
 
-@dataclass(slots=True)
+@dataclass
 class EmailMessage:
     """Structured representation of an outbound email."""
 
