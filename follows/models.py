@@ -1,4 +1,9 @@
-"""Database models for tracking collaborator follows of athletes."""
+"""Database models for tracking collaborator follows of athletes.
+
+The follow model links collaborators to athletes and stores notification
+preferences that influence messaging throughout the product. Inline comments
+and Google-style docstrings make those relationships explicit.
+"""
 
 import uuid
 
@@ -9,7 +14,14 @@ from organisations.models import Collaborator
 
 
 class BaseModel(models.Model):
-    """Abstract base model providing UUID primary key and timestamp metadata."""
+    """Provide UUID primary keys and timestamp metadata.
+
+    Attributes:
+        id: Primary key generated as a UUID so identifiers are hard to guess
+            when exposed through the API.
+        created_at: Timestamp marking when the record was created.
+        updated_at: Timestamp automatically bumped when the record is saved.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -22,7 +34,18 @@ class BaseModel(models.Model):
 
 
 class Follow(BaseModel):
-    """Link a collaborator to an athlete they wish to track."""
+    """Represent a collaborator following an athlete.
+
+    Attributes:
+        collaborator: Collaborator that owns the relationship. A collaborator
+            may belong to an organisation which controls follow limits.
+        athlete: Athlete being tracked so downstream services can surface
+            relevant updates.
+        notify_news: Toggle for whether organisation staff wish to hear about
+            general news events.
+        notify_stats: Toggle for stats digests.
+        notify_contracts: Toggle for contract updates.
+    """
 
     collaborator = models.ForeignKey(
         Collaborator,
@@ -39,7 +62,12 @@ class Follow(BaseModel):
     notify_contracts = models.BooleanField(default=True)
 
     class Meta:
-        """Django model configuration metadata."""
+        """Additional configuration that enforces uniqueness and indexes.
+
+        The unique constraint prevents duplicate follow relationships while
+        the indexes keep lookup queries fast when filtering by athlete or
+        collaborator.
+        """
 
         constraints = [
             models.UniqueConstraint(
@@ -56,4 +84,6 @@ class Follow(BaseModel):
         ]
 
     def __str__(self):
+        """Return a readable description for debugging and admin displays."""
+
         return f"{self.collaborator} -> {self.athlete}"

@@ -73,11 +73,25 @@ class AthleteSocialAccount(BaseModel):
 class DailyStatsQuerySet(models.QuerySet):
     """Custom queryset helpers for daily stats."""
 
-    def for_range(self, start_date: Optional[date], end_date: Optional[date]):
+    def for_range(
+        self, start_date: Optional[date], end_date: Optional[date]
+    ) -> "DailyStatsQuerySet":
+        """Restrict stats to a specific inclusive date window.
+
+        Args:
+            start_date: Earliest date to retain, or ``None`` for open ended.
+            end_date: Latest date to retain, or ``None`` to include all future values.
+
+        Returns:
+            DailyStatsQuerySet: Queryset filtered to the requested bounds.
+        """
+
         qs = self
         if start_date:
+            # Apply a lower bound when the consumer provided a start date.
             qs = qs.filter(date__gte=start_date)
         if end_date:
+            # Similarly clamp the results to the requested upper bound.
             qs = qs.filter(date__lte=end_date)
         return qs
 
@@ -120,16 +134,33 @@ class DailyStats(BaseModel):
         return f"{self.account} on {self.date}"
 
     def compute_engagement_rate(self) -> float:
-        """Calculate the engagement rate percentage for the stat line."""
+        """Calculate the engagement rate percentage for the stat line.
+
+        Returns:
+            float: Engagement percentage rounded to four decimal places.
+        """
 
         if not self.followers:
+            # Avoid division by zero when the platform did not report followers.
             return 0.0
         interactions = self.likes + self.comments
         if self.shares:
+            # Shares are optional but should contribute to total interactions.
             interactions += self.shares
         engagement = (interactions / self.followers) * 100
         return round(float(engagement), 4)
 
     def save(self, *args, **kwargs):
+        """Persist the stat while refreshing derived engagement metrics.
+
+        Args:
+            *args: Positional arguments forwarded to :meth:`models.Model.save`.
+            **kwargs: Keyword arguments forwarded to :meth:`models.Model.save`.
+
+        Returns:
+            None: The method relies on Django's base ``save`` return value.
+        """
+
+        # Always recompute engagement to ensure the stored value matches inputs.
         self.engagement_rate = self.compute_engagement_rate()
         super().save(*args, **kwargs)

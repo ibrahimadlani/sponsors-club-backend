@@ -1,4 +1,4 @@
-"""Views for interacting with follow relationships."""
+"""API views for creating, removing, and listing follow relationships."""
 
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
@@ -20,12 +20,31 @@ from .serializers import FollowSerializer
 
 
 class AthleteFollowView(APIView):
-    """Create or remove follow relationships for the current collaborator."""
+    """Create or remove follow relationships for the authenticated user.
+
+    The view orchestrates collaborator lookup, subscription entitlement
+    validation, and creation/deletion of :class:`follows.models.Follow`
+    records. Keeping this logic centralised ensures the same guardrails apply
+    whether requests originate from the dashboard or future integrations.
+    """
 
     permission_classes = (permissions.IsAuthenticated, IsCollaboratorUser)
 
     def _get_collaborator(self, request):
-        """Return the collaborator referenced in the request payload or query params."""
+        """Return the collaborator referenced in the request data.
+
+        Args:
+            request: Incoming request whose body or query parameters may
+                include a ``collaborator_id`` value.
+
+        Returns:
+            organisations.models.Collaborator: Collaborator tied to the
+            authenticated user.
+
+        Raises:
+            Collaborator.DoesNotExist: Raised when the user is not linked to a
+            collaborator and no collaborator can be derived automatically.
+        """
 
         collaborator_id = request.data.get(
             "collaborator_id"
@@ -40,7 +59,16 @@ class AthleteFollowView(APIView):
         return collaborator
 
     def _enforce_follow_limits(self, request, collaborator):
-        """Verify follow entitlements and return a denial response when needed."""
+        """Verify subscription limits before allowing a follow to be created.
+
+        Args:
+            request: Incoming API request used to resolve feature requirements.
+            collaborator: Collaborator attempting to follow an athlete.
+
+        Returns:
+            Optional[Response]: ``None`` when the request may proceed or an
+            HTTP 403 response describing the restriction.
+        """
 
         features = get_collaborator_plan_features(
             request.user,
@@ -62,6 +90,8 @@ class AthleteFollowView(APIView):
             return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         if max_follows > 0:
+            # Count follows for the entire organisation because slots are
+            # shared across collaborators.
             current_count = Follow.objects.filter(
                 collaborator__organisation=collaborator.organisation,
             ).count()
@@ -75,7 +105,17 @@ class AthleteFollowView(APIView):
         return None
 
     def post(self, request, athlete_id):
-        """Create a follow relationship if the collaborator has available slots."""
+        """Create a follow relationship when the collaborator has capacity.
+
+        Args:
+            request: HTTP request initiating the follow action.
+            athlete_id: Primary key of the athlete being followed.
+
+        Returns:
+            Response: 201 Created when a new follow is made, 200 OK when an
+            existing follow is re-used, 400 Bad Request when the user lacks a
+            collaborator, or 403 Forbidden when subscription limits are hit.
+        """
 
         try:
             collaborator = self._get_collaborator(request)
@@ -90,6 +130,8 @@ class AthleteFollowView(APIView):
             return denial
 
         athlete = get_object_or_404(Athlete, id=athlete_id)
+        # ``get_or_create`` avoids duplicate records when the client retries a
+        # request or when concurrent requests target the same athlete.
         follow, created = Follow.objects.get_or_create(
             collaborator=collaborator,
             athlete=athlete,
@@ -99,7 +141,17 @@ class AthleteFollowView(APIView):
         return Response(serializer.data, status=response_status)
 
     def delete(self, request, athlete_id):
-        """Remove a follow relationship for the collaborator."""
+        """Remove a follow relationship owned by the collaborator.
+
+        Args:
+            request: HTTP request initiating the unfollow action.
+            athlete_id: Primary key of the athlete to stop tracking.
+
+        Returns:
+            Response: 204 No Content when a relationship is removed, 400 Bad
+            Request when the user lacks a collaborator, or 404 Not Found when
+            no follow existed.
+        """
 
         try:
             collaborator = self._get_collaborator(request)
@@ -123,16 +175,32 @@ class AthleteFollowView(APIView):
 
 
 class MyFollowsView(APIView):
-    """List all athletes followed by the authenticated collaborator."""
+    """List all athletes followed by the authenticated collaborator.
+
+    The endpoint collects follows across every collaborator membership tied to
+    the current user. This mirrors how the dashboard aggregates data and keeps
+    the public API consistent with the product experience.
+    """
 
     permission_classes = (permissions.IsAuthenticated, IsCollaboratorUser)
 
     def get(self, request, *_args, **_kwargs):
-        """Return serialized follow records for the requesting user."""
+        """Return serialized follow records for the requesting user.
+
+        Args:
+            request: HTTP request initiating the fetch.
+            *_args: Positional arguments provided by Django (unused).
+            **_kwargs: Keyword arguments provided by Django (unused).
+
+        Returns:
+            Response: 200 OK response containing serialized follow data.
+        """
 
         collaborator_ids = Collaborator.objects.filter(user=request.user).values_list(
             "id", flat=True
         )
+        # Selecting related sport data avoids N+1 queries when rendering the
+        # athlete serializer.
         follows = Follow.objects.filter(
             collaborator_id__in=collaborator_ids
         ).select_related("athlete__sport")

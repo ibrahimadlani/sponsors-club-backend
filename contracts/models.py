@@ -1,4 +1,10 @@
-"""Database models powering the contracts domain."""
+"""Database models powering the contracts domain.
+
+The module models every step of a sponsorship negotiation, from drafting
+clauses to recording legal review and DocuSign status updates. Each model is
+kept intentionally lightweight so that service layers and serializers can focus
+on workflow rules without duplicating persistence concerns.
+"""
 
 import uuid
 
@@ -11,7 +17,13 @@ from users.models import AgentProfile
 
 
 class BaseModel(models.Model):
-    """Abstract helper adding UUID primary keys and timestamps."""
+    """Abstract helper adding UUID primary keys and timestamps.
+
+    Attributes:
+        id: Deterministic UUID primary key for consistent API identifiers.
+        created_at: Timestamp for when the record was first persisted.
+        updated_at: Timestamp automatically refreshed on each save.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -22,7 +34,16 @@ class BaseModel(models.Model):
 
 
 class ClauseTemplate(BaseModel):
-    """Reusable clause blueprint that can be attached to contracts."""
+    """Reusable clause blueprint that can be attached to contracts.
+
+    Attributes:
+        category: Classification used to cluster templates in the UI.
+        title: Human-friendly label shown to negotiators.
+        content: Templated text that can include ``{{placeholders}}``.
+        placeholders: List of placeholder keys expected in the content body.
+        is_mandatory: Whether new contracts automatically include the clause.
+        version: Version counter so legal can iterate on template wording.
+    """
 
     class Category(models.TextChoices):
         LEGAL_OBLIGATIONS = "legal_obligations", "Obligatoires (juridiques)"
@@ -44,6 +65,7 @@ class ClauseTemplate(BaseModel):
     content = models.TextField(
         help_text="Supports placeholders using double curly braces like {{athlete_name}}",
     )
+    # JSON keeps placeholder hints flexible without forcing a rigid schema.
     placeholders = models.JSONField(default=list, blank=True)
     is_mandatory = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)
@@ -57,7 +79,20 @@ class ClauseTemplate(BaseModel):
 
 
 class Contract(BaseModel):
-    """Represents a sponsorship contract between an organisation and an agent."""
+    """Represent a sponsorship contract between an organisation and an agent.
+
+    Attributes:
+        organisation: Organisation that owns the sponsorship rights.
+        agent: Agent responsible for the athlete's interests.
+        initiated_by: Collaborator who created the draft contract.
+        status: Current lifecycle state of the contract.
+        title: Human-friendly title displayed in listings.
+        effective_date: Date the agreement becomes active.
+        expiration_date: Date the agreement expires naturally.
+        owner_agreed_at: Timestamp when the organisation accepted the draft.
+        agent_agreed_at: Timestamp when the agent accepted the draft.
+        current_version_number: Incrementing counter for version snapshots.
+    """
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -100,21 +135,31 @@ class Contract(BaseModel):
 
     class Meta:
         ordering = ("-created_at",)
+        # Sorting by recency keeps the admin changelist aligned with how staff
+        # typically triage active deals.
         indexes = [
             models.Index(
                 fields=("organisation", "status"), name="contracts_org_status_idx"
             ),
             models.Index(fields=("agent",), name="contracts_agent_idx"),
         ]
+        # Indexes above are tuned for the list endpoint filters (status + org)
+        # and the agent dashboard where we pivot on the agent id.
 
     def __str__(self) -> str:  # pragma: no cover - human readable
         return f"{self.title} ({self.organisation.name})"
 
     def add_mandatory_clauses(self) -> None:
-        """Populate the contract with all mandatory clause templates."""
+        """Populate the contract with all mandatory clause templates.
+
+        Returns:
+            None: The method operates for its side effects only.
+        """
 
         mandatory_templates = ClauseTemplate.objects.filter(is_mandatory=True)
         for template in mandatory_templates:
+            # ``get_or_create`` avoids duplicates if the method is invoked twice
+            # (e.g. during a retry of the creation workflow).
             ContractClause.objects.get_or_create(
                 contract=self,
                 template=template,
@@ -127,14 +172,23 @@ class Contract(BaseModel):
             )
 
     def has_full_agreement(self) -> bool:
-        """Return whether both parties formally agreed."""
+        """Report whether both parties formally agreed to the contract.
+
+        Returns:
+            bool: ``True`` when both timestamps are recorded, ``False`` otherwise.
+        """
 
         return bool(self.owner_agreed_at and self.agent_agreed_at)
 
     def record_agreement(self, *, owner: bool = False, agent: bool = False) -> bool:
         """Persist an agreement timestamp for the relevant actor.
 
-        Returns ``True`` if any timestamp changed.
+        Args:
+            owner: Whether the organisation accepted the contract.
+            agent: Whether the agent accepted the contract.
+
+        Returns:
+            bool: ``True`` if a timestamp changed, ``False`` otherwise.
         """
 
         changed = False
@@ -149,6 +203,8 @@ class Contract(BaseModel):
             changed = True
 
         if changed:
+            # Only persist the fields that actually changed to avoid clobbering
+            # unrelated updates that may happen concurrently.
             self.save(
                 update_fields=[
                     "owner_agreed_at",
@@ -166,7 +222,17 @@ class Contract(BaseModel):
         source_revision=None,
         notes: str = "",
     ):
-        """Create a new contract version snapshot and bump the counter."""
+        """Create a new contract version snapshot and bump the counter.
+
+        Args:
+            created_by: User who generated the version snapshot.
+            source_revision: Revision that triggered the new version, if any.
+            notes: Free-form description of what changed.
+
+        Returns:
+            ContractVersion: The persisted version record representing the
+            snapshot.
+        """
 
         next_number = self.current_version_number + 1
         version = ContractVersion.objects.create(
@@ -177,12 +243,22 @@ class Contract(BaseModel):
             notes=notes,
         )
         self.current_version_number = next_number
+        # Persist the increment before returning so subsequent calls stay in sync.
         self.save(update_fields=["current_version_number", "updated_at"])
         return version
 
 
 class ContractClause(BaseModel):
-    """Concrete clause tied to a specific contract instance."""
+    """Concrete clause tied to a specific contract instance.
+
+    Attributes:
+        contract: Parent contract the clause belongs to.
+        template: Optional template that seeded the clause content.
+        title: Heading shown in PDFs and the admin interface.
+        content: Body of the clause, potentially customised from the template.
+        is_mandatory: Whether the clause originated from a mandatory template.
+        is_modified: Tracks edits made after the template was applied.
+    """
 
     contract = models.ForeignKey(
         Contract,
@@ -209,7 +285,15 @@ class ContractClause(BaseModel):
 
 
 class ContractRevision(BaseModel):
-    """Record of proposed clause updates during negotiations."""
+    """Record of proposed clause updates during negotiations.
+
+    Attributes:
+        contract: Contract impacted by the revision.
+        proposed_by: User who suggested the change.
+        clauses_changed: Clauses impacted by the proposal.
+        comment: Context explaining the proposed changes.
+        accepted: Ternary flag representing review outcome.
+    """
 
     contract = models.ForeignKey(
         Contract,
@@ -237,7 +321,15 @@ class ContractRevision(BaseModel):
 
 
 class ContractVersion(BaseModel):
-    """Snapshot of the contract at a specific negotiation step."""
+    """Snapshot of the contract at a specific negotiation step.
+
+    Attributes:
+        contract: Contract the snapshot belongs to.
+        number: Incremental version counter.
+        created_by: User who generated the snapshot.
+        source_revision: Revision that triggered the snapshot.
+        notes: Optional narrative attached to the version.
+    """
 
     contract = models.ForeignKey(
         Contract,
@@ -268,7 +360,15 @@ class ContractVersion(BaseModel):
 
 
 class ContractComment(BaseModel):
-    """Free-form annotation tied to a specific contract version and clause."""
+    """Free-form annotation tied to a specific contract version and clause.
+
+    Attributes:
+        contract: Contract receiving the comment.
+        version: Version that the comment references.
+        clause: Clause targeted by the feedback (optional).
+        author: User who left the comment.
+        body: Content of the annotation.
+    """
 
     contract = models.ForeignKey(
         Contract,
@@ -302,7 +402,16 @@ class ContractComment(BaseModel):
 
 
 class ContractLegalReview(BaseModel):
-    """Track the legal review lifecycle prior to signature."""
+    """Track the legal review lifecycle prior to signature.
+
+    Attributes:
+        contract: Contract undergoing review.
+        requested_by: Collaborator who requested the review.
+        notes: Additional context provided during submission.
+        verified_by: Legal reviewer who completed the verification.
+        verified_at: Timestamp for the verification action.
+        verification_notes: Final comments from the legal reviewer.
+    """
 
     contract = models.OneToOneField(
         Contract,
@@ -333,7 +442,16 @@ class ContractLegalReview(BaseModel):
 
 
 class ContractSigning(BaseModel):
-    """Track DocuSign envelope and signature status."""
+    """Track DocuSign envelope and signature status.
+
+    Attributes:
+        contract: Contract being signed.
+        envelope_id: Identifier returned by the external e-sign provider.
+        status: Workflow state for the signature process.
+        initiated_by: User who started the signing flow.
+        last_payload: Latest webhook payload captured for auditing.
+        completed_at: Timestamp when the signing reached a terminal state.
+    """
 
     class Status(models.TextChoices):
         INITIATED = "initiated", "Initiated"
@@ -368,7 +486,12 @@ class ContractSigning(BaseModel):
 
 
 class ContractFile(BaseModel):
-    """Persist signed contract exports (e.g. PDF)."""
+    """Persist signed contract exports (e.g. PDF).
+
+    Attributes:
+        contract: Contract the file belongs to.
+        pdf: File handle for the exported document.
+    """
 
     contract = models.OneToOneField(
         Contract,
