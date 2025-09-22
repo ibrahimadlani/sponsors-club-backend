@@ -21,8 +21,10 @@ class BaseModel(models.Model):
 class Sport(BaseModel):
     """Categorise athletes by sport and discipline."""
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     discipline = models.CharField(max_length=255)
+    class Meta:
+        unique_together = ("name", "discipline")
 
     def __str__(self):
         return str(self.name)
