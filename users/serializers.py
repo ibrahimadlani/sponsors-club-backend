@@ -5,7 +5,8 @@ from rest_framework import serializers
 
 from organisations.models import Collaborator
 
-from .models import AgentProfile, User
+from .emails import send_email_verification
+from .models import AgentProfile, EmailVerificationToken, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -100,6 +101,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 user=user,
                 display_name=display_name or default_display_name,
             )
+        send_email_verification(user)
         return user
 
     def to_representation(self, instance):
@@ -214,3 +216,36 @@ class RolesDataBuilder:
             "agent_profile": agent_info,
             "collaborations": collaborations,
         }
+
+
+class EmailVerificationConfirmSerializer(serializers.Serializer):
+    """Validate and persist email verification submissions."""
+
+    uid = serializers.UUIDField()
+    token = serializers.CharField()
+
+    default_error_messages = {
+        "invalid_token": "Invalid or expired verification token.",
+    }
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(id=attrs["uid"])
+        except User.DoesNotExist as exc:  # pragma: no cover - defensive
+            raise serializers.ValidationError(
+                self.error_messages["invalid_token"]
+            ) from exc
+
+        token = EmailVerificationToken.verify(user, attrs["token"])
+        if token is None:
+            raise serializers.ValidationError(self.error_messages["invalid_token"])
+
+        attrs["user"] = user
+        return attrs
+
+    def save(self, **kwargs):
+        user: User = self.validated_data["user"]
+        if not user.email_verified:
+            user.email_verified = True
+            user.save(update_fields=["email_verified", "updated_at"])
+        return user

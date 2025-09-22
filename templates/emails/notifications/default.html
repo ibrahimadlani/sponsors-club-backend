@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body style="font-family: Arial, sans-serif; color: #111827;">
+    <p>Hello {{ user.first_name|default:user.email }},</p>
+    <p>
+      You have a new <strong>{{ notification.get_type_display }}</strong>
+      notification on Sponsors Club.
+    </p>
+    <p>Summary:</p>
+    <pre style="background: #f3f4f6; padding: 12px; border-radius: 6px;">
+{{ notification.payload }}
+    </pre>
+    <p>
+      Visit your dashboard to review the full details and respond as needed.
+    </p>
+    <p>The Sponsors Club team</p>
+  </body>
+</html>
