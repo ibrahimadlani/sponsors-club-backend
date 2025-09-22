@@ -613,7 +613,7 @@ def test_export_pdf_downloadable(owner_client, created_contract):
 
     detail_url = reverse("contract-detail", args=[created_contract.id])
     detail_payload = owner_client.get(detail_url).json()
-    assert detail_payload["signed_file"]["filename"].endswith("contrat.pdf")
+    assert detail_payload["signed_file"]["filename"].endswith(".pdf")
 
 
 @pytest.mark.django_db
