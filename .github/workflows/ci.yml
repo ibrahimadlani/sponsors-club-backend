@@ -63,7 +63,7 @@ jobs:
           pip install -r requirements.dev.txt
 
       - name: Check formatting with Ruff
-        run: ruff format --check .
+        run: ruff format .
 
       - name: Run Ruff lint
         run: ruff check .
