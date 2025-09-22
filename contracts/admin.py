@@ -1,4 +1,4 @@
-"""Admin registrations for contract templates, versions, and status history."""
+"""Admin registrations for contracts domain models."""
 
 from django.contrib import admin
 
@@ -6,75 +6,81 @@ from .models import (
     ClauseTemplate,
     Contract,
     ContractClause,
-    ContractStatusHistory,
+    ContractComment,
+    ContractFile,
+    ContractLegalReview,
+    ContractRevision,
+    ContractSigning,
     ContractVersion,
 )
 
 
 @admin.register(ClauseTemplate)
 class ClauseTemplateAdmin(admin.ModelAdmin):
-    """Display clause templates with version and activation filters."""
-
-    list_display = (
-        "identifier",
-        "title",
-        "type",
-        "version",
-        "mandatory",
-        "is_active",
-    )
-    list_filter = ("type", "mandatory", "is_active")
-    search_fields = ("identifier", "title")
+    list_display = ("title", "category", "version", "is_mandatory")
+    list_filter = ("category", "is_mandatory")
+    search_fields = ("title", "category")
 
 
 class ContractClauseInline(admin.TabularInline):
-    """Inline editor for contract clauses."""
-
     model = ContractClause
     extra = 0
+    fields = ("title", "is_mandatory", "is_modified")
+    readonly_fields = ("is_mandatory", "is_modified")
 
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    """Expose contracts with key metadata and clause inline editing."""
-
-    list_display = (
-        "organisation",
-        "athlete",
-        "status",
-        "start_date",
-        "end_date",
-        "amount",
-        "currency",
-    )
-    list_filter = ("status", "currency", "organisation")
-    search_fields = ("organisation__name", "athlete__full_name")
+    list_display = ("title", "organisation", "agent", "status", "effective_date")
+    list_filter = ("status", "organisation")
+    search_fields = ("title", "organisation__name", "agent__display_name")
     inlines = [ContractClauseInline]
+
+
+@admin.register(ContractRevision)
+class ContractRevisionAdmin(admin.ModelAdmin):
+    list_display = ("contract", "proposed_by", "accepted", "created_at")
+    list_filter = ("accepted",)
+    search_fields = ("contract__title", "proposed_by__email")
+    filter_horizontal = ("clauses_changed",)
+
+
+@admin.register(ContractFile)
+class ContractFileAdmin(admin.ModelAdmin):
+    list_display = ("contract", "created_at")
+    search_fields = ("contract__title",)
 
 
 @admin.register(ContractVersion)
 class ContractVersionAdmin(admin.ModelAdmin):
-    """Allow inspection of stored contract versions."""
-
-    list_display = ("contract", "version_number", "created_at")
-    list_filter = ("version_number",)
-    search_fields = ("contract__organisation__name", "contract__athlete__full_name")
+    list_display = ("contract", "number", "created_by", "created_at")
+    search_fields = ("contract__title", "created_by__email")
+    ordering = ("-created_at",)
 
 
-@admin.register(ContractStatusHistory)
-class ContractStatusHistoryAdmin(admin.ModelAdmin):
-    """List contract status transitions with audit details."""
-
-    list_display = (
-        "contract",
-        "from_status",
-        "to_status",
-        "changed_by",
-        "changed_at",
-    )
-    list_filter = ("to_status",)
+@admin.register(ContractComment)
+class ContractCommentAdmin(admin.ModelAdmin):
+    list_display = ("contract", "version", "author", "created_at")
     search_fields = (
-        "contract__organisation__name",
-        "contract__athlete__full_name",
-        "changed_by__email",
+        "contract__title",
+        "author__email",
+        "body",
     )
+    list_filter = ("version",)
+
+
+@admin.register(ContractLegalReview)
+class ContractLegalReviewAdmin(admin.ModelAdmin):
+    list_display = ("contract", "requested_by", "verified_by", "created_at")
+    search_fields = (
+        "contract__title",
+        "requested_by__email",
+        "verified_by__email",
+    )
+
+
+@admin.register(ContractSigning)
+class ContractSigningAdmin(admin.ModelAdmin):
+    list_display = ("contract", "envelope_id", "status", "created_at")
+    search_fields = ("contract__title", "envelope_id")
+    list_filter = ("status",)

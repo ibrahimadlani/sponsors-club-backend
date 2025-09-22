@@ -1,17 +1,17 @@
-"""Data models for contract templates, drafts, and history tracking."""
+"""Database models powering the contracts domain."""
 
 import uuid
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Max
+from django.utils import timezone
 
-from athletes.models import Athlete
 from organisations.models import Collaborator, Organisation
+from users.models import AgentProfile
 
 
 class BaseModel(models.Model):
-    """Abstract base model providing UUID primary key and timestamps."""
+    """Abstract helper adding UUID primary keys and timestamps."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -22,85 +22,167 @@ class BaseModel(models.Model):
 
 
 class ClauseTemplate(BaseModel):
-    """Reusable clause template supporting tokenised content and versioning."""
+    """Reusable clause blueprint that can be attached to contracts."""
 
-    class ClauseType(models.TextChoices):
-        OBLIGATION = "obligation", "Obligation"
-        CONDITION = "condition", "Condition"
-        PAIEMENT = "paiement", "Paiement"
-        DUREE = "duree", "Durée"
-        LEGAL = "legal", "Légal"
+    class Category(models.TextChoices):
+        LEGAL_OBLIGATIONS = "legal_obligations", "Obligatoires (juridiques)"
+        FINANCIAL = "financial", "Financières"
+        ATHLETE_OBLIGATIONS = "athlete_obligations", "Obligations de l’athlète"
+        ORGANISATION_OBLIGATIONS = (
+            "organisation_obligations",
+            "Obligations de l’organisation",
+        )
+        INTELLECTUAL_PROPERTY = "intellectual_property", "Propriété intellectuelle"
+        CONFIDENTIALITY = "confidentiality", "Confidentialité"
+        PERFORMANCE = "performance", "Performance"
+        ETHICS_AND_MORALITY = "ethics_morality", "Éthique et moralité"
+        LOGISTICS = "logistics", "Logistique"
+        ADMINISTRATIVE = "administrative", "Administratives"
 
-    identifier = models.CharField(max_length=100, unique=True)
+    category = models.CharField(max_length=32, choices=Category.choices)
     title = models.CharField(max_length=255)
-    type = models.CharField(max_length=20, choices=ClauseType.choices)
     content = models.TextField(
-        help_text="Content supporting placeholder tokens like [key].",
+        help_text="Supports placeholders using double curly braces like {{athlete_name}}",
     )
     placeholders = models.JSONField(default=list, blank=True)
-    mandatory = models.BooleanField(default=False)
+    is_mandatory = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)
-    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ("identifier", "version")
+        ordering = ("category", "title", "-version")
+        unique_together = (("title", "version"),)
 
-    def __str__(self):
-        return f"{self.identifier} v{self.version}"
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"{self.title} (v{self.version})"
 
 
 class Contract(BaseModel):
-    """Represents a contract between an organisation and an athlete."""
+    """Represents a sponsorship contract between an organisation and an agent."""
 
     class Status(models.TextChoices):
-        DRAFT = "DRAFT", "Draft"
-        AGREEMENT = "AGREEMENT", "Agreement"
-        VERIFICATION = "VERIFICATION", "Verification"
-        ACTIVE = "ACTIVE", "Active"
-        TERMINATED = "TERMINATED", "Terminated"
+        DRAFT = "draft", "Draft"
+        NEGOTIATION = "negotiation", "Negotiation"
+        AGREEMENT = "agreement", "Agreement"
+        LEGAL_REVIEW = "legal_review", "Legal review"
+        SIGNING = "signing", "Signing"
+        ACTIVE = "active", "Active"
+        EXPIRED = "expired", "Expired"
+        TERMINATED = "terminated", "Terminated"
 
     organisation = models.ForeignKey(
         Organisation,
         on_delete=models.CASCADE,
         related_name="contracts",
     )
-    athlete = models.ForeignKey(
-        Athlete,
+    agent = models.ForeignKey(
+        AgentProfile,
         on_delete=models.CASCADE,
         related_name="contracts",
     )
-    created_by = models.ForeignKey(
+    initiated_by = models.ForeignKey(
         Collaborator,
-        on_delete=models.CASCADE,
-        related_name="created_contracts",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="initiated_contracts",
     )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.DRAFT,
     )
-    start_date = models.DateField(blank=True, null=True)
-    end_date = models.DateField(blank=True, null=True)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    currency = models.CharField(max_length=10, default="EUR")
+    title = models.CharField(max_length=255)
+    effective_date = models.DateField(blank=True, null=True)
+    expiration_date = models.DateField(blank=True, null=True)
+    owner_agreed_at = models.DateTimeField(null=True, blank=True)
+    agent_agreed_at = models.DateTimeField(null=True, blank=True)
+    current_version_number = models.PositiveIntegerField(default=0)
 
     class Meta:
+        ordering = ("-created_at",)
         indexes = [
             models.Index(
-                fields=("organisation", "status"),
-                name="contract_org_status_idx",
+                fields=("organisation", "status"), name="contracts_org_status_idx"
             ),
-            models.Index(fields=("athlete",), name="contract_athlete_idx"),
-            models.Index(fields=("start_date",), name="contract_start_idx"),
+            models.Index(fields=("agent",), name="contracts_agent_idx"),
         ]
-        ordering = ("-created_at",)
 
-    def __str__(self):
-        return f"Contract {self.organisation} ↔ {self.athlete} ({self.status})"
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"{self.title} ({self.organisation.name})"
+
+    def add_mandatory_clauses(self) -> None:
+        """Populate the contract with all mandatory clause templates."""
+
+        mandatory_templates = ClauseTemplate.objects.filter(is_mandatory=True)
+        for template in mandatory_templates:
+            ContractClause.objects.get_or_create(
+                contract=self,
+                template=template,
+                defaults={
+                    "title": template.title,
+                    "content": template.content,
+                    "is_mandatory": True,
+                    "is_modified": False,
+                },
+            )
+
+    def has_full_agreement(self) -> bool:
+        """Return whether both parties formally agreed."""
+
+        return bool(self.owner_agreed_at and self.agent_agreed_at)
+
+    def record_agreement(self, *, owner: bool = False, agent: bool = False) -> bool:
+        """Persist an agreement timestamp for the relevant actor.
+
+        Returns ``True`` if any timestamp changed.
+        """
+
+        changed = False
+        now = timezone.now()
+
+        if owner and not self.owner_agreed_at:
+            self.owner_agreed_at = now
+            changed = True
+
+        if agent and not self.agent_agreed_at:
+            self.agent_agreed_at = now
+            changed = True
+
+        if changed:
+            self.save(
+                update_fields=[
+                    "owner_agreed_at",
+                    "agent_agreed_at",
+                    "updated_at",
+                ]
+            )
+
+        return changed
+
+    def bump_version(
+        self,
+        *,
+        created_by,
+        source_revision=None,
+        notes: str = "",
+    ):
+        """Create a new contract version snapshot and bump the counter."""
+
+        next_number = self.current_version_number + 1
+        version = ContractVersion.objects.create(
+            contract=self,
+            number=next_number,
+            created_by=created_by,
+            source_revision=source_revision,
+            notes=notes,
+        )
+        self.current_version_number = next_number
+        self.save(update_fields=["current_version_number", "updated_at"])
+        return version
 
 
 class ContractClause(BaseModel):
-    """Concrete clause bound to a specific contract instance."""
+    """Concrete clause tied to a specific contract instance."""
 
     contract = models.ForeignKey(
         Contract,
@@ -109,90 +191,194 @@ class ContractClause(BaseModel):
     )
     template = models.ForeignKey(
         ClauseTemplate,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="contract_clauses",
     )
-    values = models.JSONField(default=dict, blank=True)
-    order_index = models.PositiveIntegerField()
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    is_mandatory = models.BooleanField(default=False)
+    is_modified = models.BooleanField(default=False)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=("contract", "template", "order_index"),
-                name="unique_contract_clause_order",
-            ),
-        ]
-        ordering = ("contract", "order_index")
+        ordering = ("created_at",)
 
-    def __str__(self):
-        return f"Clause {self.template.identifier} for {self.contract}"
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"{self.title} ({self.contract.title})"
+
+
+class ContractRevision(BaseModel):
+    """Record of proposed clause updates during negotiations."""
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    proposed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="contract_revisions",
+    )
+    clauses_changed = models.ManyToManyField(
+        ContractClause,
+        related_name="revisions",
+        blank=True,
+    )
+    comment = models.TextField(blank=True)
+    accepted = models.BooleanField(null=True, blank=True, default=None)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Revision {self.id} on {self.contract.title}"
 
 
 class ContractVersion(BaseModel):
-    """Snapshot of a contract at a specific version number."""
+    """Snapshot of the contract at a specific negotiation step."""
 
     contract = models.ForeignKey(
         Contract,
         on_delete=models.CASCADE,
         related_name="versions",
     )
-    version_number = models.PositiveIntegerField()
-    snapshot = models.JSONField(default=dict)
+    number = models.PositiveIntegerField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="created_contract_versions",
+    )
+    source_revision = models.ForeignKey(
+        "ContractRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resulting_versions",
+    )
+    notes = models.TextField(blank=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=("contract", "version_number"),
-                name="unique_contract_version_number",
-            ),
-        ]
-        ordering = ("contract", "-version_number")
+        ordering = ("-number",)
+        unique_together = (("contract", "number"),)
 
-    def __str__(self):
-        return f"{self.contract} v{self.version_number}"
-
-    def save(self, *args, **kwargs):
-        if self.pk is None and not self.version_number:
-            last_version = (
-                type(self)
-                .objects.filter(contract=self.contract)
-                .aggregate(max_version=Max("version_number"))
-                .get("max_version")
-            )
-            self.version_number = (last_version or 0) + 1
-        super().save(*args, **kwargs)
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Version {self.number} of {self.contract.title}"
 
 
-class ContractStatusHistory(BaseModel):
-    """Audit trail of status transitions for a contract."""
+class ContractComment(BaseModel):
+    """Free-form annotation tied to a specific contract version and clause."""
 
     contract = models.ForeignKey(
         Contract,
         on_delete=models.CASCADE,
-        related_name="status_history",
+        related_name="comments",
     )
-    from_status = models.CharField(
-        max_length=20,
-        choices=Contract.Status.choices,
-        blank=True,
-        null=True,
+    version = models.ForeignKey(
+        ContractVersion,
+        on_delete=models.CASCADE,
+        related_name="comments",
     )
-    to_status = models.CharField(max_length=20, choices=Contract.Status.choices)
-    changed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    clause = models.ForeignKey(
+        ContractClause,
         on_delete=models.SET_NULL,
-        blank=True,
         null=True,
-        related_name="contract_status_changes",
+        blank=True,
+        related_name="comments",
     )
-    changed_at = models.DateTimeField(auto_now_add=True)
-    reason = models.TextField(blank=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="contract_comments",
+    )
+    body = models.TextField()
 
     class Meta:
-        indexes = [
-            models.Index(fields=("contract", "changed_at")),
-        ]
-        ordering = ("-changed_at",)
+        ordering = ("created_at",)
 
-    def __str__(self):
-        return f"{self.contract} {self.from_status} -> {self.to_status}"
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Comment by {self.author} on {self.contract.title}"
+
+
+class ContractLegalReview(BaseModel):
+    """Track the legal review lifecycle prior to signature."""
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="legal_review",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="requested_contract_reviews",
+    )
+    notes = models.TextField(blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_contract_reviews",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Legal review for {self.contract.title}"
+
+
+class ContractSigning(BaseModel):
+    """Track DocuSign envelope and signature status."""
+
+    class Status(models.TextChoices):
+        INITIATED = "initiated", "Initiated"
+        COMPLETED = "completed", "Completed"
+        DECLINED = "declined", "Declined"
+        ERROR = "error", "Error"
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="signing",
+    )
+    envelope_id = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.INITIATED,
+    )
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="initiated_contract_signings",
+    )
+    last_payload = models.JSONField(default=dict, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"Signing for {self.contract.title}"
+
+
+class ContractFile(BaseModel):
+    """Persist signed contract exports (e.g. PDF)."""
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="file",
+    )
+    pdf = models.FileField(upload_to="contracts/exports/")
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        return f"File for {self.contract.title}"
