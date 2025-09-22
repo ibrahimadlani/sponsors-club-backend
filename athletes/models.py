@@ -41,6 +41,7 @@ class Sport(BaseModel):
     name = models.CharField(max_length=255)
     # Discipline provides additional granularity, such as "Track" vs "Field".
     discipline = models.CharField(max_length=255)
+    emoji = models.CharField(max_length=16, blank=True, null=True)
     class Meta:
         unique_together = ("name", "discipline")
 
