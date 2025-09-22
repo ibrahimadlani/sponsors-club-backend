@@ -1,4 +1,9 @@
-"""Serializers for the contracts API endpoints."""
+"""Serializers translating contract models to and from API payloads.
+
+The serializers coordinate validation rules shared between the REST views and
+admin actions. Inline comments highlight the decisions that ensure the public
+API remains predictable for both collaborators and agents.
+"""
 
 from typing import Iterable
 
@@ -22,18 +27,28 @@ from .models import (
 
 
 class OrganisationSummarySerializer(serializers.ModelSerializer):
+    """Render a minimal organisation representation.
+
+    Attributes:
+        Meta: Declares the fields exposed to API consumers.
+    """
+
     class Meta:
         model = Organisation
         fields = ("id", "name")
 
 
 class AgentSummarySerializer(serializers.ModelSerializer):
+    """Render a minimal agent representation for contract payloads."""
+
     class Meta:
         model = AgentProfile
         fields = ("id", "display_name")
 
 
 class CollaboratorSummarySerializer(serializers.ModelSerializer):
+    """Expose collaborator role and email for quick lookups."""
+
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
@@ -42,6 +57,8 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
 
 
 class ClauseTemplateSerializer(serializers.ModelSerializer):
+    """Serialize clause templates with their human-readable labels."""
+
     category_label = serializers.CharField(
         source="get_category_display", read_only=True
     )
@@ -61,6 +78,8 @@ class ClauseTemplateSerializer(serializers.ModelSerializer):
 
 
 class ContractClauseSerializer(serializers.ModelSerializer):
+    """Serialize clauses including their source template when available."""
+
     template = ClauseTemplateSerializer(read_only=True)
     template_id = serializers.SerializerMethodField()
 
@@ -77,11 +96,22 @@ class ContractClauseSerializer(serializers.ModelSerializer):
         )
 
     def get_template_id(self, obj):
+        """Return the identifier of the linked template.
+
+        Args:
+            obj: Clause instance being serialized.
+
+        Returns:
+            str | None: Template UUID as a string when available.
+        """
+
         template = obj.template
         return str(template.id) if template else None
 
 
 class ContractSigningSerializer(serializers.ModelSerializer):
+    """Expose signing metadata captured from the e-signature provider."""
+
     initiated_by_email = serializers.EmailField(
         source="initiated_by.email", read_only=True
     )
@@ -108,6 +138,8 @@ class ContractSigningSerializer(serializers.ModelSerializer):
 
 
 class ContractLegalReviewSerializer(serializers.ModelSerializer):
+    """Summarise the legal review state and reviewers."""
+
     requested_by_email = serializers.EmailField(
         source="requested_by.email", read_only=True
     )
@@ -130,6 +162,8 @@ class ContractLegalReviewSerializer(serializers.ModelSerializer):
 
 
 class ContractVersionSerializer(serializers.ModelSerializer):
+    """Render contract versions along with their provenance."""
+
     created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
     source_revision_id = serializers.SerializerMethodField()
 
@@ -145,11 +179,22 @@ class ContractVersionSerializer(serializers.ModelSerializer):
         )
 
     def get_source_revision_id(self, obj):
+        """Return the originating revision identifier if present.
+
+        Args:
+            obj: ContractVersion instance being serialized.
+
+        Returns:
+            str | None: Revision UUID as a string when linked.
+        """
+
         revision = obj.source_revision
         return str(revision.id) if revision else None
 
 
 class ContractCommentSerializer(serializers.ModelSerializer):
+    """Serialize review comments with author details."""
+
     author_email = serializers.EmailField(source="author.email", read_only=True)
     clause_id = serializers.SerializerMethodField()
 
@@ -164,11 +209,22 @@ class ContractCommentSerializer(serializers.ModelSerializer):
         )
 
     def get_clause_id(self, obj):
+        """Return the clause identifier targeted by the comment.
+
+        Args:
+            obj: Comment instance being serialized.
+
+        Returns:
+            str | None: Clause UUID as a string when available.
+        """
+
         clause = obj.clause
         return str(clause.id) if clause else None
 
 
 class ContractSerializer(serializers.ModelSerializer):
+    """Return the full contract representation consumed by the UI."""
+
     organisation = OrganisationSummarySerializer(read_only=True)
     agent = AgentSummarySerializer(read_only=True)
     initiated_by = CollaboratorSummarySerializer(read_only=True)
@@ -204,6 +260,15 @@ class ContractSerializer(serializers.ModelSerializer):
         )
 
     def get_signed_file(self, obj):
+        """Return metadata about the signed PDF, if any.
+
+        Args:
+            obj: Contract instance being serialized.
+
+        Returns:
+            dict | None: Minimal file payload or ``None`` when absent.
+        """
+
         try:
             contract_file = obj.file
         except ContractFile.DoesNotExist:  # pragma: no cover - relationship missing
@@ -216,6 +281,15 @@ class ContractSerializer(serializers.ModelSerializer):
         }
 
     def get_legal_review(self, obj):
+        """Return the serialized legal review when it exists.
+
+        Args:
+            obj: Contract instance being serialized.
+
+        Returns:
+            dict | None: Serialized legal review payload or ``None``.
+        """
+
         try:
             review = obj.legal_review
         except ContractLegalReview.DoesNotExist:
@@ -224,6 +298,15 @@ class ContractSerializer(serializers.ModelSerializer):
         return ContractLegalReviewSerializer(review).data
 
     def get_signing(self, obj):
+        """Return the signing metadata when available.
+
+        Args:
+            obj: Contract instance being serialized.
+
+        Returns:
+            dict | None: Serialized signing payload or ``None``.
+        """
+
         try:
             signing = obj.signing
         except ContractSigning.DoesNotExist:
@@ -233,6 +316,8 @@ class ContractSerializer(serializers.ModelSerializer):
 
 
 class ContractCreateSerializer(serializers.ModelSerializer):
+    """Validate the minimal payload required to open a contract."""
+
     organisation_id = serializers.UUIDField(write_only=True)
     agent_id = serializers.UUIDField(write_only=True)
 
@@ -247,6 +332,19 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        """Ensure the requester can bind the contract parties.
+
+        Args:
+            attrs: Incoming data validated by DRF.
+
+        Returns:
+            dict: Mutated attributes with resolved foreign keys.
+
+        Raises:
+            serializers.ValidationError: When the organisation or agent is
+                missing or the user lacks permissions.
+        """
+
         request = self.context["request"]
         user = request.user
         organisation_id = attrs["organisation_id"]
@@ -277,6 +375,15 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Persist the contract and attach mandatory clauses.
+
+        Args:
+            validated_data: Sanitised payload produced by :meth:`validate`.
+
+        Returns:
+            Contract: Newly created contract instance.
+        """
+
         organisation = validated_data.pop("organisation")
         agent = validated_data.pop("agent")
         initiated_by = validated_data.pop("initiated_by", None)
@@ -294,6 +401,8 @@ class ContractCreateSerializer(serializers.ModelSerializer):
 
 
 class ContractClauseCreateSerializer(serializers.ModelSerializer):
+    """Handle clause creation while respecting optional templates."""
+
     template_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
@@ -305,6 +414,19 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        """Resolve the template and enforce basic field requirements.
+
+        Args:
+            attrs: Incoming data validated by DRF.
+
+        Returns:
+            dict: Mutated attributes ready for persistence.
+
+        Raises:
+            serializers.ValidationError: When identifiers are invalid or
+                required content is missing.
+        """
+
         template = None
         template_id = attrs.pop("template_id", None)
         if template_id is not None:
@@ -340,6 +462,15 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Persist the clause under the contract provided in context.
+
+        Args:
+            validated_data: Sanitised clause payload.
+
+        Returns:
+            ContractClause: Newly created clause instance.
+        """
+
         contract: Contract = self.context["contract"]
         template = validated_data.pop("template", None)
         return ContractClause.objects.create(
@@ -350,6 +481,8 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
 
 
 class ContractClauseUpdateSerializer(serializers.ModelSerializer):
+    """Handle clause updates triggered during negotiations."""
+
     template_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
@@ -357,6 +490,19 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
         fields = ("title", "content", "template_id")
 
     def validate(self, attrs):
+        """Apply template lookups and basic empty-field constraints.
+
+        Args:
+            attrs: Incoming data validated by DRF.
+
+        Returns:
+            dict: Attributes that can safely update the clause.
+
+        Raises:
+            serializers.ValidationError: If the template is unknown or fields
+                are blank.
+        """
+
         template_id = attrs.pop("template_id", None)
         if template_id is not None:
             try:
@@ -373,6 +519,16 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
+        """Apply updates while keeping template flags in sync.
+
+        Args:
+            instance: Clause instance to mutate.
+            validated_data: Sanitised clause payload.
+
+        Returns:
+            ContractClause: Updated clause instance.
+        """
+
         template = validated_data.pop("template", None)
         title_provided = "title" in self.initial_data
         content_provided = "content" in self.initial_data
@@ -402,10 +558,14 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
 
 
 class ContractStatusSerializer(serializers.Serializer):
+    """Validate requested status transitions for a contract."""
+
     status = serializers.ChoiceField(choices=Contract.Status.choices)
 
 
 class ContractRevisionSerializer(serializers.ModelSerializer):
+    """Serialize revisions along with the acting user."""
+
     proposed_by = serializers.SerializerMethodField()
     clauses_changed = ContractClauseSerializer(many=True, read_only=True)
 
@@ -421,6 +581,15 @@ class ContractRevisionSerializer(serializers.ModelSerializer):
         )
 
     def get_proposed_by(self, obj):
+        """Return a lightweight representation of the proposing user.
+
+        Args:
+            obj: ContractRevision instance being serialized.
+
+        Returns:
+            dict: Identifier and email of the user.
+        """
+
         user: User = obj.proposed_by
         return {
             "id": str(user.id),
@@ -429,12 +598,26 @@ class ContractRevisionSerializer(serializers.ModelSerializer):
 
 
 class ContractRevisionCreateSerializer(serializers.Serializer):
+    """Validate payloads used to create revisions."""
+
     clause_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, allow_empty=True
     )
     comment = serializers.CharField(required=False, allow_blank=True)
 
     def validate_clause_ids(self, value: Iterable[str]):
+        """Ensure referenced clauses belong to the contract.
+
+        Args:
+            value: Raw list of clause identifiers supplied by the client.
+
+        Returns:
+            list: Normalised list of clause IDs that exist on the contract.
+
+        Raises:
+            serializers.ValidationError: When unknown clauses are referenced.
+        """
+
         contract: Contract = self.context["contract"]
         clause_ids = set(value)
         existing_ids = set(
@@ -447,6 +630,8 @@ class ContractRevisionCreateSerializer(serializers.Serializer):
 
 
 class ContractCommentCreateSerializer(serializers.ModelSerializer):
+    """Validate comment creation targeting contract versions."""
+
     clause_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
@@ -454,6 +639,18 @@ class ContractCommentCreateSerializer(serializers.ModelSerializer):
         fields = ("body", "clause_id")
 
     def validate(self, attrs):
+        """Resolve the clause and attach it to the validated attributes.
+
+        Args:
+            attrs: Incoming data validated by DRF.
+
+        Returns:
+            dict: Attributes enriched with the clause relation.
+
+        Raises:
+            serializers.ValidationError: When the clause cannot be found.
+        """
+
         contract: Contract = self.context["contract"]
         clause_id = attrs.pop("clause_id", None)
         if clause_id is None:
@@ -471,6 +668,15 @@ class ContractCommentCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Persist the comment for the targeted contract version.
+
+        Args:
+            validated_data: Sanitised comment payload.
+
+        Returns:
+            ContractComment: Newly created comment instance.
+        """
+
         contract: Contract = self.context["contract"]
         version: ContractVersion = self.context["version"]
         author: User = self.context["author"]
@@ -484,20 +690,28 @@ class ContractCommentCreateSerializer(serializers.ModelSerializer):
 
 
 class ContractLegalReviewCreateSerializer(serializers.ModelSerializer):
+    """Validate the payload used to request a legal review."""
+
     class Meta:
         model = ContractLegalReview
         fields = ("notes",)
 
 
 class ContractLegalReviewVerifySerializer(serializers.Serializer):
+    """Validate additional notes supplied during legal verification."""
+
     verification_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class ContractSigningInitSerializer(serializers.Serializer):
+    """Validate the minimal payload to start the signing workflow."""
+
     envelope_id = serializers.CharField(max_length=255)
 
 
 class ContractSigningWebhookSerializer(serializers.Serializer):
+    """Validate webhook notifications coming from the e-signature tool."""
+
     contract_id = serializers.UUIDField()
     envelope_id = serializers.CharField(max_length=255)
     status = serializers.ChoiceField(choices=ContractSigning.Status.choices)

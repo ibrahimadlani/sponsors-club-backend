@@ -1,4 +1,4 @@
-"""Serializers for the follows application."""
+"""Serializers for translating follow records to API payloads."""
 
 from rest_framework import serializers
 
@@ -8,7 +8,13 @@ from .models import Follow
 
 
 class FollowSerializer(serializers.ModelSerializer):
-    """Serialize the follower relationship along with athlete details."""
+    """Expose follow details tailored for collaborator dashboards.
+
+    The serializer intentionally surfaces read-only fields because follow
+    creation is handled by dedicated endpoints. Serializing the embedded
+    athlete gives clients immediate access to presentation data without
+    triggering additional requests.
+    """
 
     athlete = AthletePublicSerializer(read_only=True)
 
@@ -24,4 +30,6 @@ class FollowSerializer(serializers.ModelSerializer):
             "notify_contracts",
             "created_at",
         )
+        # All fields are read-only because follow preferences are currently
+        # managed exclusively through follow/unfollow endpoints.
         read_only_fields = fields
