@@ -63,7 +63,6 @@ def seed_initial_versions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("contracts", "0005_alter_clausetemplate_category"),

@@ -69,26 +69,25 @@ class ContractViewSet(
             return Contract.objects.none()
 
         user = self.request.user
-        queryset = (
-            Contract.objects.select_related(
-                "organisation",
-                "agent__user",
-                "initiated_by__user",
-                "legal_review",
-                "signing",
-            )
-            .prefetch_related(
-                "clauses__template",
-                "revisions__clauses_changed",
-                Prefetch(
-                    "versions",
-                    queryset=ContractVersion.objects.order_by("number"),
+        queryset = Contract.objects.select_related(
+            "organisation",
+            "agent__user",
+            "initiated_by__user",
+            "legal_review",
+            "signing",
+        ).prefetch_related(
+            "clauses__template",
+            "revisions__clauses_changed",
+            Prefetch(
+                "versions",
+                queryset=ContractVersion.objects.order_by("number"),
+            ),
+            Prefetch(
+                "comments",
+                queryset=ContractComment.objects.select_related(
+                    "author", "clause", "version"
                 ),
-                Prefetch(
-                    "comments",
-                    queryset=ContractComment.objects.select_related("author", "clause", "version"),
-                ),
-            )
+            ),
         )
 
         if user.is_staff or user.is_superuser:
@@ -153,7 +152,9 @@ class ContractViewSet(
             organisation = collaborator.organisation
             if organisation.id in seen:
                 continue
-            organisations.append({"id": str(organisation.id), "name": organisation.name})
+            organisations.append(
+                {"id": str(organisation.id), "name": organisation.name}
+            )
             seen.add(organisation.id)
 
         agents = [
@@ -162,8 +163,7 @@ class ContractViewSet(
         ]
 
         statuses = [
-            {"value": value, "label": label}
-            for value, label in Contract.Status.choices
+            {"value": value, "label": label} for value, label in Contract.Status.choices
         ]
 
         return Response(
@@ -296,7 +296,9 @@ class ContractViewSet(
             Contract.Status.AGREEMENT,
         }:
             return Response(
-                {"detail": "Le contrat doit être en négociation pour valider l'accord."},
+                {
+                    "detail": "Le contrat doit être en négociation pour valider l'accord."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -364,8 +366,17 @@ class ContractViewSet(
 
         review.verified_by = request.user
         review.verified_at = timezone.now()
-        review.verification_notes = serializer.validated_data.get("verification_notes", "")
-        review.save(update_fields=["verified_by", "verified_at", "verification_notes", "updated_at"])
+        review.verification_notes = serializer.validated_data.get(
+            "verification_notes", ""
+        )
+        review.save(
+            update_fields=[
+                "verified_by",
+                "verified_at",
+                "verification_notes",
+                "updated_at",
+            ]
+        )
 
         contract.status = Contract.Status.SIGNING
         contract.save(update_fields=["status", "updated_at"])
@@ -448,7 +459,9 @@ class ContractViewSet(
         }:
             signing.completed_at = timezone.now()
 
-        signing.save(update_fields=["status", "last_payload", "completed_at", "updated_at"])
+        signing.save(
+            update_fields=["status", "last_payload", "completed_at", "updated_at"]
+        )
 
         if signing.status == ContractSigning.Status.COMPLETED:
             contract.status = Contract.Status.ACTIVE
@@ -483,7 +496,11 @@ class ContractViewSet(
         serializer = ContractVersionSerializer(versions, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["get", "post"], url_path="versions/(?P<version_id>[^/.]+)/comments")
+    @action(
+        detail=True,
+        methods=["get", "post"],
+        url_path="versions/(?P<version_id>[^/.]+)/comments",
+    )
     def version_comments(self, request, version_id=None, *args, **kwargs):
         contract = self.get_object()
 
@@ -560,7 +577,10 @@ class ContractViewSet(
         pdf_file.open("rb")
         filename = pdf_file.name.split("/")[-1]
         return FileResponse(
-            pdf_file, as_attachment=True, filename=filename, content_type="application/pdf"
+            pdf_file,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
         )
 
     def _is_owner(self, user, organisation_id):

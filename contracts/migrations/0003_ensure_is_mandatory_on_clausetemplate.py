@@ -7,7 +7,10 @@ def add_is_mandatory_field(apps, schema_editor):
     connection = schema_editor.connection
     with connection.cursor() as cursor:
         existing_columns = {
-            column.name for column in connection.introspection.get_table_description(cursor, table_name)
+            column.name
+            for column in connection.introspection.get_table_description(
+                cursor, table_name
+            )
         }
 
     if "is_mandatory" in existing_columns:
@@ -24,7 +27,10 @@ def remove_is_mandatory_field(apps, schema_editor):
     connection = schema_editor.connection
     with connection.cursor() as cursor:
         existing_columns = {
-            column.name for column in connection.introspection.get_table_description(cursor, table_name)
+            column.name
+            for column in connection.introspection.get_table_description(
+                cursor, table_name
+            )
         }
 
     if "is_mandatory" not in existing_columns:
@@ -35,7 +41,6 @@ def remove_is_mandatory_field(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "contracts",

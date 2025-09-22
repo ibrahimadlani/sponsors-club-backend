@@ -156,7 +156,9 @@ def test_add_clause_from_template_with_custom_content_marks_modified(
 
 
 @pytest.mark.django_db
-def test_contract_creation_flow(owner_client, organisations_setup, agent_user, mandatory_clause_template):
+def test_contract_creation_flow(
+    owner_client, organisations_setup, agent_user, mandatory_clause_template
+):
     """End-to-end check that contract creation seeds metadata and mandatory clauses."""
 
     organisation = organisations_setup["organisation"]
@@ -218,7 +220,9 @@ def test_update_clause_can_apply_new_template(
     )
     clause_id = response.json()["id"]
 
-    update_url = reverse("contract-update-clause", args=[created_contract.id, clause_id])
+    update_url = reverse(
+        "contract-update-clause", args=[created_contract.id, clause_id]
+    )
     patch = owner_client.patch(
         update_url,
         {"template_id": str(alternative_clause_template.id)},
@@ -245,7 +249,9 @@ def test_update_clause_with_template_and_custom_content_marks_modified(
     )
     clause_id = response.json()["id"]
 
-    update_url = reverse("contract-update-clause", args=[created_contract.id, clause_id])
+    update_url = reverse(
+        "contract-update-clause", args=[created_contract.id, clause_id]
+    )
     patch = owner_client.patch(
         update_url,
         {
@@ -261,7 +267,9 @@ def test_update_clause_with_template_and_custom_content_marks_modified(
 
 
 @pytest.mark.django_db
-def test_list_clause_templates(owner_client, mandatory_clause_template, optional_clause_template):
+def test_list_clause_templates(
+    owner_client, mandatory_clause_template, optional_clause_template
+):
     url = reverse("clause-template-list")
     response = owner_client.get(url)
     assert response.status_code == status.HTTP_200_OK
@@ -311,7 +319,9 @@ def test_revision_acceptance_creates_new_version(
     optional_clause_template,
 ):
     add_url = reverse("contract-add-clause", args=[created_contract.id])
-    owner_client.post(add_url, {"template_id": str(optional_clause_template.id)}, format="json")
+    owner_client.post(
+        add_url, {"template_id": str(optional_clause_template.id)}, format="json"
+    )
 
     clause = created_contract.clauses.filter(is_mandatory=False).first()
 
@@ -410,7 +420,9 @@ def test_legal_review_requires_dual_agreement(
     created_contract,
 ):
     status_url = reverse("contract-change-status", args=[created_contract.id])
-    owner_client.patch(status_url, {"status": Contract.Status.NEGOTIATION}, format="json")
+    owner_client.patch(
+        status_url, {"status": Contract.Status.NEGOTIATION}, format="json"
+    )
 
     agree_url = reverse("contract-agree", args=[created_contract.id])
     owner_client.post(agree_url, format="json")
@@ -436,7 +448,9 @@ def test_legal_verification_and_signing_flow(
     created_contract,
 ):
     status_url = reverse("contract-change-status", args=[created_contract.id])
-    owner_client.patch(status_url, {"status": Contract.Status.NEGOTIATION}, format="json")
+    owner_client.patch(
+        status_url, {"status": Contract.Status.NEGOTIATION}, format="json"
+    )
 
     agree_url = reverse("contract-agree", args=[created_contract.id])
     owner_client.post(agree_url, format="json")
@@ -594,8 +608,8 @@ def test_export_pdf_downloadable(owner_client, created_contract):
     response = owner_client.get(export_url)
     assert response.status_code == status.HTTP_200_OK
     disposition = response["Content-Disposition"]
-    assert disposition.startswith("attachment; filename=\"")
-    assert disposition.endswith(".pdf\"")
+    assert disposition.startswith('attachment; filename="')
+    assert disposition.endswith('.pdf"')
 
     detail_url = reverse("contract-detail", args=[created_contract.id])
     detail_payload = owner_client.get(detail_url).json()

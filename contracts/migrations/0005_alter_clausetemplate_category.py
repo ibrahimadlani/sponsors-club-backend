@@ -44,7 +44,6 @@ def backwards(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("contracts", "0004_update_contract_workflow_models"),
     ]

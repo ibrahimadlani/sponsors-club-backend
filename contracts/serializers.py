@@ -42,7 +42,9 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
 
 
 class ClauseTemplateSerializer(serializers.ModelSerializer):
-    category_label = serializers.CharField(source="get_category_display", read_only=True)
+    category_label = serializers.CharField(
+        source="get_category_display", read_only=True
+    )
 
     class Meta:
         model = ClauseTemplate
@@ -80,7 +82,9 @@ class ContractClauseSerializer(serializers.ModelSerializer):
 
 
 class ContractSigningSerializer(serializers.ModelSerializer):
-    initiated_by_email = serializers.EmailField(source="initiated_by.email", read_only=True)
+    initiated_by_email = serializers.EmailField(
+        source="initiated_by.email", read_only=True
+    )
 
     class Meta:
         model = ContractSigning
@@ -104,8 +108,12 @@ class ContractSigningSerializer(serializers.ModelSerializer):
 
 
 class ContractLegalReviewSerializer(serializers.ModelSerializer):
-    requested_by_email = serializers.EmailField(source="requested_by.email", read_only=True)
-    verified_by_email = serializers.EmailField(source="verified_by.email", read_only=True)
+    requested_by_email = serializers.EmailField(
+        source="requested_by.email", read_only=True
+    )
+    verified_by_email = serializers.EmailField(
+        source="verified_by.email", read_only=True
+    )
 
     class Meta:
         model = ContractLegalReview
@@ -247,7 +255,9 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         try:
             organisation = Organisation.objects.get(id=organisation_id)
         except Organisation.DoesNotExist as exc:  # pragma: no cover - defensive
-            raise serializers.ValidationError({"organisation_id": "Organisation not found."}) from exc
+            raise serializers.ValidationError(
+                {"organisation_id": "Organisation not found."}
+            ) from exc
 
         try:
             agent = AgentProfile.objects.get(id=agent_id)
@@ -301,22 +311,25 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
             try:
                 template = ClauseTemplate.objects.get(id=template_id)
             except ClauseTemplate.DoesNotExist as exc:
-                raise serializers.ValidationError({"template_id": "Template not found."}) from exc
+                raise serializers.ValidationError(
+                    {"template_id": "Template not found."}
+                ) from exc
 
         title_provided = "title" in self.initial_data
         content_provided = "content" in self.initial_data
 
         if template:
             final_title = attrs.get("title") if title_provided else template.title
-            final_content = attrs.get("content") if content_provided else template.content
+            final_content = (
+                attrs.get("content") if content_provided else template.content
+            )
             attrs["title"] = final_title or template.title
             attrs["content"] = final_content or template.content
             attrs["template"] = template
             attrs["is_mandatory"] = template.is_mandatory
             attrs["is_modified"] = (
-                (title_provided and attrs["title"] != template.title)
-                or (content_provided and attrs["content"] != template.content)
-            )
+                title_provided and attrs["title"] != template.title
+            ) or (content_provided and attrs["content"] != template.content)
         else:
             if not attrs.get("title"):
                 raise serializers.ValidationError({"title": "Title is required."})
@@ -349,7 +362,9 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
             try:
                 attrs["template"] = ClauseTemplate.objects.get(id=template_id)
             except ClauseTemplate.DoesNotExist as exc:
-                raise serializers.ValidationError({"template_id": "Template not found."}) from exc
+                raise serializers.ValidationError(
+                    {"template_id": "Template not found."}
+                ) from exc
 
         if "title" in attrs and not attrs["title"]:
             raise serializers.ValidationError({"title": "Title cannot be blank."})
@@ -448,7 +463,9 @@ class ContractCommentCreateSerializer(serializers.ModelSerializer):
         try:
             clause = contract.clauses.get(id=clause_id)
         except ContractClause.DoesNotExist as exc:
-            raise serializers.ValidationError({"clause_id": "Clause not found."}) from exc
+            raise serializers.ValidationError(
+                {"clause_id": "Clause not found."}
+            ) from exc
 
         attrs["clause"] = clause
         return attrs
@@ -485,4 +502,3 @@ class ContractSigningWebhookSerializer(serializers.Serializer):
     envelope_id = serializers.CharField(max_length=255)
     status = serializers.ChoiceField(choices=ContractSigning.Status.choices)
     payload = serializers.JSONField(required=False)
-

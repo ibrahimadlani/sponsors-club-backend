@@ -28,7 +28,10 @@ class ClauseTemplate(BaseModel):
         LEGAL_OBLIGATIONS = "legal_obligations", "Obligatoires (juridiques)"
         FINANCIAL = "financial", "Financières"
         ATHLETE_OBLIGATIONS = "athlete_obligations", "Obligations de l’athlète"
-        ORGANISATION_OBLIGATIONS = "organisation_obligations", "Obligations de l’organisation"
+        ORGANISATION_OBLIGATIONS = (
+            "organisation_obligations",
+            "Obligations de l’organisation",
+        )
         INTELLECTUAL_PROPERTY = "intellectual_property", "Propriété intellectuelle"
         CONFIDENTIALITY = "confidentiality", "Confidentialité"
         PERFORMANCE = "performance", "Performance"
@@ -98,7 +101,9 @@ class Contract(BaseModel):
     class Meta:
         ordering = ("-created_at",)
         indexes = [
-            models.Index(fields=("organisation", "status"), name="contracts_org_status_idx"),
+            models.Index(
+                fields=("organisation", "status"), name="contracts_org_status_idx"
+            ),
             models.Index(fields=("agent",), name="contracts_agent_idx"),
         ]
 
@@ -144,11 +149,13 @@ class Contract(BaseModel):
             changed = True
 
         if changed:
-            self.save(update_fields=[
-                "owner_agreed_at",
-                "agent_agreed_at",
-                "updated_at",
-            ])
+            self.save(
+                update_fields=[
+                    "owner_agreed_at",
+                    "agent_agreed_at",
+                    "updated_at",
+                ]
+            )
 
         return changed
 

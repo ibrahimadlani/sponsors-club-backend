@@ -90,7 +90,6 @@ def seed_clause_defaults(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "contracts",

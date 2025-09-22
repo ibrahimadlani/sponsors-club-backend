@@ -49,9 +49,7 @@ urlpatterns = [
     ),
     path(
         "poc/contracts/agent/",
-        TemplateView.as_view(
-            template_name="poc/contracts_agent_revisions.html"
-        ),
+        TemplateView.as_view(template_name="poc/contracts_agent_revisions.html"),
         name="poc-contracts-agent",
     ),
 ]
