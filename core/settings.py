@@ -160,7 +160,7 @@ STRIPE_API_VERSION = os.environ.get("STRIPE_API_VERSION", "2024-06-20")
 # breaking tests if they are absent.
 AWS_SES_ACCESS_KEY_ID = os.environ.get("AWS_SES_ACCESS_KEY_ID", "")
 AWS_SES_SECRET_ACCESS_KEY = os.environ.get("AWS_SES_SECRET_ACCESS_KEY", "")
-AWS_SES_REGION_NAME = os.environ.get("AWS_SES_REGION_NAME", "us-east-1")
+AWS_SES_REGION_NAME = os.environ.get("AWS_SES_REGION_NAME", "eu-west-3")
 AWS_SES_SOURCE_EMAIL = os.environ.get(
     "AWS_SES_SOURCE_EMAIL", "no-reply@sponsors-club.test"
 )
