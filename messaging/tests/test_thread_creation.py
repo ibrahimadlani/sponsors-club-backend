@@ -10,7 +10,15 @@ from organisations.models import Collaborator
 
 @pytest.fixture(name="thread_payload_data")
 def fixture_thread_payload(agent_user, organisations_setup):
-    """Return the canonical payload for creating a thread."""
+    """Return the canonical payload for creating a thread.
+
+    Args:
+        agent_user (User): Agent initiating the conversation.
+        organisations_setup (dict): Fixture-provided collaborator bundle.
+
+    Returns:
+        dict: Payload containing the collaborator and agent identifiers.
+    """
 
     collaborator = organisations_setup["collaborator"]
     return {
@@ -23,7 +31,12 @@ def fixture_thread_payload(agent_user, organisations_setup):
 def test_agent_without_subscription_cannot_create_thread(
     agent_user, thread_payload_data
 ):
-    """Agents without the messaging feature should be denied."""
+    """Ensure agents without the messaging feature are denied access.
+
+    Args:
+        agent_user (User): Agent account lacking the subscription.
+        thread_payload_data (dict): Baseline request payload.
+    """
 
     client = APIClient()
     client.force_authenticate(user=agent_user)
@@ -41,7 +54,13 @@ def test_agent_with_subscription_can_create_thread(
     agent_subscription,
     thread_payload_data,
 ):
-    """Agents with an appropriate subscription should create threads successfully."""
+    """Verify agents with the feature can open new threads.
+
+    Args:
+        agent_user (User): Agent requesting the thread.
+        agent_subscription (Subscription): Active plan enabling messaging.
+        thread_payload_data (dict): Baseline request payload.
+    """
 
     del agent_subscription
 
@@ -54,7 +73,12 @@ def test_agent_with_subscription_can_create_thread(
 
 @pytest.mark.django_db
 def test_collaborator_can_create_thread(owner_user, agent_user):
-    """Collaborators may create threads when selecting an agent."""
+    """Ensure collaborators can initiate threads.
+
+    Args:
+        owner_user (User): Organisation owner acting as collaborator.
+        agent_user (User): Target agent for the conversation.
+    """
 
     payload = {
         "agent_id": str(agent_user.agent_profile.id),

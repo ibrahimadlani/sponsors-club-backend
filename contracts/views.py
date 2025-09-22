@@ -46,7 +46,13 @@ from .serializers import (
 
 
 class ClauseTemplateViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    """Expose the available clause templates for contract drafting."""
+    """Expose the available clause templates for contract drafting.
+
+    Attributes:
+        permission_classes: Authentication requirement for listing templates.
+        serializer_class: Serializer used to render templates.
+        queryset: Base queryset ordered for predictable UI grouping.
+    """
 
     permission_classes = (IsAuthenticated,)
     serializer_class = ClauseTemplateSerializer
@@ -59,12 +65,23 @@ class ContractViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Expose the contract workflow through REST endpoints."""
+    """Expose the contract workflow through REST endpoints.
+
+    Attributes:
+        permission_classes: Guards the viewset behind authentication.
+        serializer_class: Default serializer used for contract retrieval.
+    """
 
     permission_classes = (IsAuthenticated,)
     serializer_class = ContractSerializer
 
     def get_queryset(self):
+        """Return the base queryset tailored to the requesting user.
+
+        Returns:
+            QuerySet: Contracts visible to the authenticated user.
+        """
+
         if getattr(self, "swagger_fake_view", False):  # pragma: no cover
             return Contract.objects.none()
 
@@ -105,32 +122,73 @@ class ContractViewSet(
             filters |= Q(agent=agent_profile)
 
         if not filters:
+            # Returning ``none()`` prevents leaking contracts to unrelated users.
             return Contract.objects.none()
 
         return queryset.filter(filters).distinct()
 
     def get_serializer_class(self):
+        """Pick the serializer matching the current viewset action.
+
+        Returns:
+            Type[Serializer]: Serializer class used for serialization.
+        """
+
         if self.action == "create":
             return ContractCreateSerializer
         return super().get_serializer_class()
 
     def list(self, request, *args, **kwargs):
+        """Return the list of contracts visible to the user.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized list of contracts.
+        """
+
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
+        """Return a single contract resource.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized contract representation.
+        """
+
         contract = self.get_object()
         serializer = self.get_serializer(contract)
         return Response(serializer.data)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        """Create a new contract and seed mandatory clauses.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized contract after creation.
+        """
+
         serializer = ContractCreateSerializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
         contract = serializer.save()
+        # Version ``1`` captures the automatically generated clause baseline.
         contract.bump_version(created_by=request.user, notes="Initial version")
         contract.refresh_from_db()
         output = ContractSerializer(contract, context=self.get_serializer_context())
@@ -138,7 +196,16 @@ class ContractViewSet(
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request, *args, **kwargs):
-        """Return helper metadata used by the proof-of-concept UI."""
+        """Return helper metadata used by the proof-of-concept UI.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Metadata required by the front-end form.
+        """
 
         collaborator_entries = (
             Collaborator.objects.filter(user=request.user)
@@ -152,6 +219,8 @@ class ContractViewSet(
             organisation = collaborator.organisation
             if organisation.id in seen:
                 continue
+            # ``seen`` avoids duplicates when a user is a collaborator multiple
+            # times with different roles.
             organisations.append(
                 {"id": str(organisation.id), "name": organisation.name}
             )
@@ -176,6 +245,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["post"], url_path="clauses")
     def add_clause(self, request, *args, **kwargs):
+        """Create a new clause attached to the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized clause on success or an error response.
+        """
+
         contract = self.get_object()
         if not self._can_edit_clauses(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -190,6 +270,18 @@ class ContractViewSet(
 
     @action(detail=True, methods=["patch"], url_path="clauses/(?P<clause_id>[^/.]+)")
     def update_clause(self, request, clause_id=None, *args, **kwargs):
+        """Update an existing clause.
+
+        Args:
+            request: Incoming HTTP request.
+            clause_id: Identifier of the clause to update.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized clause or an error payload.
+        """
+
         contract = self.get_object()
         clause = self._get_clause(contract, clause_id)
 
@@ -206,6 +298,18 @@ class ContractViewSet(
 
     @update_clause.mapping.delete
     def delete_clause(self, request, clause_id=None, *args, **kwargs):
+        """Remove a non-mandatory clause from the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            clause_id: Identifier of the clause to delete.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Empty payload with the appropriate HTTP status.
+        """
+
         contract = self.get_object()
         clause = self._get_clause(contract, clause_id)
 
@@ -220,6 +324,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["post"], url_path="revisions")
     def create_revision(self, request, *args, **kwargs):
+        """Create a revision entry for the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized revision payload.
+        """
+
         contract = self.get_object()
         if not self._can_propose_revision(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -242,6 +357,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["get"], url_path="revisions")
     def list_revisions(self, request, *args, **kwargs):
+        """Return all revisions associated with the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized revision list.
+        """
+
         contract = self.get_object()
         if not self._user_can_view(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -255,6 +381,18 @@ class ContractViewSet(
         url_path="revisions/(?P<revision_id>[^/.]+)/accept",
     )
     def accept_revision(self, request, revision_id=None, *args, **kwargs):
+        """Mark a revision as accepted and bump the contract version.
+
+        Args:
+            request: Incoming HTTP request.
+            revision_id: Identifier of the revision to accept.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized revision after acceptance.
+        """
+
         contract = self.get_object()
         if not self._is_collaborator(request.user, contract.organisation_id):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -281,6 +419,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["post"], url_path="agree")
     def agree(self, request, *args, **kwargs):
+        """Record the user's agreement on the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Updated contract payload or an error message.
+        """
+
         contract = self.get_object()
         user = request.user
 
@@ -310,6 +459,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["post"], url_path="legal/review")
     def create_legal_review(self, request, *args, **kwargs):
+        """Start the legal review phase for a contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized legal review entry.
+        """
+
         contract = self.get_object()
 
         if not self._is_owner(request.user, contract.organisation_id):
@@ -348,6 +508,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["patch"], url_path="legal/verify")
     def verify_legal_review(self, request, *args, **kwargs):
+        """Mark the legal review as complete and progress to signing.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized legal review entry.
+        """
+
         contract = self.get_object()
 
         if not (request.user.is_staff or request.user.is_superuser):
@@ -386,6 +557,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["post"], url_path="signing/init")
     def init_signing(self, request, *args, **kwargs):
+        """Create or update the signing envelope information.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized signing payload.
+        """
+
         contract = self.get_object()
 
         if not self._is_owner(request.user, contract.organisation_id):
@@ -414,6 +596,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["get"], url_path="signing/status")
     def signing_status(self, request, *args, **kwargs):
+        """Return signing status for a contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized signing details.
+        """
+
         contract = self.get_object()
         if not self._user_can_view(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -433,6 +626,17 @@ class ContractViewSet(
         permission_classes=[AllowAny],
     )
     def signing_webhook(self, request, *args, **kwargs):
+        """Process a webhook coming from the e-signature provider.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized signing payload after updates or an error.
+        """
+
         serializer = ContractSigningWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -468,12 +672,25 @@ class ContractViewSet(
             contract.save(update_fields=["status", "updated_at"])
         elif signing.status == ContractSigning.Status.DECLINED:
             contract.status = Contract.Status.NEGOTIATION
+            # Falling back to negotiation gives collaborators room to amend
+            # clauses before re-initiating a new signing envelope.
             contract.save(update_fields=["status", "updated_at"])
 
         return Response(ContractSigningSerializer(signing).data)
 
     @action(detail=True, methods=["post"], url_path="expire")
     def expire(self, request, *args, **kwargs):
+        """Force a contract into the expired state.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized contract payload after the change.
+        """
+
         contract = self.get_object()
 
         if not (request.user.is_staff or request.user.is_superuser):
@@ -487,6 +704,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["get"], url_path="versions")
     def list_versions(self, request, *args, **kwargs):
+        """Return the version history of a contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized version list.
+        """
+
         contract = self.get_object()
 
         if not self._user_can_view(request.user, contract):
@@ -502,6 +730,18 @@ class ContractViewSet(
         url_path="versions/(?P<version_id>[^/.]+)/comments",
     )
     def version_comments(self, request, version_id=None, *args, **kwargs):
+        """List or create comments for a specific contract version.
+
+        Args:
+            request: Incoming HTTP request.
+            version_id: Identifier of the version whose comments are targeted.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized comments or creation output.
+        """
+
         contract = self.get_object()
 
         if not self._user_can_view(request.user, contract):
@@ -529,6 +769,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["patch"], url_path="status")
     def change_status(self, request, *args, **kwargs):
+        """Apply a status transition after validating permissions.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized contract payload after the transition.
+        """
+
         contract = self.get_object()
         if not self._is_owner(request.user, contract.organisation_id):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -561,6 +812,17 @@ class ContractViewSet(
 
     @action(detail=True, methods=["get"], url_path="export")
     def export_pdf(self, request, *args, **kwargs):
+        """Return the signed PDF file associated with the contract.
+
+        Args:
+            request: Incoming HTTP request.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            FileResponse: Response streaming the PDF file.
+        """
+
         contract = self.get_object()
         if not self._user_can_view(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -584,6 +846,16 @@ class ContractViewSet(
         )
 
     def _is_owner(self, user, organisation_id):
+        """Return whether the user owns the given organisation.
+
+        Args:
+            user: Authenticated user to inspect.
+            organisation_id: Organisation identifier to match.
+
+        Returns:
+            bool: ``True`` if the user is an owner, ``False`` otherwise.
+        """
+
         return Collaborator.objects.filter(
             user=user,
             organisation_id=organisation_id,
@@ -591,11 +863,31 @@ class ContractViewSet(
         ).exists()
 
     def _is_collaborator(self, user, organisation_id):
+        """Return whether the user collaborates with the organisation.
+
+        Args:
+            user: Authenticated user to inspect.
+            organisation_id: Organisation identifier to match.
+
+        Returns:
+            bool: ``True`` if the user collaborates, ``False`` otherwise.
+        """
+
         return Collaborator.objects.filter(
             user=user, organisation_id=organisation_id
         ).exists()
 
     def _user_can_view(self, user, contract):
+        """Determine whether the user can access the contract details.
+
+        Args:
+            user: Authenticated user to inspect.
+            contract: Contract record being accessed.
+
+        Returns:
+            bool: ``True`` if the user has viewing rights.
+        """
+
         if user.is_staff or user.is_superuser:
             return True
         if self._is_collaborator(user, contract.organisation_id):
@@ -604,29 +896,85 @@ class ContractViewSet(
         return bool(agent_profile and agent_profile == contract.agent)
 
     def _can_edit_clauses(self, user, contract):
+        """Return whether the user can create or update clauses.
+
+        Args:
+            user: Authenticated user to inspect.
+            contract: Contract subject to editing.
+
+        Returns:
+            bool: ``True`` when the user can edit clauses.
+        """
+
         if contract.status not in {Contract.Status.DRAFT, Contract.Status.NEGOTIATION}:
             return False
         return self._is_collaborator(user, contract.organisation_id)
 
     def _can_propose_revision(self, user, contract):
+        """Return whether the user can propose a contract revision.
+
+        Args:
+            user: Authenticated user to inspect.
+            contract: Contract subject to the revision.
+
+        Returns:
+            bool: ``True`` when the user may create a revision.
+        """
+
         if self._is_collaborator(user, contract.organisation_id):
             return True
         agent_profile = getattr(user, "agent_profile", None)
         return bool(agent_profile and agent_profile == contract.agent)
 
     def _get_clause(self, contract, clause_id):
+        """Fetch a clause within a contract or raise ``Http404``.
+
+        Args:
+            contract: Contract housing the clause.
+            clause_id: Identifier of the clause to retrieve.
+
+        Returns:
+            ContractClause: Clause instance when found.
+
+        Raises:
+            Http404: If the clause cannot be located.
+        """
+
         try:
             return contract.clauses.get(id=clause_id)
         except ContractClause.DoesNotExist as exc:
             raise Http404 from exc
 
     def _get_version(self, contract, version_id):
+        """Fetch a contract version or raise ``Http404``.
+
+        Args:
+            contract: Contract housing the version.
+            version_id: Identifier of the version to fetch.
+
+        Returns:
+            ContractVersion: Version instance when found.
+
+        Raises:
+            Http404: If the version cannot be located.
+        """
+
         try:
             return contract.versions.get(id=version_id)
         except ContractVersion.DoesNotExist as exc:
             raise Http404 from exc
 
     def _is_valid_transition(self, current_status, new_status):
+        """Validate status transitions for the contract lifecycle.
+
+        Args:
+            current_status: The contract's current status value.
+            new_status: Desired status value.
+
+        Returns:
+            bool: ``True`` when the transition is authorised.
+        """
+
         transitions = {
             Contract.Status.DRAFT: {
                 Contract.Status.DRAFT,
