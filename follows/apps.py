@@ -20,4 +20,3 @@ class FollowsConfig(AppConfig):
         # Importing within ``ready`` ensures signal modules are loaded exactly
         # once when Django starts, avoiding circular imports during tests.
         from . import signals  # noqa: F401  pylint: disable=unused-import
-
