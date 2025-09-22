@@ -1,7 +1,5 @@
 """Router registration for contract endpoints."""
 
-"""URL routing for the contracts API endpoints."""
-
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
