@@ -38,9 +38,12 @@ class Sport(BaseModel):
         discipline (str): Sub-discipline or event to help filter athletes.
     """
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     # Discipline provides additional granularity, such as "Track" vs "Field".
+
     discipline = models.CharField(max_length=255)
+    class Meta:
+        unique_together = ("name", "discipline")
 
     def __str__(self):
         return str(self.name)
