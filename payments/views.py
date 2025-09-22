@@ -1,5 +1,9 @@
 """Views powering the payments API."""
 
+# The module integrates with Stripe for subscription checkout, plan management,
+# and webhook ingestion. Detailed docstrings explain each helper so the
+# accounting and entitlement logic is easy to audit.
+
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone as datetime_timezone
@@ -49,7 +53,15 @@ class StripeConfigurationError(Exception):
 
 
 def _require_stripe_secret_key() -> str:
-    """Ensure a Stripe secret key is configured before making API calls."""
+    """Ensure a Stripe secret key is configured before making API calls.
+
+    Returns:
+        str: Configured Stripe secret key used for API authentication.
+
+    Raises:
+        StripeConfigurationError: If the project settings do not define a
+            usable secret key.
+    """
 
     secret_key = getattr(settings, "STRIPE_SECRET_KEY", "") or ""
     if not secret_key:
@@ -60,14 +72,33 @@ def _require_stripe_secret_key() -> str:
 
 
 def _decimal_to_cents(amount: Decimal) -> int:
-    """Convert a decimal amount to minor currency units (cents)."""
+    """Convert a decimal amount to minor currency units (cents).
+
+    Args:
+        amount (Decimal): Monetary amount expressed in major currency units.
+
+    Returns:
+        int: Value converted to cents after rounding to two decimal places.
+    """
 
     quantized = (amount or Decimal("0")).quantize(Decimal("0.01"), ROUND_HALF_UP)
     return int((quantized * 100).to_integral_value(rounding=ROUND_HALF_UP))
 
 
 def _ensure_plan_product(plan: SubscriptionPlan) -> str:
-    """Ensure a Stripe product exists for the given plan."""
+    """Ensure a Stripe product exists for the given plan.
+
+    Args:
+        plan (SubscriptionPlan): Plan whose product should be verified or
+            created on Stripe.
+
+    Returns:
+        str: Identifier of the Stripe product associated with the plan.
+
+    Raises:
+        StripePlanConfigurationError: If the product cannot be retrieved or
+            created due to API errors.
+    """
 
     if plan.stripe_product_id:
         try:
@@ -116,7 +147,17 @@ def _ensure_plan_product(plan: SubscriptionPlan) -> str:
 def _select_matching_price(
     prices: Iterable[Any], plan: SubscriptionPlan
 ) -> Optional[str]:
-    """Return the identifier of a price that matches the plan amount and currency."""
+    """Return the identifier of a price that matches the plan amount and currency.
+
+    Args:
+        prices (Iterable[Any]): Price objects or dictionaries returned by the
+            Stripe API.
+        plan (SubscriptionPlan): Plan whose pricing configuration we compare
+            against.
+
+    Returns:
+        Optional[str]: Matching Stripe price identifier if one exists.
+    """
 
     target_currency = (plan.currency or "").lower()
     expected_amount = _decimal_to_cents(plan.price)
@@ -149,7 +190,19 @@ def _select_matching_price(
 
 
 def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
-    """Ensure the plan is associated with an active Stripe price."""
+    """Ensure the plan is associated with an active Stripe price.
+
+    Args:
+        plan (SubscriptionPlan): Plan whose Stripe price should be confirmed.
+
+    Returns:
+        str: Identifier of the verified or newly created Stripe price.
+
+    Raises:
+        StripeConfigurationError: If Stripe credentials are missing.
+        StripePlanConfigurationError: If Stripe rejects product or price
+            requests.
+    """
 
     _require_stripe_secret_key()
 
@@ -214,7 +267,16 @@ def ensure_plan_price_id(plan: SubscriptionPlan) -> str:
 
 
 def timestamp_to_datetime(timestamp: Optional[Any]) -> Optional[datetime]:
-    """Convert a Stripe timestamp to an aware datetime."""
+    """Convert a Stripe timestamp to an aware datetime.
+
+    Args:
+        timestamp (Optional[Any]): Unix timestamp or timestamp string returned
+            by Stripe.
+
+    Returns:
+        Optional[datetime]: Aware datetime in UTC when parsing succeeds, else
+            ``None`` when the payload is empty or malformed.
+    """
 
     if timestamp in (None, ""):
         return None
@@ -225,7 +287,14 @@ def timestamp_to_datetime(timestamp: Optional[Any]) -> Optional[datetime]:
 
 
 def to_plain_dict(payload: Any) -> Dict[str, Any]:
-    """Convert Stripe objects to dictionaries for easier handling."""
+    """Convert Stripe objects to dictionaries for easier handling.
+
+    Args:
+        payload (Any): Stripe object, dictionary, or plain Python structure.
+
+    Returns:
+        Dict[str, Any]: Serializable dictionary representation of ``payload``.
+    """
 
     if isinstance(payload, dict):
         return payload
@@ -239,7 +308,17 @@ def to_plain_dict(payload: Any) -> Dict[str, Any]:
 def resolve_subscription_plan(
     data_object: Dict[str, Any], metadata: Dict[str, Any]
 ) -> Optional[SubscriptionPlan]:
-    """Resolve the subscription plan matching the Stripe payload."""
+    """Resolve the subscription plan matching the Stripe payload.
+
+    Args:
+        data_object (dict): Stripe subscription or checkout object payload.
+        metadata (dict): Metadata accompanying the payload that may reference
+            the plan or scope identifiers.
+
+    Returns:
+        Optional[SubscriptionPlan]: Plan matched from identifiers, or ``None``
+            when the payload cannot be mapped to a configured plan.
+    """
 
     plan_id = metadata.get("plan_id")
     if plan_id:
@@ -272,7 +351,17 @@ def sync_subscription_from_payload(
     data_object: Dict[str, Any],
     fallback_metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Subscription]:
-    """Create or update a subscription from Stripe webhook data."""
+    """Create or update a subscription from Stripe webhook data.
+
+    Args:
+        data_object (dict): Stripe subscription payload taken from an event.
+        fallback_metadata (Optional[dict]): Metadata to use when the payload does
+            not include metadata directly.
+
+    Returns:
+        Optional[Subscription]: Subscription instance after synchronisation, or
+            ``None`` when required context is missing.
+    """
 
     metadata = data_object.get("metadata") or fallback_metadata or {}
     subscription_id = data_object.get("id")
@@ -368,12 +457,21 @@ def sync_subscription_from_payload(
 
 
 class PlanListView(APIView):
-    """List active subscription plans."""
+    """List active subscription plans for public browsing."""
 
     permission_classes = (permissions.AllowAny,)
 
     def get(self, request, *args, **kwargs):
-        """Return all active plans ordered by price."""
+        """Return all active plans ordered by price.
+
+        Args:
+            request (Request): Incoming HTTP request.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Serialized plans sorted from the lowest to highest price.
+        """
 
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by("price")
         serializer = SubscriptionPlanSerializer(plans, many=True)
@@ -386,7 +484,17 @@ class StripeCheckoutSessionView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
-        """Create a Stripe Checkout session tied to the requested plan."""
+        """Create a Stripe Checkout session tied to the requested plan.
+
+        Args:
+            request (Request): Incoming HTTP request containing payload data.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Stripe session payload or error details when configuration
+                problems are detected.
+        """
 
         del args, kwargs
 
@@ -413,6 +521,8 @@ class StripeCheckoutSessionView(APIView):
         except StripePlanConfigurationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Metadata helps reconcile Stripe events with the correct plan and user
+        # scope once the webhook fires.
         metadata: Dict[str, str] = {
             "plan_id": str(plan.id),
             "plan_code": plan.code,
@@ -429,6 +539,8 @@ class StripeCheckoutSessionView(APIView):
         if request.user.email:
             metadata["user_email"] = request.user.email
 
+        # The checkout session is configured in subscription mode so Stripe
+        # manages the billing cycle and sends subsequent webhook updates.
         session_payload: Dict[str, Any] = {
             "mode": "subscription",
             "success_url": success_url,
@@ -479,7 +591,16 @@ class SubscriptionCreateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
-        """Validate payload and create a subscription."""
+        """Validate payload and create a subscription.
+
+        Args:
+            request (Request): Incoming HTTP request from the client.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Representation of the created subscription.
+        """
 
         del args, kwargs
 
@@ -501,7 +622,15 @@ class MySubscriptionView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_subscription(self, request):
-        """Fetch the most relevant active subscription for the user."""
+        """Fetch the most relevant active subscription for the user.
+
+        Args:
+            request (Request): Request used to identify the authenticated user.
+
+        Returns:
+            Optional[Subscription]: Matching subscription prioritising agent
+                scope before organisation scope.
+        """
 
         user = request.user
         active_statuses = (
@@ -510,6 +639,8 @@ class MySubscriptionView(APIView):
             Subscription.Status.INCOMPLETE,
         )
 
+        # Limit to active-like statuses; cancelled subscriptions should not be
+        # exposed when retrieving the current subscription.
         queryset = Subscription.objects.filter(status__in=active_statuses)
 
         try:
@@ -540,7 +671,16 @@ class MySubscriptionView(APIView):
         return None
 
     def get(self, request, *args, **kwargs):
-        """Return the user's subscription details."""
+        """Return the user's subscription details.
+
+        Args:
+            request (Request): Incoming HTTP request.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Subscription data when found, otherwise a 404 payload.
+        """
 
         del args, kwargs
 
@@ -553,7 +693,17 @@ class MySubscriptionView(APIView):
         return Response(SubscriptionSerializer(subscription).data)
 
     def delete(self, request, *args, **kwargs):
-        """Cancel the user's subscription when permitted."""
+        """Cancel the user's subscription when permitted.
+
+        Args:
+            request (Request): Incoming HTTP request.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Empty body on success or details describing why the
+                subscription could not be cancelled.
+        """
 
         del args, kwargs
 
@@ -593,7 +743,17 @@ class StripeWebhookView(APIView):
     permission_classes = (permissions.AllowAny,)
 
     def post(self, request, *args, **kwargs):
-        """Process the Stripe webhook payload."""
+        """Process the Stripe webhook payload.
+
+        Args:
+            request (Request): Incoming webhook request from Stripe.
+            *args: Additional positional arguments (unused).
+            **kwargs: Additional keyword arguments (unused).
+
+        Returns:
+            Response: Empty success response or error payload when the webhook
+                cannot be processed.
+        """
 
         del args, kwargs
 

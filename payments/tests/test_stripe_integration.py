@@ -1,4 +1,4 @@
-"""Tests covering the Stripe integration layer."""
+"""Integration tests covering Stripe checkout and webhook flows."""
 
 import json
 from datetime import datetime, timedelta, timezone as datetime_timezone
@@ -16,7 +16,14 @@ from payments.models import Subscription, SubscriptionPlan
 def test_checkout_session_creation_sets_metadata(
     api_client, agent_user, settings, monkeypatch
 ):
-    """Checkout session creation should call Stripe with scope metadata."""
+    """Checkout session creation should call Stripe with scope metadata.
+
+    Args:
+        api_client (APIClient): Authenticated test client hitting the API.
+        agent_user (User): Agent user initiating the checkout.
+        settings (Settings): Django settings object for runtime configuration.
+        monkeypatch (MonkeyPatch): Pytest helper for faking Stripe calls.
+    """
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
     settings.STRIPE_SECRET_KEY = "sk_test_dummy"
@@ -96,7 +103,14 @@ def test_checkout_session_creation_sets_metadata(
 def test_checkout_session_creation_creates_missing_price(
     api_client, agent_user, settings, monkeypatch
 ):
-    """When no matching price exists, the integration should create one automatically."""
+    """When no matching price exists, the integration should create one automatically.
+
+    Args:
+        api_client (APIClient): Authenticated test client hitting the API.
+        agent_user (User): Agent initiating checkout for their own profile.
+        settings (Settings): Django settings object for runtime configuration.
+        monkeypatch (MonkeyPatch): Pytest helper for mocking Stripe endpoints.
+    """
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
     settings.STRIPE_SECRET_KEY = "sk_test_dummy"
@@ -162,7 +176,14 @@ def test_checkout_session_creation_creates_missing_price(
 def test_checkout_session_creation_recovers_from_missing_product(
     api_client, agent_user, settings, monkeypatch
 ):
-    """If the configured product is missing, it should be recreated automatically."""
+    """If the configured product is missing, it should be recreated automatically.
+
+    Args:
+        api_client (APIClient): Authenticated test client hitting the API.
+        agent_user (User): Agent user performing the checkout call.
+        settings (Settings): Django settings object updated for Stripe keys.
+        monkeypatch (MonkeyPatch): Pytest helper for overriding Stripe SDK calls.
+    """
 
     settings.STRIPE_PUBLIC_KEY = "pk_test_dummy"
     settings.STRIPE_SECRET_KEY = "sk_test_dummy"
