@@ -11,7 +11,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import importlib.util
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -96,6 +98,19 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    parsed_db_url = urlparse(database_url)
+    if parsed_db_url.scheme in {"postgres", "postgresql"}:
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": parsed_db_url.path.lstrip("/"),
+            "USER": parsed_db_url.username or "",
+            "PASSWORD": parsed_db_url.password or "",
+            "HOST": parsed_db_url.hostname or "",
+            "PORT": str(parsed_db_url.port or ""),
+        }
 
 
 # Password validation
