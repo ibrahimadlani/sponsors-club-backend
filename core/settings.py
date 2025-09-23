@@ -154,3 +154,21 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API_VERSION = os.environ.get("STRIPE_API_VERSION", "2024-06-20")
+
+# Amazon SES email delivery configuration. Credentials default to blank values so
+# local development can rely on environment variables when available without
+# breaking tests if they are absent.
+AWS_SES_ACCESS_KEY_ID = os.environ.get("AWS_SES_ACCESS_KEY_ID", "")
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get("AWS_SES_SECRET_ACCESS_KEY", "")
+AWS_SES_REGION_NAME = os.environ.get("AWS_SES_REGION_NAME", "eu-west-3")
+AWS_SES_SOURCE_EMAIL = os.environ.get(
+    "AWS_SES_SOURCE_EMAIL", "no-reply@sponsors-club.test"
+)
+AWS_SES_CONFIGURATION_SET = os.environ.get("AWS_SES_CONFIGURATION_SET", "")
+
+# Verification links default to an empty template so deployments can customise
+# the destination (e.g. web frontend or deep link) without code changes.
+EMAIL_VERIFICATION_URL_TEMPLATE = os.environ.get(
+    "EMAIL_VERIFICATION_URL_TEMPLATE",
+    "",
+)
