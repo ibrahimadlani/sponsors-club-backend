@@ -14,6 +14,7 @@ from core.permissions import (
     requirement_denied_payload,
     user_feature_requirement,
 )
+from core.responses import error_response
 from .models import Follow
 from .permissions import IsCollaboratorUser
 from .serializers import FollowSerializer
@@ -80,9 +81,10 @@ class AthleteFollowView(APIView):
         try:
             collaborator = self._get_collaborator(request)
         except Collaborator.DoesNotExist:
-            return Response(
-                {"detail": "Collaborator membership required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return error_response(
+                "Collaborator membership required.",
+                status.HTTP_400_BAD_REQUEST,
+                code="collaborator_membership_required",
             )
 
         denial = self._enforce_follow_limits(request, collaborator)
@@ -104,9 +106,10 @@ class AthleteFollowView(APIView):
         try:
             collaborator = self._get_collaborator(request)
         except Collaborator.DoesNotExist:
-            return Response(
-                {"detail": "Collaborator membership required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return error_response(
+                "Collaborator membership required.",
+                status.HTTP_400_BAD_REQUEST,
+                code="collaborator_membership_required",
             )
 
         athlete = get_object_or_404(Athlete, id=athlete_id)
@@ -116,9 +119,10 @@ class AthleteFollowView(APIView):
         ).delete()
         if deleted_count:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(
-            {"detail": "Follow relationship not found."},
-            status=status.HTTP_404_NOT_FOUND,
+        return error_response(
+            "Follow relationship not found.",
+            status.HTTP_404_NOT_FOUND,
+            code="follow_relationship_not_found",
         )
 
 

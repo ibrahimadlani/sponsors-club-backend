@@ -11,6 +11,7 @@ from core.permissions import (
     get_collaborator_plan_features,
     requirement_denied_payload,
 )
+from core.responses import error_response
 from .models import Collaborator, Organisation
 from .permissions import (
     IsAuthenticatedCollaborator,
@@ -102,9 +103,11 @@ class OrganisationViewSet(
             user=request.user,
             role=Collaborator.Role.OWNER,
         ).exists():
-            return Response(
-                {"detail": "Only owners can add collaborators."},
-                status=status.HTTP_403_FORBIDDEN,
+            return error_response(
+                "Only owners can add collaborators.",
+                status.HTTP_403_FORBIDDEN,
+                code="organisation_add_collaborator_owner_required",
+                organisation_id=str(organisation.id),
             )
 
         requirement = COLLABORATOR_FEATURES["collaborator_invites"]
@@ -157,8 +160,11 @@ class OrganisationViewSet(
                 id=collaborator_id
             )
         except Collaborator.DoesNotExist:
-            return Response(
-                {"detail": "Collaborator not found."}, status=status.HTTP_404_NOT_FOUND
+            return error_response(
+                "Collaborator not found.",
+                status.HTTP_404_NOT_FOUND,
+                code="organisation_collaborator_not_found",
+                collaborator_id=str(collaborator_id),
             )
 
         if not Collaborator.objects.filter(
@@ -166,9 +172,12 @@ class OrganisationViewSet(
             user=request.user,
             role=Collaborator.Role.OWNER,
         ).exists():
-            return Response(
-                {"detail": "Only owners can remove collaborators."},
-                status=status.HTTP_403_FORBIDDEN,
+            return error_response(
+                "Only owners can remove collaborators.",
+                status.HTTP_403_FORBIDDEN,
+                code="organisation_remove_collaborator_owner_required",
+                organisation_id=str(collaborator.organisation_id),
+                collaborator_id=str(collaborator.id),
             )
 
         requirement = COLLABORATOR_FEATURES["collaborator_invites"]

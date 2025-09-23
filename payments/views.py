@@ -17,6 +17,7 @@ from core.permissions import (
     collaborator_meets_requirement,
     requirement_denied_payload,
 )
+from core.responses import error_response
 
 from .models import Subscription, SubscriptionPlan
 from .serializers import (
@@ -114,9 +115,10 @@ class MySubscriptionView(APIView):
 
         subscription = self.get_subscription(request)
         if subscription is None:
-            return Response(
-                {"detail": "No active subscription found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "No active subscription found.",
+                status.HTTP_404_NOT_FOUND,
+                code="subscription_not_found",
             )
         return Response(SubscriptionSerializer(subscription).data)
 
@@ -127,9 +129,10 @@ class MySubscriptionView(APIView):
 
         subscription = self.get_subscription(request)
         if subscription is None:
-            return Response(
-                {"detail": "No active subscription found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "No active subscription found.",
+                status.HTTP_404_NOT_FOUND,
+                code="subscription_not_found",
             )
 
         if subscription.agent_id:
@@ -175,9 +178,10 @@ class StripeWebhookView(APIView):
                 "Stripe webhook received without subscription id: %s",
                 request.data,
             )
-            return Response(
-                {"detail": "Missing subscription id."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return error_response(
+                "Missing subscription id.",
+                status.HTTP_400_BAD_REQUEST,
+                code="stripe_subscription_id_missing",
             )
 
         subscription = Subscription.objects.filter(
