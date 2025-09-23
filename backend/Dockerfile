@@ -29,4 +29,4 @@ USER django-user
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/app/scripts/entrypoint.sh"]
