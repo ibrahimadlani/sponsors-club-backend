@@ -17,6 +17,7 @@ from core.permissions import (
     collaborator_meets_requirement,
     requirement_denied_payload,
 )
+from core.responses import error_response
 
 from .models import Subscription, SubscriptionPlan
 from .serializers import (
@@ -114,9 +115,10 @@ class MySubscriptionView(APIView):
 
         subscription = self.get_subscription(request)
         if subscription is None:
-            return Response(
-                {"detail": "No active subscription found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "No active subscription found.",
+                status.HTTP_404_NOT_FOUND,
+                code="subscription_not_found",
             )
         return Response(SubscriptionSerializer(subscription).data)
 
@@ -127,27 +129,32 @@ class MySubscriptionView(APIView):
 
         subscription = self.get_subscription(request)
         if subscription is None:
-            return Response(
-                {"detail": "No active subscription found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "No active subscription found.",
+                status.HTTP_404_NOT_FOUND,
+                code="subscription_not_found",
             )
 
         if subscription.agent_id:
             requirement = AGENT_FEATURES["subscription_management"]
             if not agent_meets_requirement(request.user, requirement):
-                payload = requirement_denied_payload(
-                    requirement,
-                    "Upgrade required to manage your agent subscription.",
+                return Response(
+                    requirement_denied_payload(
+                        requirement,
+                        "Upgrade required to manage your agent subscription.",
+                    ),
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-                return Response(payload, status=status.HTTP_403_FORBIDDEN)
         elif subscription.organisation_id:
             requirement = COLLABORATOR_FEATURES["organisation_subscription_management"]
             if not collaborator_meets_requirement(request.user, requirement):
-                payload = requirement_denied_payload(
-                    requirement,
-                    "Upgrade required to manage organisation subscriptions.",
+                return Response(
+                    requirement_denied_payload(
+                        requirement,
+                        "Upgrade required to manage organisation subscriptions.",
+                    ),
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-                return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         subscription.status = Subscription.Status.CANCELED
         subscription.current_period_end = timezone.now()
@@ -175,9 +182,10 @@ class StripeWebhookView(APIView):
                 "Stripe webhook received without subscription id: %s",
                 request.data,
             )
-            return Response(
-                {"detail": "Missing subscription id."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return error_response(
+                "Missing subscription id.",
+                status.HTTP_400_BAD_REQUEST,
+                code="stripe_subscription_id_missing",
             )
 
         subscription = Subscription.objects.filter(

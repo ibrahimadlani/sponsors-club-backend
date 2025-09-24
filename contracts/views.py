@@ -15,6 +15,7 @@ from users.models import AgentProfile
 
 from core.feature_matrix import COLLABORATOR_FEATURES
 from core.permissions import collaborator_meets_requirement, requirement_denied_payload
+from core.responses import error_response
 
 from .models import (
     ClauseTemplate,
@@ -119,15 +120,22 @@ class ContractsViewSet(viewsets.GenericViewSet):
         contract = self.get_object()
         if not self._user_is_owner(request.user, contract.organisation_id):
             detail = "Only organisation owners can update contract status."
-            return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                detail,
+                status.HTTP_403_FORBIDDEN,
+                code="contract_status_owner_required",
+                organisation_id=str(contract.organisation_id),
+            )
 
         requirement = COLLABORATOR_FEATURES["contract_management"]
         if not collaborator_meets_requirement(request.user, requirement):
-            payload = requirement_denied_payload(
-                requirement,
-                "Upgrade required to access the contract workspace.",
+            return Response(
+                requirement_denied_payload(
+                    requirement,
+                    "Upgrade required to access the contract workspace.",
+                ),
+                status=status.HTTP_403_FORBIDDEN,
             )
-            return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ContractStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -138,7 +146,13 @@ class ContractsViewSet(viewsets.GenericViewSet):
             detail = (
                 f"Invalid status transition from {contract.status} to {new_status}."
             )
-            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                detail,
+                status.HTTP_400_BAD_REQUEST,
+                code="contract_status_invalid_transition",
+                current_status=contract.status,
+                attempted_status=new_status,
+            )
 
         previous_status = contract.status
         if previous_status == new_status:
@@ -173,15 +187,22 @@ class ContractsViewSet(viewsets.GenericViewSet):
         contract = self.get_object()
         if not self._user_is_owner(request.user, contract.organisation_id):
             detail = "Only organisation owners can modify clauses."
-            return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                detail,
+                status.HTTP_403_FORBIDDEN,
+                code="contract_clause_owner_required",
+                organisation_id=str(contract.organisation_id),
+            )
 
         requirement = COLLABORATOR_FEATURES["contract_management"]
         if not collaborator_meets_requirement(request.user, requirement):
-            payload = requirement_denied_payload(
-                requirement,
-                "Upgrade required to access the contract workspace.",
+            return Response(
+                requirement_denied_payload(
+                    requirement,
+                    "Upgrade required to access the contract workspace.",
+                ),
+                status=status.HTTP_403_FORBIDDEN,
             )
-            return Response(payload, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ContractClauseUpsertSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -192,7 +213,12 @@ class ContractsViewSet(viewsets.GenericViewSet):
         template = ClauseTemplate.objects.filter(id=template_id).first()
         if not template:
             detail = "Clause template not found."
-            return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
+            return error_response(
+                detail,
+                status.HTTP_404_NOT_FOUND,
+                code="contract_clause_template_not_found",
+                template_id=str(template_id),
+            )
 
         clause, created = ContractClause.objects.get_or_create(
             contract=contract,

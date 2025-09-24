@@ -11,7 +11,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import importlib.util
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -90,12 +92,59 @@ WSGI_APPLICATION = "core.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+
+def _is_running_tests() -> bool:
+    """Return True when the Django process is running under pytest."""
+
+    return bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+        or os.environ.get("DJANGO_TEST", "").lower() in {"1", "true"}
+    )
+
+
+def _database_from_url(url: str) -> dict[str, object]:
+    """Translate a DATABASE_URL style string into a Django DATABASES entry."""
+
+    parsed = urlparse(url)
+    engine_map = {
+        "postgres": "django.db.backends.postgresql",
+        "postgresql": "django.db.backends.postgresql",
+        "sqlite": "django.db.backends.sqlite3",
     }
-}
+    engine = engine_map.get(parsed.scheme)
+    if not engine:
+        return {}
+
+    if engine.endswith("sqlite3"):
+        db_name = parsed.path.lstrip("/") or "db.sqlite3"
+        return {"ENGINE": engine, "NAME": BASE_DIR / db_name}
+
+    return {
+        "ENGINE": engine,
+        "NAME": (parsed.path.lstrip("/") or "postgres"),
+        "USER": parsed.username or "",
+        "PASSWORD": parsed.password or "",
+        "HOST": parsed.hostname or "",
+        "PORT": str(parsed.port) if parsed.port else "",
+    }
+
+
+def _default_database() -> dict[str, object]:
+    """Return the project's default database configuration."""
+
+    if _is_running_tests():
+        return {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "test_db.sqlite3"}
+
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        config = _database_from_url(url)
+        if config:
+            return config
+
+    return {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}
+
+
+DATABASES = {"default": _default_database()}
 
 
 # Password validation

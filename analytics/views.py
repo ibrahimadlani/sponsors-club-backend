@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from athletes.models import Athlete
 
+from core.responses import error_response
+
 from .models import AthleteSocialAccount, DailyStats
 from .serializers import DailyStatsSerializer, DailyStatsSummarySerializer
 from .services.reports import (
@@ -59,9 +61,10 @@ class AthleteStatsSummaryView(APIView):
             accounts = accounts.filter(platform__name__iexact=platform)
         account = accounts.first()
         if not account:
-            return Response(
-                {"detail": "No social accounts with stats available."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "No social accounts with stats available.",
+                status.HTTP_404_NOT_FOUND,
+                code="athlete_stats_account_missing",
             )
 
         stats_queryset = account.daily_stats.for_range(
