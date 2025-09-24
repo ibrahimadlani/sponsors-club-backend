@@ -13,7 +13,7 @@ def add_is_mandatory_field(apps, schema_editor):
             )
         }
 
-    if "is_mandatory" in existing_columns:
+    if "is_mandatory" in existing_columns or "mandatory" in existing_columns:
         return
 
     field = models.BooleanField(default=False)
