@@ -50,22 +50,29 @@ Each business area is encapsulated in its own Django app and documented under `d
 - **Proof-of-concept UI:** HTML templates at `/poc/login/` and `/poc/messaging/` demonstrate JWT flows and messaging interactions against the live API.
 
 ## Local development quickstart
-1. **Clone and install dependencies**
+1. **Configure environment variables**
+   Copy the provided template and adjust values as needed:
+   ```bash
+   cp .env.local .env
+   ```
+   The Django settings automatically load `.env` so any credentials or API keys defined there become available to the server, management commands, and Docker entrypoints.
+
+2. **Clone and install dependencies**
    ```bash
    python -m venv .venv
    source .venv/bin/activate
    pip install --upgrade pip
    pip install -r requirements.dev.txt
    ```
-2. **Apply migrations**
+3. **Apply migrations**
    ```bash
    python manage.py migrate
    ```
-3. **Create an admin (optional)**
+4. **Create an admin (optional)**
    ```bash
    python manage.py createsuperuser
    ```
-4. **Run the server**
+5. **Run the server**
    ```bash
    python manage.py runserver 0.0.0.0:8000
    ```
