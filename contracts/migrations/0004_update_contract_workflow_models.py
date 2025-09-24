@@ -89,6 +89,74 @@ def seed_clause_defaults(apps, schema_editor):
         clause.save(update_fields=["title", "content", "is_mandatory", "is_modified"])
 
 
+def reconcile_is_mandatory_column(apps, schema_editor):
+    """Rename or merge the legacy mandatory column with the new flag."""
+
+    ClauseTemplate = apps.get_model("contracts", "ClauseTemplate")
+    table_name = ClauseTemplate._meta.db_table
+    connection = schema_editor.connection
+
+    with connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in connection.introspection.get_table_description(cursor, table_name)
+        }
+
+    if "mandatory" not in existing_columns:
+        return
+
+    quoted_table = schema_editor.quote_name(table_name)
+    quoted_mandatory = schema_editor.quote_name("mandatory")
+    quoted_is_mandatory = schema_editor.quote_name("is_mandatory")
+
+    if "is_mandatory" not in existing_columns:
+        schema_editor.execute(
+            f"ALTER TABLE {quoted_table} RENAME COLUMN {quoted_mandatory} TO {quoted_is_mandatory}"
+        )
+        return
+
+    schema_editor.execute(
+        f"UPDATE {quoted_table} SET {quoted_is_mandatory} = {quoted_mandatory}"
+    )
+    schema_editor.execute(
+        f"ALTER TABLE {quoted_table} DROP COLUMN {quoted_mandatory}"
+    )
+
+
+def reverse_reconcile_is_mandatory_column(apps, schema_editor):
+    """Restore the legacy mandatory column when rolling back the migration."""
+
+    ClauseTemplate = apps.get_model("contracts", "ClauseTemplate")
+    table_name = ClauseTemplate._meta.db_table
+    connection = schema_editor.connection
+
+    with connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in connection.introspection.get_table_description(cursor, table_name)
+        }
+
+    if "is_mandatory" not in existing_columns:
+        return
+
+    quoted_table = schema_editor.quote_name(table_name)
+    quoted_mandatory = schema_editor.quote_name("mandatory")
+    quoted_is_mandatory = schema_editor.quote_name("is_mandatory")
+
+    if "mandatory" in existing_columns:
+        schema_editor.execute(
+            f"UPDATE {quoted_table} SET {quoted_mandatory} = {quoted_is_mandatory}"
+        )
+        schema_editor.execute(
+            f"ALTER TABLE {quoted_table} DROP COLUMN {quoted_is_mandatory}"
+        )
+        return
+
+    schema_editor.execute(
+        f"ALTER TABLE {quoted_table} RENAME COLUMN {quoted_is_mandatory} TO {quoted_mandatory}"
+    )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         (
@@ -117,10 +185,20 @@ class Migration(migrations.Migration):
                 max_length=32,
             ),
         ),
-        migrations.RenameField(
-            model_name="clausetemplate",
-            old_name="mandatory",
-            new_name="is_mandatory",
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    reconcile_is_mandatory_column,
+                    reverse_code=reverse_reconcile_is_mandatory_column,
+                )
+            ],
+            state_operations=[
+                migrations.RenameField(
+                    model_name="clausetemplate",
+                    old_name="mandatory",
+                    new_name="is_mandatory",
+                ),
+            ],
         ),
         migrations.RunPython(map_clause_categories, migrations.RunPython.noop),
         migrations.RemoveField(
