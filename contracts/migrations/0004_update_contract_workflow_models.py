@@ -158,6 +158,8 @@ def reverse_reconcile_is_mandatory_column(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         (
             "contracts",
