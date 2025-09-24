@@ -17,6 +17,7 @@ services:
       - "8000:8000"
     volumes:
       - ./:/app
+      - static_volume:/app/staticfiles
   db:
     image: postgres:15-alpine
     environment:
@@ -35,3 +36,4 @@ services:
 
 volumes:
   postgres_data:
+  static_volume:
