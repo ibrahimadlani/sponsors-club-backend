@@ -82,6 +82,23 @@ docker run --rm -p 8000:8000 \
 ```
 `PORT` overrides the Gunicorn bind address, while `scripts/migrate.sh` and `scripts/entrypoint.sh` manage database migrations and server startup inside the container.
 
+### Docker Compose with PostgreSQL
+A `docker-compose.yml` file is available for a full local stack that includes PostgreSQL. It builds the application container,
+waits for the database to become healthy, runs migrations, creates a superuser (using the credentials from the compose file),
+and then launches Gunicorn:
+
+```bash
+docker compose up --build
+```
+
+Override the default database credentials or Django settings by exporting environment variables before running `docker compose`
+or by editing the compose file. The service mounts the repository into the container so code changes are picked up without a
+rebuild. To re-run migrations manually, use:
+
+```bash
+docker compose run --rm web /app/scripts/migrate.sh
+```
+
 ## Database seeding
 Populate a realistic dataset for demos or development:
 ```bash
