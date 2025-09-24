@@ -1,0 +1,10 @@
+Hello {{ user.first_name|default:user.email }},
+
+You have a new {{ notification.get_type_display }} notification on Sponsors Club.
+
+Summary:
+{{ notification.payload }}
+
+Visit your dashboard to review the full details and respond as needed.
+
+The Sponsors Club team

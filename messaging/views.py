@@ -1,4 +1,9 @@
-"""Views providing messaging thread and message APIs."""
+"""Views providing messaging thread and message APIs.
+
+The module focuses on the presentation layer of the messaging feature. It
+contains viewsets and API views that orchestrate authentication checks,
+pagination concerns, and serializer interactions for threads and messages.
+"""
 
 from django.db.models import Q
 from rest_framework import permissions, status, viewsets
@@ -28,7 +33,12 @@ MESSAGING_INITIATE_REQUIREMENT = AGENT_FEATURES["messaging_initiate"]
 
 
 class ThreadPagination(PageNumberPagination):
-    """Pagination configuration for thread listings."""
+    """Pagination configuration for thread listings.
+
+    The pagination behaviour is defined on a dedicated class to keep the
+    ``ThreadViewSet`` readable while still exposing the knobs that influence
+    page size.
+    """
 
     page_size = 20
     page_size_query_param = "page_size"
@@ -36,14 +46,24 @@ class ThreadPagination(PageNumberPagination):
 
 
 class ThreadViewSet(viewsets.GenericViewSet):
-    """List and create messaging threads."""
+    """List and create messaging threads.
+
+    The viewset keeps mutations limited to thread creation, while reads are
+    paginated through ``ThreadPagination``. All heavy lifting is delegated to
+    serializers, so the code here is mostly about orchestrating those helpers.
+    """
 
     serializer_class = ThreadSerializer
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = ThreadPagination
 
     def get_queryset(self):
-        """Return the threads visible to the requesting user."""
+        """Return the threads visible to the requesting user.
+
+        Returns:
+            QuerySet[Thread]: Thread records ordered by last activity where the
+            current user is either the collaborating organisation or the agent.
+        """
 
         user = self.request.user
         return (
@@ -58,7 +78,17 @@ class ThreadViewSet(viewsets.GenericViewSet):
         )
 
     def list(self, request, *args, **kwargs):
-        """Return a paginated list of threads for the current user."""
+        """Return a paginated list of threads for the current user.
+
+        Args:
+            request (Request): The HTTP request containing authentication
+                context.
+            *args: Unused positional parameters required by the DRF signature.
+            **kwargs: Unused keyword parameters required by the DRF signature.
+
+        Returns:
+            Response: Paginated response with serialized threads.
+        """
 
         del args, kwargs
 
@@ -68,7 +98,16 @@ class ThreadViewSet(viewsets.GenericViewSet):
         return self.get_paginated_response(serializer.data)
 
     def create(self, request, *args, **kwargs):
-        """Create a messaging thread after validating entitlement."""
+        """Create a messaging thread after validating entitlement.
+
+        Args:
+            request (Request): The HTTP request with payload data.
+            *args: Unused positional parameters required by DRF.
+            **kwargs: Unused keyword parameters required by DRF.
+
+        Returns:
+            Response: The created thread serialized as JSON.
+        """
 
         del args, kwargs
 
@@ -84,6 +123,8 @@ class ThreadViewSet(viewsets.GenericViewSet):
 
         agent_profile = get_agent_profile(user)
         if agent_profile and agent_profile.id == agent.id:
+            # Agents must satisfy a feature-flag-like requirement before they
+            # can initiate new threads themselves.
             if not agent_meets_requirement(user, MESSAGING_INITIATE_REQUIREMENT):
                 payload = requirement_denied_payload(
                     MESSAGING_INITIATE_REQUIREMENT,
@@ -103,7 +144,11 @@ class ThreadViewSet(viewsets.GenericViewSet):
 
 
 class ThreadMessagesPagination(PageNumberPagination):
-    """Pagination configuration for thread message listings."""
+    """Pagination configuration for thread message listings.
+
+    Separate pagination from ``ThreadPagination`` to keep message listing
+    responses lighter even when threads themselves use larger pages.
+    """
 
     page_size = 50
     page_size_query_param = "page_size"
@@ -111,13 +156,25 @@ class ThreadMessagesPagination(PageNumberPagination):
 
 
 class ThreadMessagesView(APIView):
-    """List and create messages within a thread."""
+    """List and create messages within a thread.
+
+    The view groups ``GET`` and ``POST`` endpoints together so the thread lookup
+    and permission checks are centralised in ``get_thread``.
+    """
 
     permission_classes = (IsThreadParticipant,)
     pagination_class = ThreadMessagesPagination
 
     def get_thread(self, request, thread_id):
-        """Return the requested thread if the user has access."""
+        """Return the requested thread if the user has access.
+
+        Args:
+            request (Request): Incoming HTTP request.
+            thread_id (UUID): Identifier of the thread.
+
+        Returns:
+            Thread | None: The thread when accessible, otherwise ``None``.
+        """
 
         thread = (
             Thread.objects.select_related(
@@ -134,7 +191,16 @@ class ThreadMessagesView(APIView):
         return None
 
     def get(self, request, thread_id):
-        """Paginate and return messages for the given thread."""
+        """Paginate and return messages for the given thread.
+
+        Args:
+            request (Request): The HTTP request.
+            thread_id (UUID): Identifier of the thread.
+
+        Returns:
+            Response: Paginated response containing serialized messages or an
+            error payload if access is denied.
+        """
 
         thread = self.get_thread(request, thread_id)
         if not thread:
@@ -156,7 +222,16 @@ class ThreadMessagesView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request, thread_id):
-        """Create a new message within the specified thread."""
+        """Create a new message within the specified thread.
+
+        Args:
+            request (Request): The HTTP request containing message payload.
+            thread_id (UUID): Identifier of the thread that receives the
+                message.
+
+        Returns:
+            Response: Serialized message data after creation.
+        """
 
         thread = self.get_thread(request, thread_id)
         if not thread:
@@ -180,12 +255,25 @@ class ThreadMessagesView(APIView):
 
 
 class MessageReadView(APIView):
-    """Toggle read state for a specific message."""
+    """Toggle read state for a specific message.
+
+    This view is intentionally limited to a ``PATCH`` handler to make the
+    intent clear: only partial updates to the ``is_read`` flag are supported.
+    """
 
     permission_classes = (IsThreadParticipant,)
 
     def patch(self, request, message_id):
-        """Update the message read status if the user participates in the thread."""
+        """Update the message read status when the user participates in the thread.
+
+        Args:
+            request (Request): The HTTP request containing the update payload.
+            message_id (UUID): Identifier of the message being updated.
+
+        Returns:
+            Response: Serialized message data after the read state toggle or an
+            error payload if validation fails.
+        """
 
         message = (
             Message.objects.select_related(

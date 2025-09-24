@@ -1,4 +1,4 @@
-"""Follow feature limit behaviours."""
+"""Tests covering follow entitlement and limit behaviours."""
 
 from datetime import date
 
@@ -13,7 +13,15 @@ from follows.models import Follow
 
 @pytest.fixture(name="follow_client")
 def fixture_follow_client(owner_user):
-    """Return an authenticated API client for follow interactions."""
+    """Return an authenticated API client for follow interactions.
+
+    Args:
+        owner_user: Fixture providing the organisation owner used for
+            authentication.
+
+    Returns:
+        APIClient: Authenticated client ready to call follow endpoints.
+    """
 
     client = APIClient()
     client.force_authenticate(user=owner_user)
@@ -22,7 +30,15 @@ def fixture_follow_client(owner_user):
 
 @pytest.fixture(name="follow_athlete")
 def fixture_follow_athlete(agent_user):
-    """Create an athlete linked to the agent fixture for follow scenarios."""
+    """Create an athlete linked to the agent fixture for follow scenarios.
+
+    Args:
+        agent_user: Fixture representing the agent responsible for the new
+            athlete.
+
+    Returns:
+        Athlete: Persisted athlete ready to be followed in tests.
+    """
 
     sport = Sport.objects.create(name="Follow Sport", discipline="Individual")
     return Athlete.objects.create(
@@ -36,7 +52,14 @@ def fixture_follow_athlete(agent_user):
 
 @pytest.mark.django_db
 def test_follow_limit_enforced(follow_client, organisations_setup, follow_athlete):
-    """Reject follow creation when the organisation has reached its limit."""
+    """Reject follow creation when the organisation has reached its limit.
+
+    Args:
+        follow_client: Authenticated test client.
+        organisations_setup: Fixture returning collaborator and subscription
+            objects configured for the organisation.
+        follow_athlete: Athlete that will be followed within the test.
+    """
 
     collaborator = organisations_setup["collaborator"]
     subscription = organisations_setup["subscription"]
@@ -60,7 +83,14 @@ def test_follow_limit_enforced(follow_client, organisations_setup, follow_athlet
 def test_follow_success_within_limit(
     follow_client, organisations_setup, follow_athlete
 ):
-    """Allow follow creation when the organisation is under the limit."""
+    """Allow follow creation when the organisation is under the limit.
+
+    Args:
+        follow_client: Authenticated test client.
+        organisations_setup: Fixture returning collaborator and subscription
+            objects configured for the organisation.
+        follow_athlete: Athlete that will be followed within the test.
+    """
 
     collaborator = organisations_setup["collaborator"]
     url = reverse("athlete-follow", kwargs={"athlete_id": follow_athlete.id})
@@ -78,7 +108,14 @@ def test_follow_requires_feature_when_zero_slots(
     organisations_setup,
     follow_athlete,
 ):
-    """Require an upgrade when the plan grants zero follow slots."""
+    """Require an upgrade when the plan grants zero follow slots.
+
+    Args:
+        follow_client: Authenticated test client.
+        organisations_setup: Fixture returning collaborator and subscription
+            objects configured for the organisation.
+        follow_athlete: Athlete that will be followed within the test.
+    """
 
     subscription = organisations_setup["subscription"]
     plan = subscription.plan

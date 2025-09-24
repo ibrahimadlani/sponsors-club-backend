@@ -3,7 +3,13 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import MeEntitlementsView, MeRolesView, MeView, RegisterView
+from .views import (
+    MeEntitlementsView,
+    MeRolesView,
+    MeView,
+    RegisterView,
+    VerifyEmailView,
+)
 
 app_name = "users"
 
@@ -14,4 +20,5 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
     path("me/roles/", MeRolesView.as_view(), name="me_roles"),
     path("me/entitlements/", MeEntitlementsView.as_view(), name="me_entitlements"),
+    path("verify-email/", VerifyEmailView.as_view(), name="verify_email"),
 ]

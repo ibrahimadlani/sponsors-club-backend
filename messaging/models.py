@@ -1,4 +1,8 @@
-"""Database models for messaging threads and messages."""
+"""Database models for messaging threads and messages.
+
+The models remain intentionally small and lean on foreign keys to other apps so
+that messaging can evolve independently from athlete or organisation features.
+"""
 
 import uuid
 
@@ -11,7 +15,13 @@ from users.models import AgentProfile
 
 
 class BaseModel(models.Model):
-    """Abstract base model providing UUID primary key and timestamps."""
+    """Abstract base model providing UUID primary key and timestamps.
+
+    Attributes:
+        id (UUIDField): Primary key used across messaging tables.
+        created_at (DateTimeField): Creation timestamp managed by Django.
+        updated_at (DateTimeField): Last modification timestamp.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -24,7 +34,12 @@ class BaseModel(models.Model):
 
 
 class Thread(BaseModel):
-    """Two-way conversation between a collaborator and an agent, optionally about an athlete."""
+    """Two-way conversation between a collaborator and an agent.
+
+    Threads may optionally reference an athlete when the conversation is tied to
+    a specific talent, but the relationship is nullable to support generic chat
+    between collaborators and agents.
+    """
 
     collaborator = models.ForeignKey(
         Collaborator,
@@ -46,7 +61,11 @@ class Thread(BaseModel):
     last_message_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        """Django model configuration metadata."""
+        """Django model configuration metadata.
+
+        The unique constraint prevents duplicate inbox conversations, while the
+        indexes accelerate lookups filtered by participant or activity date.
+        """
 
         constraints = [
             models.UniqueConstraint(
@@ -70,7 +89,15 @@ class Thread(BaseModel):
 
 
 class Message(BaseModel):
-    """Individual message sent within a thread."""
+    """Individual message sent within a thread.
+
+    Attributes:
+        thread (Thread): Parent conversation that owns the message.
+        sender (User): User account who authored the message.
+        content (str): Message body.
+        attachment (File | None): Optional file upload.
+        is_read (bool): Read receipt flag managed by recipients.
+    """
 
     thread = models.ForeignKey(
         Thread,
@@ -91,7 +118,11 @@ class Message(BaseModel):
     is_read = models.BooleanField(default=False)
 
     class Meta:
-        """Django model configuration metadata."""
+        """Django model configuration metadata.
+
+        Ordering maintains chronological message flow, while indexes improve
+        filtering by thread and read status.
+        """
 
         indexes = [
             models.Index(

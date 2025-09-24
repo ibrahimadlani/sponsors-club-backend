@@ -1,4 +1,10 @@
-"""Canonical definition of feature flags and entitlements per account type."""
+"""Canonical definition of feature flags and entitlements per account type.
+
+The constants in this module power entitlement checks throughout the project.
+Adding structured docstrings ensures downstream tooling can inspect the fields
+and helps developers reason about how each feature is exposed to agents and
+collaborators.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +14,19 @@ from typing import Optional, Sequence
 
 @dataclass(frozen=True)
 class FeatureRequirement:
-    """Describe the feature flag needed to unlock a capability."""
+    """Describe the feature flag needed to unlock a capability.
+
+    Attributes:
+        key: Identifier of the feature stored on the subscription plan.
+        allowed_values: Optional tuple limiting which plan values satisfy the
+            requirement.
+        label: Human readable label suitable for presenting in the UI.
+        description: Additional context clarifying what the feature controls.
+        denied_message: Optional message explaining why access was refused.
+        upgrade_url: URL pointing to the relevant pricing or upgrade page.
+        recommended_plans: Plans the product team suggests for unlocking the
+            feature.
+    """
 
     key: str
     allowed_values: Optional[Sequence[str]] = None
@@ -19,6 +37,8 @@ class FeatureRequirement:
     recommended_plans: Sequence[str] = ()
 
 
+# Agent entitlements define the capabilities that individual agents can access
+# through their personal subscription plans.
 AGENT_FEATURES = {
     "messaging_initiate": FeatureRequirement(
         key="messaging_tier",
@@ -78,6 +98,8 @@ AGENT_FEATURES = {
 }
 
 
+# Collaborator entitlements define the capabilities available to organisation
+# members working inside a shared workspace.
 COLLABORATOR_FEATURES = {
     "athlete_stats_all": FeatureRequirement(
         key="athlete_stats_scope",
