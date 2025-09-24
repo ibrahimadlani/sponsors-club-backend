@@ -1,0 +1,37 @@
+services:
+  web:
+    build: .
+    entrypoint: ["/bin/sh", "-c", "/app/scripts/migrate.sh && /app/scripts/entrypoint.sh"]
+    environment:
+      POSTGRES_DB: sponsors_club
+      POSTGRES_USER: sponsors
+      POSTGRES_PASSWORD: sponsors
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      DJANGO_SUPERUSER_PASSWORD: Passw0rd!
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: sponsors_club
+      POSTGRES_USER: sponsors
+      POSTGRES_PASSWORD: sponsors
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sponsors -d sponsors_club"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
