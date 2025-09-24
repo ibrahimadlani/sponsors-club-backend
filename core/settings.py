@@ -97,7 +97,7 @@ DATABASES = {
 }
 
 
-if os.environ.get("POSTGRES_DB"):
+if os.environ.get("POSTGRES_DB") and not os.environ.get("PYTEST_CURRENT_TEST"):
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ["POSTGRES_DB"],
