@@ -67,8 +67,19 @@ def comparison_account(comparison_athlete, instagram_platform):
 
 
 def _create_stats(account, start_followers=1000):
+    """Create a small timeline of stats for assertions.
+
+    Args:
+        account: Social account receiving the generated stats.
+        start_followers: Initial follower count used as baseline.
+
+    Returns:
+        None: The helper persists rows in the database for test setup.
+    """
+
     base_date = date.today() - timedelta(days=2)
     for offset in range(3):
+        # Increment the metrics slightly to ensure trends appear in assertions.
         DailyStats.objects.create(
             account=account,
             date=base_date + timedelta(days=offset),

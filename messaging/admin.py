@@ -1,4 +1,8 @@
-"""Admin configuration for messaging models."""
+"""Admin configuration for messaging models.
+
+The Django admin panels are designed for support staff who occasionally need to
+inspect conversations, so the configuration focuses on discoverability.
+"""
 
 from django.contrib import admin
 
@@ -8,7 +12,12 @@ from .models import Message, Thread
 
 @admin.register(Thread)
 class ThreadAdmin(admin.ModelAdmin):
-    """Display messaging threads with participant filters."""
+    """Display messaging threads with participant filters.
+
+    Keeping participant information in ``list_display`` provides an at-a-glance
+    overview of who is involved in a conversation, which is helpful during
+    customer support escalations.
+    """
 
     list_display = THREAD_PARTICIPANT_COLUMNS
     list_filter = ("athlete",)
@@ -22,7 +31,11 @@ class ThreadAdmin(admin.ModelAdmin):
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
-    """Expose basic metadata for individual messages."""
+    """Expose basic metadata for individual messages.
+
+    Including search across message content allows support teams to retrieve
+    problematic messages without navigating through every thread manually.
+    """
 
     list_display = ("thread", "sender", "is_read", "created_at")
     list_filter = ("is_read",)

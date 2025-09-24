@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 def fetch_account_stats(account_id) -> Optional[DailyStats]:
     """Fetch the latest stats for a social account.
 
+    Args:
+        account_id: Identifier of the :class:`~analytics.models.AthleteSocialAccount`.
+
+    Returns:
+        Optional[DailyStats]: ``DailyStats`` instance when available, otherwise ``None``.
+
     The implementation is intentionally lightweight: it resolves the account and
     logs that a sync should occur. The future Celery task can replace the body
     of this function with real API calls without changing the public contract.
@@ -39,7 +45,11 @@ def fetch_account_stats(account_id) -> Optional[DailyStats]:
 
 
 def sync_all_accounts() -> None:
-    """Iterate all active accounts and fetch their latest stats."""
+    """Iterate all active accounts and fetch their latest stats.
+
+    Returns:
+        None: The function triggers side effects only and returns ``None``.
+    """
 
     account_ids = list(
         AthleteSocialAccount.objects.filter(is_active=True).values_list("id", flat=True)

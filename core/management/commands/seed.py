@@ -1,4 +1,11 @@
-"""Populate the database with sample data using Faker."""
+"""Seed the database with deterministic demo data for local development.
+
+The command purposefully mirrors production relationships—agents own athletes,
+organisations collaborate, and analytics contain recent daily stats—so developers
+can interact with the project end-to-end. Inline comments describe why certain
+choices are made (such as how followers counts are generated), while Google
+style docstrings document arguments and return values for each helper.
+"""
 
 from __future__ import annotations
 
@@ -26,7 +33,11 @@ DEFAULT_PASSWORD = "Passw0rd!"
 
 
 class Command(BaseCommand):
-    """Seed the database with deterministic yet realistic looking data."""
+    """Seed the database with deterministic yet realistic looking data.
+
+    Attributes:
+        help: Short description surfaced by Django's ``manage.py help`` output.
+    """
 
     help = (
         "Populate the database with demo data covering users, organisations, sports, "
@@ -34,6 +45,11 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
+        """Configure CLI arguments for the seed command.
+
+        Args:
+            parser: The argument parser provided by Django.
+        """
         parser.add_argument(
             "--agents",
             type=int,
@@ -66,6 +82,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the seed process using the provided options.
+
+        Args:
+            *args: Positional arguments required by Django's command contract.
+            **options: Parsed command line options controlling record counts.
+        """
         faker = Faker()
         if options["seed"] is not None:
             Faker.seed(options["seed"])
@@ -77,6 +99,8 @@ class Command(BaseCommand):
         athletes = options["athletes"]
 
         with transaction.atomic():
+            # Each helper returns the objects it created so downstream steps can
+            # wire relationships together without additional queries.
             agent_profiles = self._create_agents(faker, agents)
             sports_created = self._create_sports(faker, sports)
             organisations_created = self._create_organisations(
@@ -103,7 +127,15 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _create_agents(self, faker: Faker, count: int) -> list[AgentProfile]:
-        """Create agent users with associated profiles."""
+        """Create agent users with associated profiles.
+
+        Args:
+            faker: Shared Faker instance for deterministic fake data.
+            count: Number of agents to create.
+
+        Returns:
+            list[AgentProfile]: Persisted agent profiles linked to new users.
+        """
         profiles: list[AgentProfile] = []
         for _ in range(count):
             email = faker.unique.email()
@@ -120,11 +152,21 @@ class Command(BaseCommand):
                 display_name=full_name,
                 bio=faker.paragraph(nb_sentences=3),
             )
+            # Re-accessing ``user.agent_profile`` ensures the relation is loaded
+            # with the correct default values before appending to the list.
             profiles.append(user.agent_profile)
         return profiles
 
     def _create_sports(self, faker: Faker, count: int) -> list[Sport]:
-        """Create a set of sports with unique names."""
+        """Create a set of sports with unique names.
+
+        Args:
+            faker: Shared Faker instance for deterministic fake data.
+            count: Number of sports to generate.
+
+        Returns:
+            list[Sport]: Newly created sports ready to be linked to athletes.
+        """
         sports: list[Sport] = []
         for _ in range(count):
             sport = Sport.objects.create(
@@ -139,7 +181,15 @@ class Command(BaseCommand):
         faker: Faker,
         count: int,
     ) -> list[Organisation]:
-        """Create organisations with dedicated collaborator owners."""
+        """Create organisations with dedicated collaborator owners.
+
+        Args:
+            faker: Shared Faker instance for deterministic fake data.
+            count: Number of organisations to generate.
+
+        Returns:
+            list[Organisation]: Persisted organisations with owner records.
+        """
         organisations: list[Organisation] = []
         if count <= 0:
             return organisations
@@ -183,7 +233,17 @@ class Command(BaseCommand):
         agent_profiles: list[AgentProfile],
         sports: list[Sport],
     ) -> list[Athlete]:
-        """Create athletes linked to sports and agents."""
+        """Create athletes linked to sports and agents.
+
+        Args:
+            faker: Shared Faker instance for deterministic fake data.
+            count: Number of athletes to create.
+            agent_profiles: Pool of agents available for assignment.
+            sports: Sports created earlier in the seed run.
+
+        Returns:
+            list[Athlete]: Persisted athletes containing base profile data.
+        """
         athletes_created: list[Athlete] = []
         if not agent_profiles or not sports:
             return athletes_created
@@ -207,11 +267,21 @@ class Command(BaseCommand):
                 followers_count_cached=faker.random_int(min=5_000, max=200_000),
                 engagement_rate_cached=round(random.uniform(0.5, 10.0), 2),
             )
+            # Storing the object in a list allows the analytics seeding step to
+            # build social accounts for the same set of athletes.
             athletes_created.append(athlete)
         return athletes_created
 
     def _create_athlete_stats(self, faker: Faker, athletes: list[Athlete]) -> None:
-        """Create demo social accounts and populate daily stats."""
+        """Create demo social accounts and populate daily stats.
+
+        Args:
+            faker: Shared Faker instance for deterministic fake data.
+            athletes: List of athletes needing social analytics.
+
+        Returns:
+            None
+        """
 
         if not athletes:
             return

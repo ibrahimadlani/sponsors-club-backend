@@ -21,6 +21,8 @@ RUN python -m venv /py \
         --disabled-password \
         --no-create-home \
         django-user \
+    && mkdir -p /app/staticfiles \
+    && chown -R django-user:django-user /app/staticfiles \
     && chmod +x /app/scripts/entrypoint.sh /app/scripts/migrate.sh
 
 ENV PATH="/py/bin:$PATH"

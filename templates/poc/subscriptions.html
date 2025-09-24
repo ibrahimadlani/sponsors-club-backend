@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Abonnements • Sandbox Sponsors Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0f172a;
+            color: #0f172a;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: clamp(24px, 4vw, 48px);
+        }
+        main {
+            width: min(1100px, 100%);
+            display: grid;
+            gap: 28px;
+            padding: clamp(28px, 4vw, 40px);
+            border-radius: 28px;
+            background: #f8fafc;
+            box-shadow: 0 32px 80px rgba(15, 23, 42, 0.35);
+        }
+        header h1 {
+            margin: 0 0 12px;
+            font-size: clamp(1.8rem, 3vw, 2.4rem);
+            color: #0f172a;
+        }
+        header p {
+            margin: 0 0 8px;
+            color: #4b5563;
+            line-height: 1.55;
+        }
+        header ul {
+            margin: 12px 0 0;
+            padding-left: 20px;
+            color: #4b5563;
+            line-height: 1.55;
+        }
+        section {
+            background: white;
+            border-radius: 22px;
+            padding: clamp(22px, 3vw, 28px);
+            display: grid;
+            gap: 18px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.35rem;
+            color: #0f172a;
+        }
+        h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #0f172a;
+        }
+        p.hint {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+        form {
+            display: grid;
+            gap: 16px;
+        }
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font: inherit;
+            color: inherit;
+        }
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 22px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            justify-self: start;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 24px rgba(37, 99, 235, 0.25);
+        }
+        button.secondary {
+            background: #6b7280;
+        }
+        button.danger {
+            background: #dc2626;
+        }
+        .status {
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #9ca3af;
+        }
+        .status.success {
+            color: #047857;
+        }
+        .status.error {
+            color: #b91c1c;
+        }
+        pre {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.45;
+            max-height: 320px;
+            overflow: auto;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .scope-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+        }
+        .scope-selector label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+        .scope-selector input[type="radio"] {
+            width: auto;
+        }
+        .grid-info {
+            display: grid;
+            gap: 12px;
+        }
+        .plans-grid {
+            display: grid;
+            gap: 16px;
+        }
+        @media (min-width: 720px) {
+            .plans-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        .plan-card {
+            position: relative;
+            display: grid;
+            gap: 14px;
+            padding: 20px;
+            border-radius: 18px;
+            background: #f9fafb;
+            border: 1px solid #e2e8f0;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.02);
+        }
+        .plan-card header {
+            display: grid;
+            gap: 4px;
+        }
+        .plan-price {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #111827;
+        }
+        .plan-code {
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        .plan-features {
+            margin: 0;
+            padding-left: 18px;
+            color: #374151;
+            font-size: 0.9rem;
+            display: grid;
+            gap: 6px;
+        }
+        .plan-card footer {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .plan-card footer a {
+            font-size: 0.85rem;
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .plan-card footer a:hover {
+            text-decoration: underline;
+        }
+        .entitlements {
+            display: grid;
+            gap: 14px;
+        }
+        .entitlement {
+            position: relative;
+            padding: 16px 18px 18px 18px;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            display: grid;
+            gap: 6px;
+        }
+        .entitlement.granted {
+            border-color: rgba(16, 185, 129, 0.45);
+            box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.15);
+        }
+        .entitlement strong {
+            color: #0f172a;
+        }
+        .entitlement small {
+            color: #6b7280;
+        }
+        .entitlement::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: inherit;
+        }
+        .entitlement.improved::after,
+        .entitlement.regressed::after {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 999px;
+        }
+        .entitlement.improved::after {
+            content: 'Nouveau droit';
+            background: #d1fae5;
+            color: #047857;
+        }
+        .entitlement.regressed::after {
+            content: 'Droit retiré';
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        details summary {
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: #2563eb;
+        }
+        details[open] {
+            background: rgba(37, 99, 235, 0.04);
+            border-radius: 12px;
+            padding: 8px 12px;
+        }
+        @media (max-width: 640px) {
+            main {
+                padding: 24px;
+            }
+            section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Portail abonnement &amp; droits</h1>
+        <p>Cette page regroupe les outils nécessaires pour tester le parcours d'abonnement Stripe, depuis l'authentification jusqu'à la visualisation des droits accordés par le plan.</p>
+        <ul>
+            <li>Connectez-vous pour obtenir vos tokens JWT (stockés en local).</li>
+            <li>Chargez les plans actifs, sélectionnez votre portée (agent ou organisation) puis initiez un checkout Stripe.</li>
+            <li>Actualisez l'abonnement courant et comparez vos droits pour suivre leur évolution.</li>
+        </ul>
+    </header>
+
+    <section id="authSection">
+        <div class="status" id="loginStatus">En attente de connexion</div>
+        <h2>1. Authentification</h2>
+        <p class="hint">Le jeton d'accès est nécessaire pour appeler les routes protégées (<code>/api/payments/stripe/checkout-session/</code>, <code>/api/payments/subscriptions/me/</code>, etc.).</p>
+        <form id="loginForm">
+            <label>
+                Email
+                <input type="email" name="email" required placeholder="jeanne.dupont@example.com">
+            </label>
+            <label>
+                Mot de passe
+                <input type="password" name="password" required>
+            </label>
+            <div class="actions">
+                <button type="submit">Connexion</button>
+                <button type="button" class="secondary" id="copyAccessToken">Copier l'access token</button>
+                <button type="button" class="secondary" id="clearTokens">Supprimer les tokens</button>
+            </div>
+        </form>
+        <pre id="loginOutput">Aucun appel effectué.</pre>
+    </section>
+
+    <section id="tokenSection">
+        <div class="status" id="refreshStatus">Refresh token prêt</div>
+        <h2>2. Rafraîchir le token</h2>
+        <p class="hint">Réutilisez votre refresh token pour prolonger la session JWT. Laissez vide pour utiliser celui stocké dans le navigateur.</p>
+        <form id="refreshForm">
+            <label>
+                Refresh token
+                <textarea name="refresh_token" placeholder="Collez un refresh token ou laissez vide"></textarea>
+            </label>
+            <div class="actions">
+                <button type="submit">Rafraîchir</button>
+                <button type="button" class="secondary" id="loadStoredRefresh">Charger le token enregistré</button>
+            </div>
+        </form>
+        <pre id="refreshOutput">Aucun appel effectué.</pre>
+    </section>
+
+    <section id="plansSection">
+        <div class="status" id="plansStatus">En attente</div>
+        <h2>3. Choisir un plan &amp; initier le checkout</h2>
+        <p class="hint">Commencez par charger la liste des plans actifs, choisissez votre portée (agent ou organisation) puis déclenchez la création d'une session Stripe.</p>
+        <div class="actions">
+            <button type="button" id="loadPlans">Charger les plans</button>
+        </div>
+        <div class="grid-info">
+            <div class="scope-selector" role="group" aria-labelledby="scopeLabel">
+                <strong id="scopeLabel">Portée de l'abonnement :</strong>
+                <label><input type="radio" name="subscription_scope" value="agent" checked> Agent</label>
+                <label><input type="radio" name="subscription_scope" value="organisation"> Organisation</label>
+            </div>
+            <label id="agentIdField">
+                Identifiant de l'agent (UUID)
+                <input type="text" id="agentIdInput" placeholder="UUID de l'AgentProfile">
+            </label>
+            <label id="organisationIdField" hidden>
+                Identifiant de l'organisation (UUID)
+                <input type="text" id="organisationIdInput" placeholder="UUID de l'organisation">
+            </label>
+            <label>
+                URL de succès Stripe
+                <input type="url" id="successUrlInput" placeholder="https://example.com/success?session_id={CHECKOUT_SESSION_ID}">
+            </label>
+            <label>
+                URL d'annulation
+                <input type="url" id="cancelUrlInput" placeholder="https://example.com/cancel">
+            </label>
+        </div>
+        <div class="plans-grid" id="plansGrid"></div>
+        <div class="grid-info">
+            <div class="status" id="checkoutStatus">Checkout non initialisé</div>
+            <div class="actions">
+                <a id="checkoutLink" href="#" target="_blank" rel="noopener" style="display:none;">Ouvrir la session Stripe</a>
+            </div>
+            <pre id="checkoutOutput">Cliquez sur «&nbsp;Initier le checkout&nbsp;» depuis une carte plan.</pre>
+        </div>
+    </section>
+
+    <section id="subscriptionSection">
+        <div class="status" id="subscriptionStatus">Abonnement non interrogé</div>
+        <h2>4. Suivre l'abonnement courant</h2>
+        <p class="hint">Cette zone interroge <code>GET /api/payments/subscriptions/me/</code> pour récupérer votre abonnement actif. Utilisez le bouton de suppression pour tester la résiliation.</p>
+        <div class="actions">
+            <button type="button" id="refreshSubscription">Actualiser l'abonnement</button>
+            <button type="button" class="danger" id="cancelSubscription">Résilier l'abonnement</button>
+        </div>
+        <pre id="subscriptionOutput">Aucun appel effectué.</pre>
+    </section>
+
+    <section id="entitlementsSection">
+        <div class="status" id="entitlementsStatus">Droits non interrogés</div>
+        <h2>5. Visualiser les droits associés</h2>
+        <p class="hint">Appelle <code>GET /api/users/me/entitlements/</code> pour comparer les droits actuels. Les nouveaux droits sont signalés après chaque rafraîchissement.</p>
+        <div class="actions">
+            <button type="button" id="refreshEntitlements">Actualiser les droits</button>
+        </div>
+        <div class="entitlements" id="entitlementsList"></div>
+    </section>
+</main>
+
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
+    const CHECKOUT_SESSION_PLACEHOLDER = 'https://example.com/success?session_id={CHECKOUT_SESSION_ID}';
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null, includeAuth = false }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = {
+            method,
+            credentials: 'same-origin',
+            headers,
+        };
+
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        if (includeAuth) {
+            const token = window.localStorage.getItem(ACCESS_KEY);
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
+
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let dataPayload = null;
+        if (text) {
+            try {
+                dataPayload = JSON.parse(text);
+            } catch (error) {
+                dataPayload = text;
+            }
+        }
+
+        return {
+            ok: response.ok,
+            status: response.status,
+            data: dataPayload,
+        };
+    }
+
+    function setStatus(element, message, variant) {
+        element.textContent = message;
+        element.classList.remove('success', 'error');
+        if (variant) {
+            element.classList.add(variant);
+        }
+    }
+
+    function renderJSON(target, payload) {
+        if (payload === null || payload === undefined || payload === '') {
+            target.textContent = 'Réponse vide';
+            return;
+        }
+        try {
+            target.textContent = JSON.stringify(payload, null, 2);
+        } catch (error) {
+            target.textContent = String(payload);
+        }
+    }
+
+    function storeTokens({ access, refresh }) {
+        if (access) {
+            window.localStorage.setItem(ACCESS_KEY, access);
+        }
+        if (refresh) {
+            window.localStorage.setItem(REFRESH_KEY, refresh);
+        }
+    }
+
+    function clearTokens() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        alert('Tokens supprimés.');
+    }
+
+    async function copyAccessToken() {
+        const token = window.localStorage.getItem(ACCESS_KEY);
+        if (!token) {
+            alert("Aucun access token enregistré.");
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(token);
+            alert('Access token copié.');
+        } catch (error) {
+            alert('Impossible de copier automatiquement.');
+        }
+    }
+
+    function priceLabel(price, currency) {
+        if (price === null || price === undefined) {
+            return 'Tarif inconnu';
+        }
+        const numeric = Number(price);
+        if (!Number.isFinite(numeric)) {
+            return `${price} ${currency || ''}`.trim();
+        }
+        try {
+            return numeric.toLocaleString('fr-FR', {
+                style: 'currency',
+                currency: currency || 'EUR',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        } catch (error) {
+            return `${numeric.toFixed(2)} ${currency || ''}`.trim();
+        }
+    }
+
+    function normaliseFeatureValue(value) {
+        if (value === null) {
+            return 'Illimité';
+        }
+        if (Array.isArray(value)) {
+            return value.join(', ');
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'Oui' : 'Non';
+        }
+        return value;
+    }
+
+    const FEATURE_LABELS = {
+        tier: 'Compte cible',
+        messaging_tier: 'Niveau de messagerie',
+        max_messages_per_month: 'Messages / mois',
+        search_visibility_pct: 'Visibilité recherche',
+        stats_tier: 'Statistiques',
+        comparative_stats: 'Comparaison avancée',
+        agent_subscription_management: 'Gestion abonnement agent',
+        contract_tools: 'Outils contrats',
+        notification_center: 'Centre de notifications',
+        max_athletes: 'Athlètes inclus',
+        max_collaborators: 'Collaborateurs inclus',
+        max_follows: 'Athlètes suivis',
+        collaborator_invites: 'Invitations collaborateurs',
+        organisation_subscription_management: 'Gestion abonnement organisation',
+        athlete_stats_scope: 'Statistiques athlètes',
+        data_access: 'Accès données',
+    };
+
+    function featureLabel(key) {
+        return FEATURE_LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    function planFeatureEntries(plan) {
+        const entries = [];
+        const features = Object.assign({}, plan.features || {});
+        if (!('max_athletes' in features) && plan.max_athletes) {
+            features.max_athletes = plan.max_athletes;
+        }
+        if (!('max_collaborators' in features) && plan.max_collaborators) {
+            features.max_collaborators = plan.max_collaborators;
+        }
+        for (const [key, value] of Object.entries(features)) {
+            if (value === undefined || value === '') {
+                continue;
+            }
+            entries.push({ key, value: normaliseFeatureValue(value) });
+        }
+        return entries;
+    }
+
+    function createPlanCard(plan) {
+        const card = document.createElement('article');
+        card.className = 'plan-card';
+
+        const header = document.createElement('header');
+        const title = document.createElement('h3');
+        title.textContent = plan.name;
+        header.appendChild(title);
+
+        const price = document.createElement('div');
+        price.className = 'plan-price';
+        price.textContent = priceLabel(plan.price, plan.currency);
+        header.appendChild(price);
+
+        if (plan.features && plan.features.tier) {
+            const tier = document.createElement('small');
+            tier.textContent = plan.features.tier === 'agent' ? 'Plan agent' : 'Plan organisation';
+            tier.style.color = '#6b7280';
+            header.appendChild(tier);
+        }
+
+        const code = document.createElement('div');
+        code.className = 'plan-code';
+        code.textContent = plan.code;
+        header.appendChild(code);
+
+        card.appendChild(header);
+
+        const list = document.createElement('ul');
+        list.className = 'plan-features';
+        const entries = planFeatureEntries(plan);
+        if (entries.length === 0) {
+            const item = document.createElement('li');
+            item.textContent = 'Aucune caractéristique renseignée.';
+            list.appendChild(item);
+        } else {
+            for (const entry of entries) {
+                const item = document.createElement('li');
+                item.innerHTML = `<strong>${featureLabel(entry.key)} :</strong> <span>${entry.value}</span>`;
+                list.appendChild(item);
+            }
+        }
+        card.appendChild(list);
+
+        const footer = document.createElement('footer');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Initier le checkout';
+        button.addEventListener('click', () => startCheckout(plan));
+        footer.appendChild(button);
+
+        if (plan.stripe_product_id) {
+            const product = document.createElement('a');
+            product.href = `https://dashboard.stripe.com/test/products/${plan.stripe_product_id}`;
+            product.target = '_blank';
+            product.rel = 'noopener';
+            product.textContent = 'Voir le produit Stripe';
+            footer.appendChild(product);
+        }
+
+        card.appendChild(footer);
+
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'Payload brut';
+        details.appendChild(summary);
+        const raw = document.createElement('pre');
+        raw.textContent = JSON.stringify(plan, null, 2);
+        details.appendChild(raw);
+        card.appendChild(details);
+
+        return card;
+    }
+
+    async function loadPlans() {
+        setStatus(plansStatus, 'Chargement des plans…');
+        plansGrid.innerHTML = '';
+        try {
+            const response = await apiRequest({ url: '/api/payments/plans/' });
+            if (response.ok && Array.isArray(response.data)) {
+                setStatus(plansStatus, `Plans chargés (${response.data.length})`, 'success');
+                if (response.data.length === 0) {
+                    plansGrid.textContent = 'Aucun plan actif.';
+                } else {
+                    for (const plan of response.data) {
+                        plansGrid.appendChild(createPlanCard(plan));
+                    }
+                }
+            } else {
+                setStatus(plansStatus, `Erreur • statut ${response.status}`, 'error');
+                plansGrid.innerHTML = '';
+                const errorBlock = document.createElement('pre');
+                errorBlock.textContent = JSON.stringify(response.data, null, 2);
+                plansGrid.appendChild(errorBlock);
+            }
+        } catch (error) {
+            setStatus(plansStatus, 'Erreur réseau lors du chargement.', 'error');
+            plansGrid.innerHTML = '';
+            const errorBlock = document.createElement('pre');
+            errorBlock.textContent = error.message || String(error);
+            plansGrid.appendChild(errorBlock);
+        }
+    }
+
+    function resolveScopePayload(plan) {
+        const scope = document.querySelector('input[name="subscription_scope"]:checked');
+        const successUrl = successUrlInput.value.trim() || CHECKOUT_SESSION_PLACEHOLDER;
+        const cancelUrl = cancelUrlInput.value.trim() || 'https://example.com/cancel';
+        const payload = {
+            plan_id: plan.id,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+        };
+
+        if (!scope) {
+            throw new Error('Sélectionnez une portée (agent ou organisation).');
+        }
+
+        if (scope.value === 'agent') {
+            const agentId = agentIdInput.value.trim();
+            if (!agentId) {
+                throw new Error("Renseignez l'identifiant de l'agent.");
+            }
+            payload.agent_id = agentId;
+        } else {
+            const organisationId = organisationIdInput.value.trim();
+            if (!organisationId) {
+                throw new Error("Renseignez l'identifiant de l'organisation.");
+            }
+            payload.organisation_id = organisationId;
+        }
+        return payload;
+    }
+
+    async function startCheckout(plan) {
+        try {
+            const payload = resolveScopePayload(plan);
+            setStatus(checkoutStatus, 'Création de la session…');
+            renderJSON(checkoutOutput, '');
+            checkoutLink.style.display = 'none';
+            const response = await apiRequest({
+                url: '/api/payments/stripe/checkout-session/',
+                method: 'POST',
+                data: payload,
+                includeAuth: true,
+            });
+            renderJSON(checkoutOutput, response.data);
+            if (response.ok) {
+                setStatus(checkoutStatus, `Session prête • statut ${response.status}`, 'success');
+                const sessionUrl = response.data && response.data.url;
+                if (sessionUrl) {
+                    checkoutLink.href = sessionUrl;
+                    checkoutLink.style.display = 'inline-flex';
+                    checkoutLink.textContent = 'Ouvrir la session Stripe';
+                }
+            } else {
+                setStatus(checkoutStatus, `Erreur • statut ${response.status}`, 'error');
+            }
+        } catch (error) {
+            setStatus(checkoutStatus, error.message || 'Erreur côté client.', 'error');
+            renderJSON(checkoutOutput, error.stack || error.message || error);
+        }
+    }
+
+    async function fetchSubscription() {
+        setStatus(subscriptionStatus, 'Chargement…');
+        renderJSON(subscriptionOutput, '');
+        try {
+            const response = await apiRequest({
+                url: '/api/payments/subscriptions/me/',
+                includeAuth: true,
+            });
+            renderJSON(subscriptionOutput, response.data);
+            if (response.ok) {
+                setStatus(subscriptionStatus, `Abonnement chargé • statut ${response.status}`, 'success');
+            } else if (response.status === 404) {
+                setStatus(subscriptionStatus, 'Aucun abonnement actif.', 'error');
+            } else {
+                setStatus(subscriptionStatus, `Erreur • statut ${response.status}`, 'error');
+            }
+        } catch (error) {
+            setStatus(subscriptionStatus, 'Erreur réseau', 'error');
+            renderJSON(subscriptionOutput, error.message || error);
+        }
+    }
+
+    async function cancelSubscription() {
+        if (!confirm('Confirmez-vous la résiliation immédiate ?')) {
+            return;
+        }
+        setStatus(subscriptionStatus, 'Résiliation en cours…');
+        try {
+            const response = await apiRequest({
+                url: '/api/payments/subscriptions/me/',
+                method: 'DELETE',
+                includeAuth: true,
+            });
+            if (response.ok || response.status === 204) {
+                setStatus(subscriptionStatus, 'Abonnement résilié.', 'success');
+                subscriptionOutput.textContent = 'Subscription canceled. Relancez un checkout pour tester à nouveau.';
+            } else {
+                setStatus(subscriptionStatus, `Erreur • statut ${response.status}`, 'error');
+                renderJSON(subscriptionOutput, response.data);
+            }
+        } catch (error) {
+            setStatus(subscriptionStatus, 'Erreur réseau', 'error');
+            subscriptionOutput.textContent = error.message || String(error);
+        }
+    }
+
+    let lastEntitlements = new Map();
+
+    function renderEntitlementsList(payload) {
+        entitlementsList.innerHTML = '';
+        if (!payload || !Array.isArray(payload.features) || payload.features.length === 0) {
+            entitlementsList.textContent = 'Aucun droit disponible.';
+            return;
+        }
+        for (const feature of payload.features) {
+            const item = document.createElement('div');
+            item.className = 'entitlement';
+            if (feature.granted) {
+                item.classList.add('granted');
+            }
+            const previous = lastEntitlements.get(feature.code);
+            if (previous === true && feature.granted === false) {
+                item.classList.add('regressed');
+            } else if (previous === false && feature.granted === true) {
+                item.classList.add('improved');
+            } else if (!lastEntitlements.has(feature.code) && feature.granted) {
+                item.classList.add('improved');
+            }
+
+            const title = document.createElement('strong');
+            title.textContent = feature.label || feature.code;
+            item.appendChild(title);
+
+            if (feature.description) {
+                const description = document.createElement('p');
+                description.textContent = feature.description;
+                description.style.margin = '0';
+                description.style.color = '#4b5563';
+                item.appendChild(description);
+            }
+
+            const statusLine = document.createElement('small');
+            statusLine.textContent = feature.granted ? 'Accordé' : 'Non accordé';
+            item.appendChild(statusLine);
+
+            if (feature.recommended_plans && feature.recommended_plans.length) {
+                const recommendation = document.createElement('small');
+                recommendation.textContent = `Plans recommandés : ${feature.recommended_plans.join(', ')}`;
+                item.appendChild(recommendation);
+            }
+
+            if (feature.upgrade_url) {
+                const upgrade = document.createElement('a');
+                upgrade.href = feature.upgrade_url;
+                upgrade.target = '_blank';
+                upgrade.rel = 'noopener';
+                upgrade.textContent = 'Voir les plans recommandés';
+                upgrade.style.fontSize = '0.8rem';
+                upgrade.style.color = '#2563eb';
+                item.appendChild(upgrade);
+            }
+
+            entitlementsList.appendChild(item);
+        }
+
+        lastEntitlements = new Map(
+            payload.features.map((feature) => [feature.code, Boolean(feature.granted)])
+        );
+    }
+
+    async function fetchEntitlements() {
+        setStatus(entitlementsStatus, 'Chargement des droits…');
+        entitlementsList.innerHTML = '';
+        try {
+            const response = await apiRequest({
+                url: '/api/users/me/entitlements/',
+                includeAuth: true,
+            });
+            if (response.ok) {
+                setStatus(entitlementsStatus, `Droits chargés • statut ${response.status}`, 'success');
+                renderEntitlementsList(response.data);
+            } else {
+                setStatus(entitlementsStatus, `Erreur • statut ${response.status}`, 'error');
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(response.data, null, 2);
+                entitlementsList.appendChild(pre);
+            }
+        } catch (error) {
+            setStatus(entitlementsStatus, 'Erreur réseau', 'error');
+            const pre = document.createElement('pre');
+            pre.textContent = error.message || String(error);
+            entitlementsList.appendChild(pre);
+        }
+    }
+
+    function toggleScopeFields() {
+        const scope = document.querySelector('input[name="subscription_scope"]:checked');
+        if (!scope) {
+            return;
+        }
+        if (scope.value === 'agent') {
+            agentIdField.hidden = false;
+            organisationIdField.hidden = true;
+        } else {
+            agentIdField.hidden = true;
+            organisationIdField.hidden = false;
+        }
+    }
+
+    function initDefaultUrls() {
+        const origin = window.location.origin;
+        if (!successUrlInput.value) {
+            successUrlInput.value = `${origin}/payments/success?session_id={CHECKOUT_SESSION_ID}`;
+        }
+        if (!cancelUrlInput.value) {
+            cancelUrlInput.value = `${origin}/payments/cancel`;
+        }
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const loginStatus = document.getElementById('loginStatus');
+    const loginOutput = document.getElementById('loginOutput');
+    const refreshForm = document.getElementById('refreshForm');
+    const refreshStatus = document.getElementById('refreshStatus');
+    const refreshOutput = document.getElementById('refreshOutput');
+    const loadPlansBtn = document.getElementById('loadPlans');
+    const plansStatus = document.getElementById('plansStatus');
+    const plansGrid = document.getElementById('plansGrid');
+    const checkoutStatus = document.getElementById('checkoutStatus');
+    const checkoutOutput = document.getElementById('checkoutOutput');
+    const checkoutLink = document.getElementById('checkoutLink');
+    const agentIdInput = document.getElementById('agentIdInput');
+    const organisationIdInput = document.getElementById('organisationIdInput');
+    const agentIdField = document.getElementById('agentIdField');
+    const organisationIdField = document.getElementById('organisationIdField');
+    const successUrlInput = document.getElementById('successUrlInput');
+    const cancelUrlInput = document.getElementById('cancelUrlInput');
+    const subscriptionStatus = document.getElementById('subscriptionStatus');
+    const subscriptionOutput = document.getElementById('subscriptionOutput');
+    const refreshSubscriptionBtn = document.getElementById('refreshSubscription');
+    const cancelSubscriptionBtn = document.getElementById('cancelSubscription');
+    const entitlementsStatus = document.getElementById('entitlementsStatus');
+    const entitlementsList = document.getElementById('entitlementsList');
+    const refreshEntitlementsBtn = document.getElementById('refreshEntitlements');
+    const copyTokenBtn = document.getElementById('copyAccessToken');
+    const clearTokensBtn = document.getElementById('clearTokens');
+    const loadStoredRefreshBtn = document.getElementById('loadStoredRefresh');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus(loginStatus, 'Connexion en cours…');
+            renderJSON(loginOutput, '');
+            const formData = new FormData(loginForm);
+            const payload = {
+                email: formData.get('email'),
+                password: formData.get('password'),
+            };
+            try {
+                const response = await apiRequest({
+                    url: '/api/users/login/',
+                    method: 'POST',
+                    data: payload,
+                });
+                renderJSON(loginOutput, response.data);
+                if (response.ok && response.data) {
+                    setStatus(loginStatus, `Connecté • statut ${response.status}`, 'success');
+                    if (typeof response.data === 'object') {
+                        storeTokens(response.data);
+                    }
+                    fetchSubscription();
+                    fetchEntitlements();
+                } else {
+                    setStatus(loginStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                setStatus(loginStatus, 'Erreur réseau', 'error');
+                renderJSON(loginOutput, error.message || error);
+            }
+        });
+    }
+
+    if (refreshForm) {
+        refreshForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setStatus(refreshStatus, 'Renouvellement en cours…');
+            renderJSON(refreshOutput, '');
+            const formData = new FormData(refreshForm);
+            const provided = formData.get('refresh_token');
+            const payload = {
+                refresh: provided || window.localStorage.getItem(REFRESH_KEY) || '',
+            };
+            if (!payload.refresh) {
+                setStatus(refreshStatus, 'Aucun refresh token disponible', 'error');
+                renderJSON(refreshOutput, '');
+                return;
+            }
+            try {
+                const response = await apiRequest({
+                    url: '/api/users/login/refresh/',
+                    method: 'POST',
+                    data: payload,
+                });
+                renderJSON(refreshOutput, response.data);
+                if (response.ok && response.data) {
+                    setStatus(refreshStatus, `Tokens mis à jour • statut ${response.status}`, 'success');
+                    if (typeof response.data === 'object') {
+                        storeTokens(response.data);
+                    }
+                    fetchSubscription();
+                    fetchEntitlements();
+                } else {
+                    setStatus(refreshStatus, `Erreur • statut ${response.status}`, 'error');
+                }
+            } catch (error) {
+                setStatus(refreshStatus, 'Erreur réseau', 'error');
+                renderJSON(refreshOutput, error.message || error);
+            }
+        });
+    }
+
+    if (loadPlansBtn) {
+        loadPlansBtn.addEventListener('click', loadPlans);
+    }
+
+    document.querySelectorAll('input[name="subscription_scope"]').forEach((radio) => {
+        radio.addEventListener('change', toggleScopeFields);
+    });
+
+    if (refreshSubscriptionBtn) {
+        refreshSubscriptionBtn.addEventListener('click', fetchSubscription);
+    }
+
+    if (cancelSubscriptionBtn) {
+        cancelSubscriptionBtn.addEventListener('click', cancelSubscription);
+    }
+
+    if (refreshEntitlementsBtn) {
+        refreshEntitlementsBtn.addEventListener('click', fetchEntitlements);
+    }
+
+    if (copyTokenBtn) {
+        copyTokenBtn.addEventListener('click', copyAccessToken);
+    }
+
+    if (clearTokensBtn) {
+        clearTokensBtn.addEventListener('click', clearTokens);
+    }
+
+    if (loadStoredRefreshBtn) {
+        loadStoredRefreshBtn.addEventListener('click', () => {
+            refreshForm.refresh_token.value = window.localStorage.getItem(REFRESH_KEY) || '';
+            if (!refreshForm.refresh_token.value) {
+                alert('Aucun refresh token stocké.');
+            }
+        });
+    }
+
+    initDefaultUrls();
+    toggleScopeFields();
+
+    const hasToken = Boolean(window.localStorage.getItem(ACCESS_KEY));
+    if (hasToken) {
+        fetchSubscription();
+        fetchEntitlements();
+    }
+})();
+</script>
+</body>
+</html>

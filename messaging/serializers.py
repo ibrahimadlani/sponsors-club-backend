@@ -1,4 +1,9 @@
-"""Serializers for messaging threads and messages."""
+"""Serializers for messaging threads and messages.
+
+Serializers in this module focus on shaping messaging payloads and validating
+thread creation rules. Inline comments call out non-obvious business rules such
+as de-duplication and access restrictions.
+"""
 
 from django.db import transaction
 from rest_framework import serializers
@@ -12,7 +17,11 @@ from .models import Message, Thread
 
 
 class CollaboratorSummarySerializer(serializers.ModelSerializer):
-    """Lightweight collaborator representation for thread payloads."""
+    """Lightweight collaborator representation for thread payloads.
+
+    The summary serializer keeps responses compact while still giving enough
+    context to render collaborator information in a client UI.
+    """
 
     class Meta:
         """Serializer configuration."""
@@ -23,7 +32,12 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
 
 
 class AgentProfileSummarySerializer(serializers.ModelSerializer):
-    """Expose core agent profile fields for thread payloads."""
+    """Expose core agent profile fields for thread payloads.
+
+    Exposing the agent email is helpful for audit trails and debugging so it is
+    denormalised here even though the ``AgentProfile`` already references the
+    underlying user.
+    """
 
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
@@ -36,7 +50,11 @@ class AgentProfileSummarySerializer(serializers.ModelSerializer):
 
 
 class AthleteSummarySerializer(serializers.ModelSerializer):
-    """Expose the subset of athlete data used within messaging threads."""
+    """Expose the subset of athlete data used within messaging threads.
+
+    Messaging only needs lightweight context, so the serializer deliberately
+    sticks to three columns to avoid needless database joins in consumers.
+    """
 
     class Meta:
         """Serializer configuration."""
@@ -47,7 +65,11 @@ class AthleteSummarySerializer(serializers.ModelSerializer):
 
 
 class ThreadSerializer(serializers.ModelSerializer):
-    """Serialize thread entities with related participant summaries."""
+    """Serialize thread entities with related participant summaries.
+
+    The serializer is read-only and combines each participant summary to form a
+    cohesive payload that matches the needs of the frontend inbox.
+    """
 
     collaborator = CollaboratorSummarySerializer(read_only=True)
     agent = AgentProfileSummarySerializer(read_only=True)
@@ -62,14 +84,30 @@ class ThreadSerializer(serializers.ModelSerializer):
 
 
 class ThreadCreateSerializer(serializers.Serializer):
-    """Validate payload required to open a messaging thread."""
+    """Validate payload required to open a messaging thread.
+
+    Only collaborators and agents that the current user represents may create a
+    thread. The serializer enforces those constraints before the view attempts
+    persistence.
+    """
 
     collaborator_id = serializers.UUIDField(required=False)
     agent_id = serializers.UUIDField(required=False)
     athlete_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
-        """Ensure collaborator, agent, and optional athlete inputs are consistent."""
+        """Ensure collaborator, agent, and optional athlete inputs are consistent.
+
+        Args:
+            attrs (dict): Raw attributes for collaborator, agent, and athlete IDs.
+
+        Raises:
+            serializers.ValidationError: If participants cannot be resolved or
+                the user is not authorised to create the thread.
+
+        Returns:
+            dict: Mutated attributes including hydrated participant instances.
+        """
 
         request = self.context["request"]
         user = request.user
@@ -103,7 +141,7 @@ class ThreadCreateSerializer(serializers.Serializer):
             if not athlete:
                 raise serializers.ValidationError({"athlete_id": "Athlete not found."})
 
-        # Determine collaborator and agent based on requesting user if not provided
+        # Determine collaborator and agent based on requesting user if not provided.
         if collaborator is None:
             collaborator = Collaborator.objects.filter(user=user).first()
         if agent is None:
@@ -126,7 +164,8 @@ class ThreadCreateSerializer(serializers.Serializer):
         attrs["agent"] = agent
         attrs["athlete"] = athlete
 
-        # Prevent duplicate threads
+        # Prevent duplicate threads so the inbox never displays multiple
+        # conversations for the same participants.
         existing = Thread.objects.filter(
             collaborator=collaborator,
             agent=agent,
@@ -141,7 +180,14 @@ class ThreadCreateSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        """Persist a new thread based on validated participant data."""
+        """Persist a new thread based on validated participant data.
+
+        Args:
+            validated_data (dict): Hydrated participant objects.
+
+        Returns:
+            Thread: Newly created thread instance.
+        """
 
         collaborator = validated_data["collaborator"]
         agent = validated_data["agent"]
@@ -154,13 +200,23 @@ class ThreadCreateSerializer(serializers.Serializer):
         return thread
 
     def update(self, instance, validated_data):
-        """Thread updates are not supported for this serializer."""
+        """Thread updates are not supported for this serializer.
+
+        Raises:
+            NotImplementedError: Always raised to signal that updates are not
+                available.
+        """
 
         raise NotImplementedError("Thread updates are not supported.")
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    """Serialize individual messages, exposing sender metadata."""
+    """Serialize individual messages while exposing sender metadata.
+
+    The serializer is used for both list and detail responses. It appends a
+    ``sender_email`` field so clients do not have to perform additional
+    lookups.
+    """
 
     sender_email = serializers.EmailField(source="sender.email", read_only=True)
 
@@ -182,7 +238,11 @@ class MessageSerializer(serializers.ModelSerializer):
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):
-    """Validate and create outbound messages for a thread."""
+    """Validate and create outbound messages for a thread.
+
+    The serializer expects the surrounding view to provide ``thread`` and
+    ``request`` in the context so it can assign ownership and update timestamps.
+    """
 
     class Meta:
         """Serializer configuration."""
@@ -191,7 +251,18 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         fields = ("content", "attachment")
 
     def validate(self, attrs):
-        """Ensure a message includes content or an attachment."""
+        """Ensure a message includes content or an attachment.
+
+        Args:
+            attrs (dict): Submitted message payload.
+
+        Raises:
+            serializers.ValidationError: If both content and attachment are
+                missing.
+
+        Returns:
+            dict: The original attributes, untouched.
+        """
 
         content = attrs.get("content", "").strip()
         if not content and not attrs.get("attachment"):
@@ -202,7 +273,14 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        """Create the message, updating the thread last-message timestamp."""
+        """Create the message, updating the thread last-message timestamp.
+
+        Args:
+            validated_data (dict): Sanitised message payload.
+
+        Returns:
+            Message: Newly persisted message instance.
+        """
 
         thread = self.context["thread"]
         sender = self.context["request"].user
@@ -217,7 +295,11 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
 
 class MessageReadSerializer(serializers.ModelSerializer):
-    """Toggle the read state of a message."""
+    """Toggle the read state of a message.
+
+    The serializer only handles the ``is_read`` flag to ensure we do not
+    accidentally expose other fields for partial updates.
+    """
 
     class Meta:
         """Serializer configuration."""
@@ -226,7 +308,15 @@ class MessageReadSerializer(serializers.ModelSerializer):
         fields = ("is_read",)
 
     def update(self, instance, validated_data):
-        """Persist the new read state."""
+        """Persist the new read state.
+
+        Args:
+            instance (Message): Message instance to update.
+            validated_data (dict): Attributes containing the desired read state.
+
+        Returns:
+            Message: Updated instance for chaining.
+        """
 
         instance.is_read = validated_data.get("is_read", True)
         instance.save(update_fields=["is_read", "updated_at"])
