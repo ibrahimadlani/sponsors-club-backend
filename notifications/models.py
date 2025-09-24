@@ -1,4 +1,9 @@
-"""Database models for persisting notifications."""
+"""Notification models that persist user-facing alerts.
+
+The models in this module favour UUID identifiers and timestamp tracking so
+that notifications can be referenced across external systems without leaking
+database ids.
+"""
 
 import uuid
 
@@ -7,23 +12,44 @@ from django.db import models
 
 
 class BaseModel(models.Model):
-    """Abstract base model providing UUID primary key and timestamps."""
+    """Abstract base model with UUID primary keys and timestamps.
+
+    Attributes:
+        id (models.UUIDField): Unique identifier that avoids predictable ids
+            and simplifies sharding if we ever move notifications to another
+            store.
+        created_at (models.DateTimeField): Timestamp for when the record was
+            created.
+        updated_at (models.DateTimeField): Timestamp automatically updated on
+            each save.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        """Django metadata configuration for abstract base."""
+        """Metadata that keeps the base model abstract."""
 
         abstract = True
 
 
 class Notification(BaseModel):
-    """Notification entry targeting a user."""
+    """Notification entry targeting a user.
+
+    Attributes:
+        user (models.ForeignKey): Recipient that should see the message within
+            the notification center.
+        type (str): Key describing the kind of notification (e.g. payment,
+            new message).
+        payload (dict): Metadata payload that holds structured details for the
+            client application.
+        is_read (bool): Flag indicating whether the recipient has acknowledged
+            the notification.
+    """
 
     class Type(models.TextChoices):
-        """Supported notification categories."""
+        """Supported notification categories for the product."""
 
         NEW_MESSAGE = "NEW_MESSAGE", "New Message"
         CONTRACT_STATUS = "CONTRACT_STATUS", "Contract Status"
@@ -41,8 +67,10 @@ class Notification(BaseModel):
     is_read = models.BooleanField(default=False)
 
     class Meta:
-        """Django metadata configuration for notifications."""
+        """Metadata that optimises querying for notification lists."""
 
+        # Index fields used together when listing notifications by read status
+        # for a particular user.
         indexes = [
             models.Index(
                 fields=("user", "is_read", "-created_at"),
@@ -51,4 +79,13 @@ class Notification(BaseModel):
         ordering = ("-created_at",)
 
     def __str__(self):
+        """Return a concise representation of the notification.
+
+        Returns:
+            str: Human-readable representation useful for debugging and admin
+            listings.
+        """
+
+        # Include the recipient to disambiguate notifications of the same
+        # type that may exist for multiple users.
         return f"Notification({self.type}) for {self.user}"

@@ -97,8 +97,16 @@ class DailyStatsSummarySerializer(serializers.Serializer):
     graph_data = GraphPointSerializer(many=True)
 
     def to_representation(self, instance):
-        """Allow passing dictionaries directly without strict serializer models."""
+        """Allow passing dictionaries directly without strict serializer models.
+
+        Args:
+            instance: Object or dictionary to serialise.
+
+        Returns:
+            dict: Serialised analytics summary payload.
+        """
 
         if isinstance(instance, dict):
+            # Service layer already produces API shaped dictionaries for speed.
             return instance
         return super().to_representation(instance)

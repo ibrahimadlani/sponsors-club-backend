@@ -1,4 +1,8 @@
-"""URL routing for the messaging application."""
+"""URL routing for the messaging application.
+
+Routes are defined in a dedicated module to keep them close to the views while
+avoiding import cycles with Django's project level URL configuration.
+"""
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter

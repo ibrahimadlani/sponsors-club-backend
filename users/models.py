@@ -1,6 +1,9 @@
 """Core data models for the users application."""
 
+import hashlib
+import secrets
 import uuid
+from datetime import timedelta
 
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -9,6 +12,7 @@ from django.contrib.auth.models import (
 )
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 
 
 class BaseModel(models.Model):
@@ -111,3 +115,64 @@ class AgentProfile(BaseModel):
         if self.display_name:
             return str(self.display_name)
         return str(self.user)
+
+
+class EmailVerificationToken(BaseModel):
+    """Token issued to confirm a user's email address."""
+
+    TOKEN_BYTES = 32
+    EXPIRY_HOURS = 48
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="email_verification_tokens",
+    )
+    token_hash = models.CharField(max_length=64, db_index=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("user", "expires_at")),
+        ]
+
+    @classmethod
+    def _hash(cls, raw_token: str) -> str:
+        return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def issue_for_user(cls, user: User) -> str:
+        """Create a new verification token for the provided user."""
+
+        raw_token = secrets.token_urlsafe(cls.TOKEN_BYTES)
+        token_hash = cls._hash(raw_token)
+        expires_at = timezone.now() + timedelta(hours=cls.EXPIRY_HOURS)
+        cls.objects.filter(user=user, used_at__isnull=True).update(
+            used_at=timezone.now(), updated_at=timezone.now()
+        )
+        cls.objects.create(
+            user=user,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        return raw_token
+
+    @classmethod
+    def verify(cls, user: User, raw_token: str) -> "EmailVerificationToken | None":
+        """Return the token instance if valid, otherwise ``None``."""
+
+        token_hash = cls._hash(raw_token)
+        try:
+            token = cls.objects.get(
+                user=user,
+                token_hash=token_hash,
+                used_at__isnull=True,
+            )
+        except cls.DoesNotExist:
+            return None
+        if token.expires_at < timezone.now():
+            return None
+        token.used_at = timezone.now()
+        token.save(update_fields=["used_at", "updated_at"])
+        return token

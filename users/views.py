@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from core.permissions import feature_status_for_user
 from .serializers import (
+    EmailVerificationConfirmSerializer,
     MeUpdateSerializer,
     RegisterSerializer,
     RolesDataBuilder,
@@ -73,3 +74,15 @@ class MeEntitlementsView(APIView):
                 "features": features,
             }
         )
+
+
+class VerifyEmailView(APIView):
+    """Allow users to confirm their email address via verification token."""
+
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request, *_args, **_kwargs):
+        serializer = EmailVerificationConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Email address verified."})
