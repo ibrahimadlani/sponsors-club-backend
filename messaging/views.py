@@ -12,6 +12,7 @@ from core.permissions import (
     get_agent_profile,
     requirement_denied_payload,
 )
+from core.responses import error_response
 from .models import Message, Thread
 from .permissions import IsThreadParticipant
 from .serializers import (
@@ -90,9 +91,11 @@ class ThreadViewSet(viewsets.GenericViewSet):
                 )
                 return Response(payload, status=status.HTTP_403_FORBIDDEN)
         elif collaborator.user_id != user.id and not request.user.is_staff:
-            return Response(
-                {"detail": "Permission denied."},
-                status=status.HTTP_403_FORBIDDEN,
+            return error_response(
+                "Permission denied.",
+                status.HTTP_403_FORBIDDEN,
+                code="messaging_thread_permission_denied",
+                collaborator_id=str(collaborator.id),
             )
         thread = serializer.save()
         output = ThreadSerializer(thread)
@@ -135,9 +138,11 @@ class ThreadMessagesView(APIView):
 
         thread = self.get_thread(request, thread_id)
         if not thread:
-            return Response(
-                {"detail": "Thread not found or access denied."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "Thread not found or access denied.",
+                status.HTTP_404_NOT_FOUND,
+                code="messaging_thread_not_accessible",
+                thread_id=str(thread_id),
             )
 
         messages = (
@@ -155,9 +160,11 @@ class ThreadMessagesView(APIView):
 
         thread = self.get_thread(request, thread_id)
         if not thread:
-            return Response(
-                {"detail": "Thread not found or access denied."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "Thread not found or access denied.",
+                status.HTTP_404_NOT_FOUND,
+                code="messaging_thread_not_accessible",
+                thread_id=str(thread_id),
             )
 
         serializer = MessageCreateSerializer(
@@ -189,20 +196,26 @@ class MessageReadView(APIView):
             .first()
         )
         if not message:
-            return Response(
-                {"detail": "Message not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "Message not found.",
+                status.HTTP_404_NOT_FOUND,
+                code="messaging_message_not_found",
+                message_id=str(message_id),
             )
         if not IsThreadParticipant().has_object_permission(request, self, message):
-            return Response(
-                {"detail": "Access denied."},
-                status=status.HTTP_403_FORBIDDEN,
+            return error_response(
+                "Access denied.",
+                status.HTTP_403_FORBIDDEN,
+                code="messaging_message_access_denied",
+                message_id=str(message_id),
             )
 
         if message.sender_id == request.user.id:
-            return Response(
-                {"detail": "Only the message recipient may update read status."},
-                status=status.HTTP_403_FORBIDDEN,
+            return error_response(
+                "Only the message recipient may update read status.",
+                status.HTTP_403_FORBIDDEN,
+                code="messaging_message_read_status_forbidden",
+                message_id=str(message_id),
             )
 
         serializer = MessageReadSerializer(message, data=request.data, partial=True)

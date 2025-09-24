@@ -9,6 +9,7 @@ from core.permissions import (
     requirement_denied_payload,
     user_feature_requirement,
 )
+from core.responses import error_response
 from .models import Notification
 from .serializers import NotificationReadSerializer, NotificationSerializer
 
@@ -81,9 +82,10 @@ class NotificationReadView(APIView):
                 id=notification_id, user=request.user
             )
         except Notification.DoesNotExist:
-            return Response(
-                {"detail": "Notification not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                "Notification not found.",
+                status.HTTP_404_NOT_FOUND,
+                code="notification_not_found",
             )
 
         serializer = NotificationReadSerializer(

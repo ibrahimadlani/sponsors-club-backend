@@ -12,6 +12,7 @@ from payments.models import Subscription
 from users.models import AgentProfile, User
 
 from .feature_matrix import FEATURE_MATRIX, FeatureRequirement
+from .responses import build_error_payload
 
 
 def get_agent_profile(user: User) -> Optional[AgentProfile]:
@@ -302,10 +303,12 @@ def requirement_denied_payload(
 ) -> dict:
     """Build a standardised denial payload for unmet feature requirements."""
 
-    return {
-        "detail": requirement.denied_message or default_detail,
-        "required_feature": requirement.key,
-        "allowed_values": requirement.allowed_values,
-        "upgrade_url": requirement.upgrade_url,
-        "recommended_plans": list(requirement.recommended_plans),
-    }
+    message = requirement.denied_message or default_detail
+    return build_error_payload(
+        message,
+        code="feature_requirement_denied",
+        required_feature=requirement.key,
+        allowed_values=requirement.allowed_values,
+        upgrade_url=requirement.upgrade_url,
+        recommended_plans=list(requirement.recommended_plans),
+    )
