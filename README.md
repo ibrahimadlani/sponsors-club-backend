@@ -99,8 +99,7 @@ docker compose up --build
 ```
 
 Override the default database credentials or Django settings by exporting environment variables before running `docker compose`
-or by editing the compose file. The service mounts the repository into the container so code changes are picked up without a
-rebuild. Static assets are collected on startup and served via WhiteNoise; they persist in a dedicated Docker volume so admin
+or by editing the compose file. The service mounts the repository into the container so code changes are picked up without a rebuild. Static assets are collected on startup and served via WhiteNoise; they persist in a dedicated Docker volume so admin
 pages load without 404s even after container restarts. To re-run migrations manually, use:
 
 ```bash
