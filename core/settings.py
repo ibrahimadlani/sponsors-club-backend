@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "rest_framework",
     "django_filters",
     "core.apps.CoreConfig",
@@ -83,6 +84,7 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = "core.asgi.application"
 WSGI_APPLICATION = "core.wsgi.application"
 
 
@@ -199,3 +201,18 @@ EMAIL_VERIFICATION_URL_TEMPLATE = os.environ.get(
     "EMAIL_VERIFICATION_URL_TEMPLATE",
     "",
 )
+
+
+if os.environ.get("REDIS_URL"):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [os.environ["REDIS_URL"]]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }

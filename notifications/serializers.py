@@ -4,6 +4,8 @@ Serializers transform notification model instances into the shape expected by
 the API clients and validate partial updates such as read-state toggles.
 """
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from rest_framework import serializers
 
 from .models import Notification
@@ -49,3 +51,15 @@ class NotificationReadSerializer(serializers.ModelSerializer):
 
         model = Notification
         fields = ("is_read",)
+
+    def update(self, instance, validated_data):
+        instance.is_read = validated_data.get("is_read", instance.is_read)
+        instance.save(update_fields=["is_read", "updated_at"])
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            payload = NotificationSerializer(instance).data
+            async_to_sync(channel_layer.group_send)(
+                f"user_{instance.user_id}",
+                {"type": "notification_updated", "payload": payload},
+            )
+        return instance

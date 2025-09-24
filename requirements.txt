@@ -13,6 +13,9 @@ djangorestframework_simplejwt==5.5.1  # JWT authentication backend for DRF
 drf-yasg==1.21.10  # OpenAPI schema generation for interactive docs
 uritemplate==4.2.0  # URL template expansion required by drf-yasg
 PyJWT==2.10.1  # Explicit pin aligned with SimpleJWT to avoid compatibility drift
+channels==4.1.0  # ASGI support enabling WebSocket consumers
+channels-redis==4.2.0  # Redis-backed channel layer for horizontal scaling
+daphne==4.1.2  # ASGI server used to serve HTTP and WebSocket traffic
 
 # Application utilities and runtime extras
 Faker==37.8.0  # Generates sample data for management commands
