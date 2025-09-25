@@ -3,8 +3,15 @@
 import importlib.util
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
-from dotenv import load_dotenv
+try:  # pragma: no cover - fallback path exercised only when dependency missing
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - lightweight shim for constrained envs
+    def load_dotenv(*_args, **_kwargs):
+        """Gracefully skip dotenv loading when the optional dependency is absent."""
+
+        return False
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,8 +43,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "rest_framework",
     "django_filters",
+    "corsheaders",
     "core.apps.CoreConfig",
     "analytics",
     "athletes",
@@ -57,6 +66,7 @@ if DRF_YASG_ENABLED:
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -83,6 +93,7 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = "core.asgi.application"
 WSGI_APPLICATION = "core.wsgi.application"
 
 
@@ -174,6 +185,30 @@ REST_FRAMEWORK = {
 }
 
 
+_default_cors_origins = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+)
+_env_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
+CORS_ALLOW_CREDENTIALS = True
+
+# Copy CORS hostnames into ALLOWED_HOSTS so websocket origin checks match.
+_cors_hosts = {
+    parsed.hostname
+    for origin in CORS_ALLOWED_ORIGINS
+    if origin and (parsed := urlparse(origin)).hostname
+}
+ALLOWED_HOSTS = list({*ALLOWED_HOSTS, *(_cors_hosts or set())})
+
+
 AUTH_USER_MODEL = "users.User"
 
 
@@ -199,3 +234,18 @@ EMAIL_VERIFICATION_URL_TEMPLATE = os.environ.get(
     "EMAIL_VERIFICATION_URL_TEMPLATE",
     "",
 )
+
+
+if os.environ.get("REDIS_URL"):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [os.environ["REDIS_URL"]]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }

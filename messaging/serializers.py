@@ -5,6 +5,8 @@ thread creation rules. Inline comments call out non-obvious business rules such
 as de-duplication and access restrictions.
 """
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from rest_framework import serializers
 
@@ -218,6 +220,8 @@ class MessageSerializer(serializers.ModelSerializer):
     lookups.
     """
 
+    thread = serializers.UUIDField(source="thread_id", read_only=True)
+    sender = serializers.UUIDField(source="sender_id", read_only=True)
     sender_email = serializers.EmailField(source="sender.email", read_only=True)
 
     class Meta:
@@ -291,6 +295,13 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         )
         thread.last_message_at = message.created_at
         thread.save(update_fields=["last_message_at", "updated_at"])
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            payload = MessageSerializer(message).data
+            async_to_sync(channel_layer.group_send)(
+                f"thread_{thread.id}",
+                {"type": "message_created", "payload": payload},
+            )
         return message
 
 
@@ -320,4 +331,11 @@ class MessageReadSerializer(serializers.ModelSerializer):
 
         instance.is_read = validated_data.get("is_read", True)
         instance.save(update_fields=["is_read", "updated_at"])
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            payload = MessageSerializer(instance).data
+            async_to_sync(channel_layer.group_send)(
+                f"thread_{instance.thread_id}",
+                {"type": "message_read", "payload": payload},
+            )
         return instance

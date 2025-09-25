@@ -98,6 +98,11 @@ and then launches Gunicorn:
 docker compose up --build
 ```
 
+> ℹ️  The `redis` service pulls the image `public.ecr.aws/docker/library/redis:7-alpine`, an AWS-hosted mirror of the official
+> Docker Hub library image. This registry does not require a Docker Hub login, avoiding 401 errors when Hub access is blocked.
+> If you cannot reach any external registry, remove the `REDIS_URL` variable (or override it to blank) and rely on the
+> in-memory channel layer defined in `core/settings.py` for single-process development.
+
 Override the default database credentials or Django settings by exporting environment variables before running `docker compose`
 or by editing the compose file. The service mounts the repository into the container so code changes are picked up without a rebuild. Static assets are collected on startup and served via WhiteNoise; they persist in a dedicated Docker volume so admin
 pages load without 404s even after container restarts. To re-run migrations manually, use:

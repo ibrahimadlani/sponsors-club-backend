@@ -10,9 +10,8 @@ APP_PORT="${PORT:-8000}"
 # Always operate from the Django project root.
 cd /app/
 
-# Launch Gunicorn with a shared memory worker tmp directory to improve
-# performance on Alpine-based images.
-exec /py/bin/gunicorn \
-    --worker-tmp-dir /dev/shm \
-    --bind "0.0.0.0:${APP_PORT}" \
-    core.wsgi:application
+# Launch Daphne so the container can serve both HTTP and WebSocket traffic.
+exec /py/bin/daphne \
+    --bind "0.0.0.0" \
+    --port "${APP_PORT}" \
+    core.asgi:application
