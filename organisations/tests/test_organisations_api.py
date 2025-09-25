@@ -13,15 +13,10 @@ from organisations.models import Collaborator, Organisation, OrganisationInvite
 from organisations.permissions import IsAuthenticatedCollaborator, IsOrganisationOwner
 from organisations.serializers import (
     CollaboratorCreateSerializer,
-    CollaboratorJobTitleSerializer,
     CollaboratorSerializer,
     OrganisationCreateSerializer,
-    OrganisationInviteCreateSerializer,
-    OrganisationInviteSerializer,
-    OrganisationJoinSerializer,
     OrganisationListFilter,
     OrganisationSerializer,
-    OwnershipTransferSerializer,
 )
 
 
