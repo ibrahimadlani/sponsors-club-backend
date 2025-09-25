@@ -34,8 +34,8 @@ class AthleteAdmin(admin.ModelAdmin):
             name, sport, or agent contact details.
     """
 
-    list_display = ("full_name", "sport", "agent", "nationality", "is_self_represented")
-    list_filter = ("sport", "nationality", "is_self_represented")
+    list_display = ("full_name", "sport", "agent", "nationality")
+    list_filter = ("sport", "nationality")
     # Including agent details allows operations staff to resolve enquiries fast.
     search_fields = (
         "full_name",

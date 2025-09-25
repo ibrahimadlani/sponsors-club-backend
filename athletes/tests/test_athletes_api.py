@@ -121,7 +121,6 @@ def test_athlete_serializer_create_success(agent_user, sport):
             "nationality": "US",
             "bio": "Bio text",
             "social_links": {"twitter": "jane_doe"},
-            "is_self_represented": False,
         },
         context={"request": request},
     )

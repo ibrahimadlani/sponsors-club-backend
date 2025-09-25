@@ -1,4 +1,5 @@
 import pytest
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 
 from organisations.models import Collaborator, Organisation
@@ -56,11 +57,17 @@ def test_register_agent_success(api_client, user_model):
         "display_name": "Agent Nouveau",
         "first_name": "Agent",
         "last_name": "Nouveau",
+        "phone_country_code": "+33",
+        "phone_number": "0102030405",
+        "is_self_represented": True,
     }
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201
     user = user_model.objects.get(email="newagent@example.com")
     assert AgentProfile.objects.filter(user=user, display_name="Agent Nouveau").exists()
+    assert user.phone_country_code == "+33"
+    assert user.phone_number == "0102030405"
+    assert user.agent_profile.is_self_represented is True
 
 
 @pytest.mark.django_db
@@ -72,6 +79,8 @@ def test_register_collaborator_success(api_client, user_model):
         "account_type": "COLLABORATOR",
         "first_name": "Org",
         "last_name": "User",
+        "phone_country_code": "+44",
+        "phone_number": "2071234567",
         "organisation_name": "Org Example",
         "job_title": "Founder",
     }
@@ -81,6 +90,8 @@ def test_register_collaborator_success(api_client, user_model):
     assert user.account_type == user_model.AccountType.COLLABORATOR
     assert not Organisation.objects.filter(owner=user).exists()
     assert not Collaborator.objects.filter(user=user).exists()
+    assert user.phone_country_code == "+44"
+    assert user.phone_number == "2071234567"
 
 
 @pytest.mark.django_db
@@ -102,6 +113,9 @@ def test_me_update_updates_fields(api_client, agent_user):
         "first_name": "Updated",
         "last_name": "Name",
         "display_name": "Updated Agent",
+        "phone_country_code": "+1",
+        "phone_number": "5551112222",
+        "is_self_represented": True,
     }
     response = api_client.patch(url, payload, format="json")
     assert response.status_code == 200
@@ -110,6 +124,10 @@ def test_me_update_updates_fields(api_client, agent_user):
     assert agent_user.first_name == "Updated"
     assert agent_user.last_name == "Name"
     assert agent_user.agent_profile.display_name == "Updated Agent"
+    assert agent_user.agent_profile.is_self_represented is True
+    assert agent_user.phone_country_code == "+1"
+    assert agent_user.phone_number == "5551112222"
+    assert response.data["agent_profile"]["is_self_represented"] is True
 
 
 @pytest.mark.django_db
@@ -124,6 +142,7 @@ def test_me_update_display_name_only(api_client, agent_user):
     serializer.save()
     agent_user.refresh_from_db()
     assert agent_user.agent_profile.display_name == "Solo Update"
+    assert agent_user.agent_profile.is_self_represented is False
 
 
 @pytest.mark.django_db
@@ -136,6 +155,20 @@ def test_me_update_serializer_without_agent_profile(user_model):
     serializer = MeUpdateSerializer(user, context={"request": None})
     data = serializer.to_representation(user)
     assert "agent_profile" not in data
+
+
+@pytest.mark.django_db
+def test_me_update_toggle_self_represented(agent_user):
+    serializer = MeUpdateSerializer(
+        agent_user,
+        data={"is_self_represented": True},
+        partial=True,
+        context={"request": None},
+    )
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+    agent_user.refresh_from_db()
+    assert agent_user.agent_profile.is_self_represented is True
 
 
 @pytest.mark.django_db
@@ -161,6 +194,7 @@ def test_roles_builder_with_agent_and_owner(agent_user, organisations_setup):
     assert (
         data["agent_profile"]["display_name"] == agent_user.agent_profile.display_name
     )
+    assert data["agent_profile"]["is_self_represented"] is False
 
     # Add collaborator membership to cover collaboration branch
     Collaborator.objects.create(
@@ -171,6 +205,7 @@ def test_roles_builder_with_agent_and_owner(agent_user, organisations_setup):
     )
     data = builder.build()
     assert len(data["collaborations"]) == 1
+    assert data["agent_profile"]["is_self_represented"] is False
 
 
 @pytest.mark.django_db
@@ -196,6 +231,40 @@ def test_user_manager_superuser_validation(user_model):
             password="pass1234",
             is_superuser=False,
         )
+
+
+@pytest.mark.django_db
+def test_phone_number_country_code_uniqueness(user_model):
+    user_model.objects.create_user(
+        email="dial@example.com",
+        password="pass1234",
+        phone_country_code="+33",
+        phone_number="123456789",
+    )
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            user_model.objects.create_user(
+                email="duplicate@example.com",
+                password="pass1234",
+                phone_country_code="+33",
+                phone_number="123456789",
+            )
+
+
+@pytest.mark.django_db
+def test_phone_number_can_repeat_with_different_country_code(user_model):
+    user_model.objects.create_user(
+        email="one@example.com",
+        password="pass1234",
+        phone_country_code="+33",
+        phone_number="123456789",
+    )
+    user_model.objects.create_user(
+        email="two@example.com",
+        password="pass1234",
+        phone_country_code="+1",
+        phone_number="123456789",
+    )
 
 
 @pytest.mark.django_db
@@ -232,14 +301,20 @@ def test_register_serializer_representation(api_client):
             "display_name": "Rep Agent",
             "first_name": "Rep",
             "last_name": "Agent",
+            "phone_country_code": "+49",
+            "phone_number": "3012345678",
+            "is_self_represented": True,
         }
     )
     assert serializer.is_valid()
     user = serializer.save()
     # ensure to_representation returns expected shape
     rep = serializer.to_representation(user)
+    assert rep["phone_country_code"] == "+49"
+    assert rep["phone_number"] == "3012345678"
     assert rep["email"] == "rep@example.com"
     assert rep["account_type"] == "AGENT"
+    assert user.agent_profile.is_self_represented is True
 
 
 @pytest.mark.django_db

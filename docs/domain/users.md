@@ -7,10 +7,13 @@ endpoints. It also exposes JWT login/refresh routes via DRF Simple JWT.
 
 ## Data model
 - **`User`** extends Django's auth system with email-as-username, account type
-  (`AGENT` or `COLLABORATOR`), profile metadata, and a mirrored `password_hash`
+  (`AGENT` or `COLLABORATOR`), profile metadata, a unique email constraint, and a
+  `phone_country_code`/`phone_number` pair that must be unique when both values
+  are present. The model mirrors Django's password hash into a `password_hash`
   field for legacy compatibility. `UserManager` powers email-based creation.
 - **`AgentProfile`** is a one-to-one extension for agent accounts, storing a
-  `display_name` and optional bio used throughout the platform.
+  `display_name`, an `is_self_represented` flag used to tailor the agent
+  experience, and an optional bio.
 
 ## Serializers and workflows
 - `RegisterSerializer` handles both agent and collaborator sign-ups. Agent

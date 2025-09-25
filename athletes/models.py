@@ -60,8 +60,6 @@ class Athlete(BaseModel):
         nationality (str): ISO country code representing the athlete's origin.
         bio (str): Optional free-form biography shown in public listings.
         social_links (dict[str, str]): Mapping of platform names to profile URLs.
-        is_self_represented (bool): Indicates whether the athlete manages their
-            own relationships rather than working with an agent.
         followers_count_cached (int): Cached follower count from social stats.
         engagement_rate_cached (decimal.Decimal): Cached engagement rate used
             for quick filtering in the UI.
@@ -84,7 +82,6 @@ class Athlete(BaseModel):
     nationality = models.CharField(max_length=100)
     bio = models.TextField(blank=True)
     social_links = models.JSONField(default=dict, blank=True)
-    is_self_represented = models.BooleanField(default=False)
     followers_count_cached = models.PositiveIntegerField(default=0)
     engagement_rate_cached = models.DecimalField(
         max_digits=5, decimal_places=2, default=0

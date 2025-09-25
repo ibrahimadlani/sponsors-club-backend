@@ -19,6 +19,7 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "phone_country_code",
             "phone_number",
             "date_of_birth",
             "email_verified",
@@ -47,6 +48,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=True,
     )
+    is_self_represented = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=False,
+    )
     organisation_name = serializers.CharField(
         write_only=True,
         required=False,
@@ -68,6 +74,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             "display_name",
             "first_name",
             "last_name",
+            "is_self_represented",
+            "phone_country_code",
             "phone_number",
             "date_of_birth",
             "organisation_name",
@@ -89,6 +97,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a user and any related agent or collaborator records."""
         display_name = validated_data.pop("display_name", None)
+        is_self_represented = validated_data.pop("is_self_represented", False)
         validated_data.pop("organisation_name", None)
         validated_data.pop("job_title", None)
         password = validated_data.pop("password")
@@ -100,6 +109,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             AgentProfile.objects.create(
                 user=user,
                 display_name=display_name or default_display_name,
+                is_self_represented=is_self_represented,
             )
         send_email_verification(user)
         return user
@@ -113,6 +123,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
     """Allow the authenticated user to update their profile details."""
 
     display_name = serializers.CharField(required=False, allow_blank=True)
+    is_self_represented = serializers.BooleanField(required=False)
 
     class Meta:
         model = User
@@ -120,14 +131,17 @@ class MeUpdateSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "phone_country_code",
             "phone_number",
             "date_of_birth",
             "display_name",
+            "is_self_represented",
         )
 
     def update(self, instance, validated_data):
         """Update the user object and related agent profile when needed."""
         display_name = validated_data.pop("display_name", None)
+        is_self_represented = validated_data.pop("is_self_represented", None)
         update_fields = []
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -138,12 +152,23 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         else:
             instance.save()
 
-        if display_name is not None and instance.account_type == User.AccountType.AGENT:
+        if (
+            instance.account_type == User.AccountType.AGENT
+            and (display_name is not None or is_self_represented is not None)
+        ):
             agent_profile, _ = AgentProfile.objects.get_or_create(
                 user=instance,
             )
-            agent_profile.display_name = display_name
-            agent_profile.save(update_fields=["display_name"])
+            profile_updates: list[str] = []
+            if display_name is not None:
+                agent_profile.display_name = display_name
+                profile_updates.append("display_name")
+            if is_self_represented is not None:
+                agent_profile.is_self_represented = is_self_represented
+                profile_updates.append("is_self_represented")
+            if profile_updates:
+                agent_profile.save(update_fields=profile_updates)
+                agent_profile.refresh_from_db(fields=profile_updates)
 
         return instance
 
@@ -151,14 +176,16 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         """Augment the serialized representation with agent info when relevant."""
         data = UserSerializer(instance, context=self.context).data
         if instance.account_type == User.AccountType.AGENT:
-            try:
-                agent_profile = instance.agent_profile
-            except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
-                agent_profile = None
+            agent_profile = (
+                AgentProfile.objects.filter(user=instance)
+                .only("id", "display_name", "is_self_represented")
+                .first()
+            )
             if agent_profile is not None:
                 data["agent_profile"] = {
                     "id": str(agent_profile.id),
                     "display_name": agent_profile.display_name,
+                    "is_self_represented": agent_profile.is_self_represented,
                 }
         return data
 
@@ -197,6 +224,7 @@ class RolesDataBuilder:
             agent_info = {
                 "id": str(agent_profile.id),
                 "display_name": agent_profile.display_name,
+                "is_self_represented": agent_profile.is_self_represented,
             }
 
         collaborations = [

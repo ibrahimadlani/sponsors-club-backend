@@ -69,7 +69,6 @@ class AthleteSerializer(serializers.ModelSerializer):
             "nationality",
             "bio",
             "social_links",
-            "is_self_represented",
             "followers_count_cached",
             "engagement_rate_cached",
             "avatar",

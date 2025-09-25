@@ -11,6 +11,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
@@ -66,7 +67,12 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(_("email address"), unique=True)
     first_name = models.CharField(_("first name"), max_length=150, blank=True)
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
-    phone_number = models.CharField(_("phone number"), max_length=32, blank=True)
+    phone_country_code = models.CharField(
+        _("phone country code"), max_length=8, blank=True, null=True
+    )
+    phone_number = models.CharField(
+        _("phone number"), max_length=32, blank=True, null=True
+    )
     date_of_birth = models.DateField(_("date of birth"), blank=True, null=True)
     email_verified = models.BooleanField(_("email verified"), default=False)
     password_hash = models.CharField(_("password hash"), max_length=128, blank=True)
@@ -84,6 +90,18 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("phone_country_code", "phone_number"),
+                condition=Q(
+                    phone_country_code__isnull=False,
+                    phone_number__isnull=False,
+                ),
+                name="unique_user_phone_cc_number",
+            )
+        ]
+
     def __str__(self):
         """Return the most informative representation for administrators."""
         display_name = f"{self.first_name} {self.last_name}".strip()
@@ -96,6 +114,10 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
     def save(self, *args, **kwargs):
         """Mirror Django's password hash onto the legacy password column."""
+        if self.phone_country_code == "":
+            self.phone_country_code = None
+        if self.phone_number == "":
+            self.phone_number = None
         if self.password and self.password != self.password_hash:
             self.password_hash = self.password
         super().save(*args, **kwargs)
@@ -109,6 +131,7 @@ class AgentProfile(BaseModel):
     )
     display_name = models.CharField(max_length=255)
     bio = models.TextField(blank=True)
+    is_self_represented = models.BooleanField(default=False)
 
     def __str__(self):
         """Return the display name or fall back to the related user."""
