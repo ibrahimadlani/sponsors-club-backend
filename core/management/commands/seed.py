@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import random
 from datetime import date, timedelta
-from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -206,16 +205,32 @@ class Command(BaseCommand):
                 last_name=last_name,
                 account_type=User.AccountType.COLLABORATOR,
             )
+            industry = faker.job().title()
+            social_links = {
+                "linkedin": faker.url(),
+                "instagram": faker.url(),
+                "x": faker.url(),
+                "facebook": faker.url(),
+                "tiktok": faker.url(),
+                "youtube": faker.url(),
+            }
             organisation = Organisation.objects.create(
                 owner=owner,
                 name=faker.unique.company(),
-                sector=faker.job().title(),
-                size=random.choice([choice[0] for choice in Organisation.Size.choices]),
-                budget_min=Decimal(faker.random_int(min=1000, max=5000)),
-                budget_max=Decimal(faker.random_int(min=6000, max=20000)),
-                country=faker.country_code(representation="alpha-2"),
+                type=random.choice([choice[0] for choice in Organisation.Type.choices]),
+                industry=industry,
                 description=faker.paragraph(nb_sentences=4),
-                website=faker.url(),
+                website_url=faker.url(),
+                email_contact=faker.company_email(),
+                phone_contact=faker.phone_number(),
+                address_city=faker.city(),
+                address_country=faker.country_code(representation="alpha-2"),
+                address_postal_code=faker.postcode(),
+                social_links=social_links,
+                founded_year=random.randint(1970, date.today().year - 1),
+                employees_count=random.choice([1, 3, 10, 50, 100, 250]),
+                budget_range=random.choice(["<10k", "10k-100k", ">100k"]),
+                sponsoring_focus=[faker.word(), faker.word(), faker.word()],
             )
             Collaborator.objects.create(
                 user=owner,

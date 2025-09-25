@@ -3,6 +3,7 @@
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 
 from core.feature_matrix import COLLABORATOR_FEATURES
@@ -19,10 +20,15 @@ from .permissions import (
 )
 from .serializers import (
     CollaboratorCreateSerializer,
+    CollaboratorJobTitleSerializer,
     CollaboratorSerializer,
     OrganisationCreateSerializer,
+    OrganisationInviteCreateSerializer,
+    OrganisationInviteSerializer,
+    OrganisationJoinSerializer,
     OrganisationListFilter,
     OrganisationSerializer,
+    OwnershipTransferSerializer,
 )
 
 
@@ -40,7 +46,7 @@ class OrganisationViewSet(
     serializer_class = OrganisationSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("sector", "size", "country")
+    filterset_fields = ("type", "industry", "address_country")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -61,6 +67,9 @@ class OrganisationViewSet(
             "collaborators": self._collaborator_permissions,
             "add_collaborator": self._collaborator_permissions,
             "remove_collaborator": lambda: [permissions.IsAuthenticated()],
+            "invites": self._owner_permissions,
+            "transfer_ownership": self._owner_permissions,
+            "update_job_title": lambda: [permissions.IsAuthenticated()],
         }
         resolver = action_permissions.get(self.action)
         if resolver is not None:
@@ -182,6 +191,121 @@ class OrganisationViewSet(
         collaborator.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["get", "post"], url_path="invites")
+    def invites(self, request, *_args, **_kwargs):
+        """List or create invitation codes for the organisation."""
+
+        organisation = self._get_organisation()
+        owner_collaborator = Collaborator.objects.filter(
+            organisation=organisation,
+            user=request.user,
+            role=Collaborator.Role.OWNER,
+        ).first()
+
+        if request.method.lower() == "post":
+            if owner_collaborator is None and not request.user.is_staff:
+                return Response(
+                    {"detail": "Only owners can create invitation codes."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if owner_collaborator is None:
+                owner_collaborator = organisation.collaborators.filter(
+                    role=Collaborator.Role.OWNER
+                ).first()
+            if owner_collaborator is None:
+                return Response(
+                    {"detail": "Organisation has no owner to attribute the invite."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            serializer = OrganisationInviteCreateSerializer(
+                data=request.data,
+                context={
+                    "organisation": organisation,
+                    "creator": owner_collaborator,
+                },
+            )
+            serializer.is_valid(raise_exception=True)
+            invite = serializer.save()
+            return Response(
+                OrganisationInviteSerializer(invite).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        invites = organisation.invites.order_by("-created_at")
+        serializer = OrganisationInviteSerializer(invites, many=True)
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="collaborators/(?P<collaborator_id>[^/.]+)/job-title",
+    )
+    def update_job_title(self, request, collaborator_id=None, *_args, **_kwargs):
+        """Allow owners or the collaborator themselves to edit the job title."""
+
+        organisation = self._get_organisation()
+        try:
+            collaborator = organisation.collaborators.select_related("user").get(
+                id=collaborator_id
+            )
+        except Collaborator.DoesNotExist:
+            return Response(
+                {"detail": "Collaborator not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        is_owner = Collaborator.objects.filter(
+            organisation=organisation,
+            user=request.user,
+            role=Collaborator.Role.OWNER,
+        ).exists()
+        is_self = collaborator.user_id == request.user.id
+        if not (is_owner or is_self or request.user.is_staff):
+            return Response(
+                {"detail": "You do not have permission to update this collaborator."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = CollaboratorJobTitleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        collaborator.job_title = serializer.validated_data["job_title"]
+        collaborator.save(update_fields=["job_title", "updated_at"])
+        return Response(CollaboratorSerializer(collaborator).data)
+
+    @action(detail=True, methods=["post"], url_path="transfer-ownership")
+    def transfer_ownership(self, request, *_args, **_kwargs):
+        """Transfer organisation ownership to another collaborator."""
+
+        organisation = self._get_organisation()
+        serializer = OwnershipTransferSerializer(
+            data=request.data,
+            context={"organisation": organisation},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        new_owner: Collaborator = serializer.validated_data["collaborator"]
+        try:
+            current_owner = organisation.collaborators.get(role=Collaborator.Role.OWNER)
+        except Collaborator.DoesNotExist:
+            current_owner = None
+
+        if current_owner and current_owner.id == new_owner.id:
+            return Response(
+                {"detail": "Collaborator is already the owner."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if current_owner:
+            current_owner.role = Collaborator.Role.MEMBER
+            current_owner.save(update_fields=["role", "updated_at"])
+
+        new_owner.role = Collaborator.Role.OWNER
+        new_owner.save(update_fields=["role", "updated_at"])
+        organisation.owner = new_owner.user
+        organisation.save(update_fields=["owner", "updated_at"])
+
+        return Response(CollaboratorSerializer(new_owner).data)
+
     def _get_organisation(self):
         """Fetch and cache the organisation associated with the current action."""
         if getattr(self, "organisation", None) is not None:
@@ -209,3 +333,21 @@ class OrganisationViewSet(
     def _organisation_account_permissions(self):
         """Return permissions for list operations restricted to collaborator accounts."""
         return [permissions.IsAuthenticated(), IsCollaboratorAccount()]
+
+
+class OrganisationJoinView(APIView):
+    """Allow collaborators to join an organisation using an invitation code."""
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *_args, **_kwargs):
+        serializer = OrganisationJoinSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        collaborator = serializer.save()
+        return Response(
+            CollaboratorSerializer(collaborator).data,
+            status=status.HTTP_201_CREATED,
+        )

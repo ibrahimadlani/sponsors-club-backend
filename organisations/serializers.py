@@ -1,11 +1,14 @@
 """Serializers used across organisation endpoints."""
 
+from datetime import timedelta
+
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import User
 
-from .models import Collaborator, Organisation
+from .models import Collaborator, Organisation, OrganisationInvite
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
@@ -18,27 +21,36 @@ class OrganisationSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
-            "sector",
-            "size",
-            "budget_min",
-            "budget_max",
+            "slug",
+            "type",
+            "industry",
             "logo",
-            "country",
+            "banner_image",
             "description",
-            "website",
+            "website_url",
+            "email_contact",
+            "phone_contact",
+            "address_city",
+            "address_country",
+            "address_postal_code",
+            "social_links",
+            "founded_year",
+            "employees_count",
+            "budget_range",
+            "sponsoring_focus",
             "created_at",
             "updated_at",
             "owner_id",
         )
-        read_only_fields = ("id", "created_at", "updated_at", "owner_id")
+        read_only_fields = ("id", "slug", "created_at", "updated_at", "owner_id")
 
 
 class OrganisationListFilter(serializers.Serializer):
     """Validate filters accepted by the organisation listing endpoint."""
 
-    sector = serializers.CharField(required=False)
-    size = serializers.ChoiceField(required=False, choices=Organisation.Size.choices)
-    country = serializers.CharField(required=False)
+    type = serializers.ChoiceField(required=False, choices=Organisation.Type.choices)
+    industry = serializers.CharField(required=False)
+    address_country = serializers.CharField(required=False)
 
     def create(self, validated_data):
         """Disallow creation on pure validation serializers."""
@@ -56,14 +68,22 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
         model = Organisation
         fields = (
             "name",
-            "sector",
-            "size",
-            "budget_min",
-            "budget_max",
+            "type",
+            "industry",
             "logo",
-            "country",
+            "banner_image",
             "description",
-            "website",
+            "website_url",
+            "email_contact",
+            "phone_contact",
+            "address_city",
+            "address_country",
+            "address_postal_code",
+            "social_links",
+            "founded_year",
+            "employees_count",
+            "budget_range",
+            "sponsoring_focus",
         )
 
     @transaction.atomic
@@ -183,3 +203,131 @@ class CollaboratorCreateSerializer(serializers.ModelSerializer):
             **validated_data,
         )
         return collaborator
+
+
+class OrganisationInviteSerializer(serializers.ModelSerializer):
+    """Expose invitation metadata for organisation owners."""
+
+    created_by = serializers.CharField(source="created_by.user.email", read_only=True)
+
+    class Meta:
+        model = OrganisationInvite
+        fields = (
+            "id",
+            "code",
+            "expires_at",
+            "is_used",
+            "used_at",
+            "created_at",
+            "created_by",
+        )
+        read_only_fields = fields
+
+
+class OrganisationInviteCreateSerializer(serializers.Serializer):
+    """Generate a one-time invitation code for an organisation."""
+
+    expires_in_hours = serializers.IntegerField(min_value=1, max_value=168, required=False)
+
+    def create(self, validated_data):
+        organisation: Organisation = self.context["organisation"]
+        created_by: Collaborator = self.context["creator"]
+        hours = validated_data.get(
+            "expires_in_hours", OrganisationInvite.DEFAULT_EXPIRY_HOURS
+        )
+        expires_at = timezone.now() + timedelta(hours=hours)
+
+        code = OrganisationInvite.generate_code()
+        while OrganisationInvite.objects.filter(code=code).exists():
+            code = OrganisationInvite.generate_code()
+
+        invite = OrganisationInvite.objects.create(
+            organisation=organisation,
+            created_by=created_by,
+            code=code,
+            expires_at=expires_at,
+        )
+        return invite
+
+
+class OrganisationJoinSerializer(serializers.Serializer):
+    """Validate the payload required to join an organisation via invite code."""
+
+    code = serializers.CharField()
+    job_title = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        code = attrs["code"].strip().upper()
+        try:
+            invite = OrganisationInvite.objects.select_related("organisation").get(
+                code=code
+            )
+        except OrganisationInvite.DoesNotExist as exc:
+            raise serializers.ValidationError({"code": "Invalid invitation code."}) from exc
+
+        if invite.is_used:
+            raise serializers.ValidationError({"code": "Invitation has already been used."})
+        if invite.expires_at < timezone.now():
+            raise serializers.ValidationError({"code": "Invitation has expired."})
+
+        user = self.context["request"].user
+        if (
+            getattr(user, "account_type", None)
+            != user.AccountType.COLLABORATOR
+            and not user.is_staff
+        ):
+            raise serializers.ValidationError(
+                {"code": "Only collaborator accounts may join organisations."}
+            )
+        if Collaborator.objects.filter(user=user).exists():
+            raise serializers.ValidationError(
+                {"code": "User already belongs to an organisation."}
+            )
+
+        attrs["invite"] = invite
+        attrs["organisation"] = invite.organisation
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        invite: OrganisationInvite = validated_data["invite"]
+        organisation: Organisation = validated_data["organisation"]
+        job_title = validated_data.get("job_title") or "Member"
+        user = self.context["request"].user
+
+        collaborator = Collaborator.objects.create(
+            user=user,
+            organisation=organisation,
+            role=Collaborator.Role.MEMBER,
+            job_title=job_title,
+        )
+        invite.mark_used(user)
+        return collaborator
+
+
+class CollaboratorJobTitleSerializer(serializers.Serializer):
+    """Update payload used when editing a collaborator job title."""
+
+    job_title = serializers.CharField(max_length=255)
+
+
+class OwnershipTransferSerializer(serializers.Serializer):
+    """Validate requests to transfer organisation ownership."""
+
+    collaborator_id = serializers.UUIDField()
+
+    def validate(self, attrs):
+        organisation: Organisation = self.context["organisation"]
+        collaborator_id = attrs["collaborator_id"]
+        try:
+            collaborator = organisation.collaborators.get(id=collaborator_id)
+        except Collaborator.DoesNotExist as exc:
+            raise serializers.ValidationError(
+                {"collaborator_id": "Collaborator does not belong to this organisation."}
+            ) from exc
+        if collaborator.role == Collaborator.Role.OWNER:
+            raise serializers.ValidationError(
+                {"collaborator_id": "Collaborator is already the owner."}
+            )
+        attrs["collaborator"] = collaborator
+        return attrs
