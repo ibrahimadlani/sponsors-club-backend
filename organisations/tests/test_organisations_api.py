@@ -9,14 +9,19 @@ from rest_framework import serializers, status
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.pagination import PageNumberPagination
 
-from organisations.models import Collaborator, Organisation
+from organisations.models import Collaborator, Organisation, OrganisationInvite
 from organisations.permissions import IsAuthenticatedCollaborator, IsOrganisationOwner
 from organisations.serializers import (
     CollaboratorCreateSerializer,
+    CollaboratorJobTitleSerializer,
     CollaboratorSerializer,
     OrganisationCreateSerializer,
+    OrganisationInviteCreateSerializer,
+    OrganisationInviteSerializer,
+    OrganisationJoinSerializer,
     OrganisationListFilter,
     OrganisationSerializer,
+    OwnershipTransferSerializer,
 )
 
 
@@ -122,13 +127,20 @@ def test_organisation_create_serializer(factory, user_model):
     serializer = OrganisationCreateSerializer(
         data={
             "name": "Created Org",
-            "sector": "Tech",
-            "size": Organisation.Size.SMALL,
-            "budget_min": 1000,
-            "budget_max": 2000,
-            "country": "FR",
+            "type": Organisation.Type.STARTUP,
+            "industry": "Tech",
             "description": "New organisation",
-            "website": "https://example.com",
+            "website_url": "https://example.com",
+            "email_contact": "hello@example.com",
+            "phone_contact": "+33123456789",
+            "address_city": "Paris",
+            "address_country": "FR",
+            "address_postal_code": "75000",
+            "social_links": {"linkedin": "https://linkedin.com/company/example"},
+            "founded_year": 2020,
+            "employees_count": 12,
+            "budget_range": "10k-100k",
+            "sponsoring_focus": ["sports collectifs"],
         },
         context={"request": request},
     )
@@ -155,11 +167,8 @@ def test_organisation_create_serializer_rejects_agent(factory, user_model):
     serializer = OrganisationCreateSerializer(
         data={
             "name": "Blocked Org",
-            "sector": "Tech",
-            "size": Organisation.Size.SMALL,
-            "budget_min": 1000,
-            "budget_max": 2000,
-            "country": "FR",
+            "type": Organisation.Type.BRAND,
+            "industry": "Tech",
         },
         context={"request": request},
     )
@@ -284,7 +293,11 @@ def test_collaborator_create_serializer_rejects_agent_accounts(
 def test_organisation_list_filter_validation():
     """Organisation list filter accepts optional query parameters."""
     serializer = OrganisationListFilter(
-        data={"sector": "Tech", "size": Organisation.Size.MEDIUM, "country": "FR"}
+        data={
+            "type": Organisation.Type.BRAND,
+            "industry": "Tech",
+            "address_country": "FR",
+        }
     )
     assert serializer.is_valid(), serializer.errors
 
@@ -352,13 +365,11 @@ def test_organisation_list_and_filter(owner_client, organisation):
     Organisation.objects.create(
         owner=organisation.owner,
         name="Filtered Org",
-        sector="Sportswear",
-        size=Organisation.Size.SMALL,
-        budget_min=500,
-        budget_max=800,
-        country="FR",
+        type=Organisation.Type.BRAND,
+        industry="Sportswear",
+        address_country="FR",
     )
-    filtered = owner_client.get(list_url, {"sector": "Sportswear"})
+    filtered = owner_client.get(list_url, {"industry": "Sportswear"})
     assert filtered.status_code == status.HTTP_200_OK
     assert len(filtered.data) == 1
     assert filtered.data[0]["name"] == "Filtered Org"
@@ -384,11 +395,9 @@ def test_organisation_list_pagination(owner_client, organisation):
     Organisation.objects.create(
         owner=organisation.owner,
         name="Second Org",
-        sector="Tech",
-        size=Organisation.Size.SMALL,
-        budget_min=500,
-        budget_max=900,
-        country="FR",
+        type=Organisation.Type.BRAND,
+        industry="Tech",
+        address_country="FR",
     )
 
     list_url = reverse("organisation-list")
@@ -426,11 +435,8 @@ def test_organisation_create_forbidden_for_agent(user_model):
     list_url = reverse("organisation-list")
     payload = {
         "name": "API Org",
-        "sector": "Media",
-        "size": Organisation.Size.MEDIUM,
-        "budget_min": 300,
-        "budget_max": 900,
-        "country": "FR",
+        "industry": "Media",
+        "address_country": "FR",
     }
     response = client.post(list_url, payload, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -452,11 +458,8 @@ def test_organisation_create_view_collaborator_success(user_model):
     list_url = reverse("organisation-list")
     payload = {
         "name": "Collaborator Org",
-        "sector": "Media",
-        "size": Organisation.Size.MEDIUM,
-        "budget_min": 300,
-        "budget_max": 900,
-        "country": "FR",
+        "industry": "Media",
+        "address_country": "FR",
     }
     response = client.post(list_url, payload, format="json")
     assert response.status_code == status.HTTP_201_CREATED
@@ -672,3 +675,82 @@ def test_add_collaborator_respects_plan_limit(
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["required_feature"] == "max_collaborators"
+
+
+@pytest.mark.django_db
+def test_invite_creation_and_listing(owner_client, organisations_setup):
+    organisation = organisations_setup["organisation"]
+    url = reverse("organisation-invites", kwargs={"pk": organisation.id})
+
+    create_response = owner_client.post(url, {"expires_in_hours": 24}, format="json")
+    assert create_response.status_code == status.HTTP_201_CREATED
+    assert OrganisationInvite.objects.filter(organisation=organisation).count() == 1
+
+    list_response = owner_client.get(url)
+    assert list_response.status_code == status.HTTP_200_OK
+    assert len(list_response.data) == 1
+
+
+@pytest.mark.django_db
+def test_join_organisation_via_invite(api_client, organisations_setup, collaborator_user):
+    organisation = organisations_setup["organisation"]
+    owner = organisations_setup["owner"]
+    owner_client = APIClient()
+    owner_client.force_authenticate(user=owner)
+    invite_url = reverse("organisation-invites", kwargs={"pk": organisation.id})
+    invite_response = owner_client.post(invite_url, {"expires_in_hours": 1}, format="json")
+    assert invite_response.status_code == status.HTTP_201_CREATED
+    code = invite_response.data["code"]
+
+    api_client.force_authenticate(user=collaborator_user)
+    join_url = reverse("organisation-join")
+    response = api_client.post(
+        join_url,
+        {"code": code, "job_title": "Marketing Lead"},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    collaborator = Collaborator.objects.get(user=collaborator_user)
+    assert collaborator.organisation == organisation
+    assert collaborator.job_title == "Marketing Lead"
+    assert OrganisationInvite.objects.get(code=code).is_used is True
+
+
+@pytest.mark.django_db
+def test_update_job_title_as_owner(owner_client, organisation, member_collaborator):
+    url = reverse(
+        "organisation-update-job-title",
+        kwargs={"pk": organisation.id, "collaborator_id": member_collaborator.id},
+    )
+    response = owner_client.patch(url, {"job_title": "Updated Role"}, format="json")
+    assert response.status_code == status.HTTP_200_OK
+    member_collaborator.refresh_from_db()
+    assert member_collaborator.job_title == "Updated Role"
+
+
+@pytest.mark.django_db
+def test_update_job_title_as_member(collaborator_client, member_collaborator):
+    organisation = member_collaborator.organisation
+    url = reverse(
+        "organisation-update-job-title",
+        kwargs={"pk": organisation.id, "collaborator_id": member_collaborator.id},
+    )
+    response = collaborator_client.patch(url, {"job_title": "Self Updated"}, format="json")
+    assert response.status_code == status.HTTP_200_OK
+    member_collaborator.refresh_from_db()
+    assert member_collaborator.job_title == "Self Updated"
+
+
+@pytest.mark.django_db
+def test_transfer_ownership(owner_client, organisation, member_collaborator):
+    url = reverse("organisation-transfer-ownership", kwargs={"pk": organisation.id})
+    response = owner_client.post(
+        url,
+        {"collaborator_id": str(member_collaborator.id)},
+        format="json",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    organisation.refresh_from_db()
+    member_collaborator.refresh_from_db()
+    assert member_collaborator.role == Collaborator.Role.OWNER
+    assert organisation.owner == member_collaborator.user
