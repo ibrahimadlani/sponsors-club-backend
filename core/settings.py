@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "channels",
     "rest_framework",
     "django_filters",
+    "corsheaders",
     "core.apps.CoreConfig",
     "analytics",
     "athletes",
@@ -64,6 +65,7 @@ if DRF_YASG_ENABLED:
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -180,6 +182,22 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
 }
+
+
+_default_cors_origins = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+)
+_env_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
+CORS_ALLOW_CREDENTIALS = True
 
 
 AUTH_USER_MODEL = "users.User"
