@@ -1,0 +1,118 @@
+name: Semantic Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Semantic version component to increment"
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      preid:
+        description: "Optional pre-release suffix (leave blank if unused, e.g. rc1)"
+        required: false
+        default: ""
+
+jobs:
+  semver-tag:
+    name: Tag & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Compute next version
+        id: version
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.release_type }}
+          PREID: ${{ github.event.inputs.preid }}
+        run: |
+          set -euo pipefail
+
+          latest_tag=$(git tag --sort=-v:refname | head -n 1 || true)
+          if [ -z "$latest_tag" ]; then
+            latest_tag="0.0.0"
+          fi
+
+          base_tag=${latest_tag#v}
+          base_tag=${base_tag%%-*}
+
+          IFS='.' read -r major minor patch <<< "$base_tag"
+          if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
+            echo "Existing tag is not valid SemVer: $latest_tag" >&2
+            exit 1
+          fi
+
+          case "$RELEASE_TYPE" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch|*)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          next_version="${major}.${minor}.${patch}"
+
+          if [ -n "$PREID" ]; then
+            if [[ "$PREID" =~ ^[0-9A-Za-z.-]+$ ]]; then
+              next_version="${next_version}-${PREID}"
+            else
+              echo "Invalid pre-release suffix: $PREID" >&2
+              exit 1
+            fi
+          fi
+
+          echo "next=$next_version" >> "$GITHUB_OUTPUT"
+          echo "previous=$latest_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create git tag
+        env:
+          VERSION: ${{ steps.version.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git tag --annotate "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Generate release notes
+        id: notes
+        env:
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          set -euo pipefail
+          if [ "$PREVIOUS" = "0.0.0" ]; then
+            git log --pretty=format:'- %s' HEAD > notes.md
+          else
+            git log "${PREVIOUS}..HEAD" --pretty=format:'- %s' > notes.md
+          fi
+          if [ ! -s notes.md ]; then
+            echo "- Version bump" > notes.md
+          fi
+          echo "file=notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.next }}
+          name: Release ${{ steps.version.outputs.next }}
+          body_path: ${{ steps.notes.outputs.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

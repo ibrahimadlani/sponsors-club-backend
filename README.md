@@ -128,6 +128,15 @@ Target individual modules with `pytest path/to/test.py -k "filter"`. Optional st
 ruff check .
 ```
 
+## Release automation
+Version tags follow [Semantic Versioning](https://semver.org/). The **Semantic Release** GitHub Action automates tag creation and release publication:
+
+1. Open the repository’s **Actions** tab and run **Semantic Release**.
+2. Select the SemVer increment (`patch`, `minor`, or `major`) and, if needed, supply a `preid` suffix such as `rc1` or `beta.1`.
+3. The workflow computes the next version from existing tags (falling back to `0.0.0` when none exist), pushes an annotated tag, and publishes a GitHub release populated with recent commit messages. Empty logs default to a generic “Mise à jour de version” note.
+
+Tags are created without a `v` prefix (`1.2.3`, `1.2.3-rc1`). Ensure the branch is up to date before triggering the workflow so the release captures the latest commits.
+
 ## API documentation
 With `drf-yasg` installed (included in `requirements.txt`), interactive documentation is available at:
 - Swagger UI: `http://127.0.0.1:8000/api/docs/`
