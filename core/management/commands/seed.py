@@ -263,7 +263,6 @@ class Command(BaseCommand):
                     "instagram": faker.user_name(),
                     "twitter": faker.user_name(),
                 },
-                is_self_represented=False,
                 followers_count_cached=faker.random_int(min=5_000, max=200_000),
                 engagement_rate_cached=round(random.uniform(0.5, 10.0), 2),
             )

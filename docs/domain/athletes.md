@@ -9,7 +9,8 @@ and restricts operations to the owning agent or invited collaborators.
 - **`Sport`** captures the sport name and discipline, referenced by athletes.
 - **`Athlete`** links to a `Sport` and an owning `AgentProfile`. It stores core
   biography fields, cached social metrics (`followers_count_cached` and
-  `engagement_rate_cached`), social links, and optional avatar uploads.
+  `engagement_rate_cached`), social links, and optional avatar uploads. Whether
+  the agent is self-represented now lives on the owning `AgentProfile` record.
 
 ## Serializers
 - `AthletePublicSerializer` exposes the readonly fields returned in nested

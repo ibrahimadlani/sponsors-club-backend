@@ -43,6 +43,7 @@ class UserAdmin(BaseUserAdmin):
                 "fields": (
                     "first_name",
                     "last_name",
+                    "phone_country_code",
                     "phone_number",
                     "date_of_birth",
                 )
@@ -72,6 +73,7 @@ class UserAdmin(BaseUserAdmin):
                     "email",
                     "first_name",
                     "last_name",
+                    "phone_country_code",
                     "phone_number",
                     "date_of_birth",
                     "account_type",
@@ -90,7 +92,8 @@ class UserAdmin(BaseUserAdmin):
 class AgentProfileAdmin(admin.ModelAdmin):
     """Admin configuration for managing agent profiles."""
 
-    list_display = ("user", "display_name")
+    list_display = ("user", "display_name", "is_self_represented")
+    list_filter = ("is_self_represented",)
     search_fields = (
         "display_name",
         "user__email",

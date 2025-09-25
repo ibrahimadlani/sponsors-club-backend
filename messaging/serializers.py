@@ -47,7 +47,7 @@ class AgentProfileSummarySerializer(serializers.ModelSerializer):
         """Serializer configuration."""
 
         model = AgentProfile
-        fields = ("id", "display_name", "user_email")
+        fields = ("id", "display_name", "user_email", "is_self_represented")
         ref_name = "MessagingAgentSummary"
 
 
