@@ -37,7 +37,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   redis:
-    image: redis:7-alpine
+    build:
+      context: ./docker/redis
     ports:
       - "6379:6379"
 
