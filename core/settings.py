@@ -4,7 +4,13 @@ import importlib.util
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:  # pragma: no cover - fallback path exercised only when dependency missing
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - lightweight shim for constrained envs
+    def load_dotenv(*_args, **_kwargs):
+        """Gracefully skip dotenv loading when the optional dependency is absent."""
+
+        return False
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
