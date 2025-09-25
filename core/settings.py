@@ -3,6 +3,7 @@
 import importlib.util
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:  # pragma: no cover - fallback path exercised only when dependency missing
     from dotenv import load_dotenv
@@ -198,6 +199,14 @@ _env_cors_origins = [
 
 CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
 CORS_ALLOW_CREDENTIALS = True
+
+# Copy CORS hostnames into ALLOWED_HOSTS so websocket origin checks match.
+_cors_hosts = {
+    parsed.hostname
+    for origin in CORS_ALLOWED_ORIGINS
+    if origin and (parsed := urlparse(origin)).hostname
+}
+ALLOWED_HOSTS = list({*ALLOWED_HOSTS, *(_cors_hosts or set())})
 
 
 AUTH_USER_MODEL = "users.User"

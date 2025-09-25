@@ -220,6 +220,8 @@ class MessageSerializer(serializers.ModelSerializer):
     lookups.
     """
 
+    thread = serializers.UUIDField(source="thread_id", read_only=True)
+    sender = serializers.UUIDField(source="sender_id", read_only=True)
     sender_email = serializers.EmailField(source="sender.email", read_only=True)
 
     class Meta:

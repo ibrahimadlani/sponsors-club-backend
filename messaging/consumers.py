@@ -35,6 +35,21 @@ class ThreadConsumer(AsyncJsonWebsocketConsumer):
             )
         await super().disconnect(code)
 
+    async def receive_json(self, content, **kwargs):  # type: ignore[override]
+        """Handle client-originating messages.
+
+        The frontend currently only uses the websocket for push updates, but
+        some clients still send keepalive or acknowledgement frames. Dropping
+        them silently avoids ``NotImplementedError`` disconnects raised by the
+        base class while keeping room for future message types.
+        """
+
+        del kwargs
+        event = content.get("event")
+        if event == "ping":
+            await self.send_json({"event": "pong"})
+        # Ignore unrecognised payloads to keep the connection alive.
+
     async def message_created(self, event):
         await self.send_json({"event": "message.created", "message": event["payload"]})
 
