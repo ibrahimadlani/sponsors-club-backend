@@ -23,7 +23,7 @@ except ImportError as exc:  # pragma: no cover - import error is handled explici
     ) from exc
 
 from analytics.models import AthleteSocialAccount, DailyStats, SocialPlatform
-from athletes.models import Athlete, Sport
+from athletes.models import Athlete, Sport, SportDiscipline
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile, User
 
@@ -167,10 +167,18 @@ class Command(BaseCommand):
             list[Sport]: Newly created sports ready to be linked to athletes.
         """
         sports: list[Sport] = []
+        categories = [choice[0] for choice in Sport.Category.choices]
         for _ in range(count):
             sport = Sport.objects.create(
                 name=faker.unique.catch_phrase(),
-                discipline=faker.word().title(),
+                emoji=faker.random_element(["🏀", "⚽", "🏈", "🎾", "🥊", "🏐", "🚴"]),
+                category=random.choice(categories),
+            )
+            SportDiscipline.objects.create(
+                sport=sport,
+                name=faker.word().title(),
+                description=faker.sentence(nb_words=6),
+                is_olympic=faker.pybool(),
             )
             sports.append(sport)
         return sports
@@ -281,6 +289,11 @@ class Command(BaseCommand):
                 followers_count_cached=faker.random_int(min=5_000, max=200_000),
                 engagement_rate_cached=round(random.uniform(0.5, 10.0), 2),
             )
+            disciplines = list(sport.disciplines.all())
+            if disciplines:
+                max_sample = max(1, len(disciplines))
+                count = min(len(disciplines), random.randint(1, max_sample))
+                athlete.disciplines.set(random.sample(disciplines, count))
             # Storing the object in a list allows the analytics seeding step to
             # build social accounts for the same set of athletes.
             athletes_created.append(athlete)

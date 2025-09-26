@@ -1,10 +1,12 @@
 """Tests for organisation models, serializers, permissions and API views."""
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from unittest.mock import patch
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.pagination import PageNumberPagination
@@ -15,6 +17,7 @@ from organisations.serializers import (
     CollaboratorCreateSerializer,
     CollaboratorSerializer,
     OrganisationCreateSerializer,
+    OrganisationInviteCreateSerializer,
     OrganisationListFilter,
     OrganisationSerializer,
 )
@@ -749,3 +752,79 @@ def test_transfer_ownership(owner_client, organisation, member_collaborator):
     member_collaborator.refresh_from_db()
     assert member_collaborator.role == Collaborator.Role.OWNER
     assert organisation.owner == member_collaborator.user
+
+
+@pytest.mark.django_db
+def test_remove_collaborator_requires_feature(monkeypatch, owner_client, organisation, member_collaborator):
+    url = reverse(
+        "organisation-remove-collaborator",
+        kwargs={"collaborator_id": member_collaborator.id},
+    )
+    monkeypatch.setattr(
+        "organisations.views.collaborator_meets_requirement",
+        lambda user, requirement: False,
+    )
+    response = owner_client.delete(url)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert "required_feature" in response.data
+
+
+@pytest.mark.django_db
+def test_invite_creation_without_owner_returns_400(user_model, organisations_setup, monkeypatch):
+    organisation = organisations_setup["organisation"]
+    organisation.collaborators.all().delete()
+    staff_user = user_model.objects.create_user(
+        email="staff@example.com",
+        password="pass1234",
+        is_staff=True,
+    )
+    monkeypatch.setattr(
+        "organisations.views.IsOrganisationOwner.has_permission",
+        lambda self, request, view: True,
+    )
+    client = APIClient()
+    client.force_authenticate(user=staff_user)
+    url = reverse("organisation-invites", kwargs={"pk": organisation.id})
+    response = client.post(url, {"expires_in_hours": 12}, format="json")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_invite_serializer_generates_unique_code(monkeypatch, organisations_setup):
+    organisation = organisations_setup["organisation"]
+    owner_collaborator = organisation.collaborators.get(role=Collaborator.Role.OWNER)
+    call_count = {"value": 0}
+
+    def fake_code():
+        call_count["value"] += 1
+        return "DUPLICATE" if call_count["value"] < 2 else f"UNIQUE{call_count['value']}"
+
+    monkeypatch.setattr(
+        "organisations.models.OrganisationInvite.generate_code",
+        staticmethod(fake_code),
+    )
+    OrganisationInvite.objects.create(
+        organisation=organisation,
+        created_by=owner_collaborator,
+        code="DUPLICATE",
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    serializer = OrganisationInviteCreateSerializer(
+        data={},
+        context={"organisation": organisation, "creator": owner_collaborator},
+    )
+    assert serializer.is_valid(), serializer.errors
+    invite = serializer.save()
+    assert invite.code.startswith("UNIQUE")
+
+
+@pytest.mark.django_db
+def test_organisation_slug_deduplicates(user_model):
+    owner = user_model.objects.create_user(
+        email="slug-owner@example.com",
+        password="pass1234",
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+    Organisation.objects.create(owner=owner, name="ACME!", type=Organisation.Type.BRAND)
+    org2 = Organisation.objects.create(owner=owner, name="ACME?", type=Organisation.Type.BRAND)
+    assert org2.slug.startswith("acme") and org2.slug != "acme"

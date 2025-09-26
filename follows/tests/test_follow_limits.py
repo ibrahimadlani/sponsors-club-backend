@@ -7,7 +7,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from athletes.models import Athlete, Sport
+from athletes.models import Athlete, Sport, SportDiscipline
 from follows.models import Follow
 
 
@@ -40,14 +40,26 @@ def fixture_follow_athlete(agent_user):
         Athlete: Persisted athlete ready to be followed in tests.
     """
 
-    sport = Sport.objects.create(name="Follow Sport", discipline="Individual")
-    return Athlete.objects.create(
+    sport = Sport.objects.create(name="Follow Sport", category=Sport.Category.INDIVIDUAL)
+    SportDiscipline.objects.create(
+        sport=sport,
+        name="Individual Competition",
+        description="Solo discipline",
+    )
+    athlete = Athlete.objects.create(
         sport=sport,
         agent=agent_user.agent_profile,
         full_name="Follow Athlete",
         birth_date=date(1990, 1, 1),
         nationality="FR",
     )
+    discipline = SportDiscipline.objects.create(
+        sport=sport,
+        name="Solo Event",
+        description="Default discipline",
+    )
+    athlete.disciplines.add(discipline)
+    return athlete
 
 
 @pytest.mark.django_db

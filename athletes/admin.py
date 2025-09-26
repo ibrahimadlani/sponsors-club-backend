@@ -5,7 +5,14 @@
 
 from django.contrib import admin
 
-from .models import Athlete, Sport
+from .models import Athlete, Sport, SportDiscipline
+
+
+class SportDisciplineInline(admin.TabularInline):
+    """Inline editor for sport disciplines within the sport admin."""
+
+    model = SportDiscipline
+    extra = 1
 
 
 @admin.register(Sport)
@@ -18,8 +25,10 @@ class SportAdmin(admin.ModelAdmin):
             search bar.
     """
 
-    list_display = ("name", "discipline")
-    search_fields = ("name", "discipline")
+    list_display = ("name", "slug", "category")
+    list_filter = ("category",)
+    search_fields = ("name", "slug")
+    inlines = (SportDisciplineInline,)
 
 
 @admin.register(Athlete)

@@ -2,7 +2,9 @@
 
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.text import slugify
 
 from users.models import AgentProfile
 
@@ -31,22 +33,70 @@ class BaseModel(models.Model):
 
 
 class Sport(BaseModel):
-    """Categorise athletes by sport and discipline.
+    """High-level sport taxonomy grouping multiple disciplines/events."""
 
-    Attributes:
-        name (str): Public name of the sport (for example "Basketball").
-        discipline (str): Sub-discipline or event to help filter athletes.
-    """
+    class Category(models.TextChoices):
+        TEAM = "TEAM", "Team"
+        INDIVIDUAL = "INDIVIDUAL", "Individual"
+        MIXED = "MIXED", "Mixed"
 
-    name = models.CharField(max_length=255)
-    # Discipline provides additional granularity, such as "Track" vs "Field".
-    discipline = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     emoji = models.CharField(max_length=16, blank=True, null=True)
+    category = models.CharField(
+        max_length=20, choices=Category.choices, default=Category.INDIVIDUAL
+    )
+
     class Meta:
-        unique_together = ("name", "discipline")
+        ordering = ("name",)
 
     def __str__(self):
         return str(self.name)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name) or uuid.uuid4().hex[:8]
+            slug = base_slug
+            counter = 1
+            while Sport.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                counter += 1
+                slug = f"{base_slug}-{counter}"
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+
+class SportDiscipline(BaseModel):
+    """Specific events or disciplines within a sport (e.g. 100m, Marathon)."""
+
+    sport = models.ForeignKey(
+        Sport,
+        on_delete=models.CASCADE,
+        related_name="disciplines",
+    )
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
+    description = models.CharField(max_length=255, blank=True)
+    is_olympic = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("sport", "slug")
+        ordering = ("sport__name", "name")
+
+    def __str__(self):
+        return f"{self.name} ({self.sport.name})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name) or uuid.uuid4().hex[:8]
+            slug = base_slug
+            counter = 1
+            while SportDiscipline.objects.filter(sport=self.sport, slug=slug).exclude(
+                pk=self.pk
+            ).exists():
+                counter += 1
+                slug = f"{base_slug}-{counter}"
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class Athlete(BaseModel):
@@ -87,6 +137,38 @@ class Athlete(BaseModel):
         max_digits=5, decimal_places=2, default=0
     )
     avatar = models.ImageField(upload_to="athlete_avatars/", blank=True, null=True)
+    disciplines = models.ManyToManyField(
+        SportDiscipline,
+        through="athletes.AthleteDiscipline",
+        related_name="athletes",
+        blank=True,
+    )
 
     def __str__(self):
         return str(self.full_name)
+
+
+class AthleteDiscipline(BaseModel):
+    """Associative table linking athletes to sport disciplines."""
+
+    athlete = models.ForeignKey(
+        "Athlete",
+        on_delete=models.CASCADE,
+        related_name="discipline_links",
+    )
+    discipline = models.ForeignKey(
+        SportDiscipline,
+        on_delete=models.CASCADE,
+        related_name="athlete_links",
+    )
+
+    class Meta:
+        unique_together = ("athlete", "discipline")
+
+    def clean(self):
+        if self.discipline.sport_id != self.athlete.sport_id:
+            raise ValidationError("Discipline must belong to the athlete's sport.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
