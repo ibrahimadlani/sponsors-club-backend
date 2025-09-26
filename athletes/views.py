@@ -11,7 +11,12 @@ from core.permissions import get_agent_profile
 
 from .models import Athlete, Sport
 from .permissions import CanViewAthlete, IsAgentUser, IsAthleteOwner, IsCollaboratorUser
-from .serializers import AthleteSerializer, SportDisciplineSerializer, SportSerializer
+from .serializers import (
+    AthletePhotoSerializer,
+    AthleteSerializer,
+    SportDisciplineSerializer,
+    SportSerializer,
+)
 
 
 class AthleteViewSet(viewsets.ModelViewSet):
@@ -23,7 +28,7 @@ class AthleteViewSet(viewsets.ModelViewSet):
 
     queryset = (
         Athlete.objects.select_related("sport", "agent__user")
-        .prefetch_related("disciplines")
+        .prefetch_related("disciplines", "photos")
         .all()
     )
 
@@ -99,7 +104,7 @@ class MyAthletesView(generics.ListAPIView):
         return (
             Athlete.objects.filter(agent=agent_profile)
             .select_related("sport", "agent__user")
-            .prefetch_related("disciplines")
+            .prefetch_related("disciplines", "photos")
         )
 
 
@@ -143,3 +148,17 @@ class SportDisciplinesView(APIView):
                 "disciplines": SportDisciplineSerializer(disciplines, many=True).data,
             }
         )
+
+
+class AthletePhotoListView(APIView):
+    """Return the gallery photos for a specific athlete."""
+
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request, athlete_id):
+        athlete = generics.get_object_or_404(
+            Athlete.objects.prefetch_related("photos"), pk=athlete_id
+        )
+        photos = athlete.photos.all()
+        serializer = AthletePhotoSerializer(photos, many=True)
+        return Response({"athlete_id": str(athlete.id), "photos": serializer.data})

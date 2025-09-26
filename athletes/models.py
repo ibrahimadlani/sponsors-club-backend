@@ -80,7 +80,7 @@ class SportDiscipline(BaseModel):
 
     class Meta:
         unique_together = ("sport", "slug")
-        ordering = ("sport__name", "name")
+        ordering = ("name",)
 
     def __str__(self):
         return f"{self.name} ({self.sport.name})"
@@ -128,8 +128,11 @@ class Athlete(BaseModel):
         related_name="athletes",
     )
     full_name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     birth_date = models.DateField()
     nationality = models.CharField(max_length=100)
+    country = models.CharField(max_length=100, blank=True, default="")
+    city = models.CharField(max_length=255, blank=True, default="")
     bio = models.TextField(blank=True)
     social_links = models.JSONField(default=dict, blank=True)
     followers_count_cached = models.PositiveIntegerField(default=0)
@@ -146,6 +149,17 @@ class Athlete(BaseModel):
 
     def __str__(self):
         return str(self.full_name)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.full_name) or uuid.uuid4().hex[:8]
+            slug = base_slug
+            counter = 1
+            while Athlete.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                counter += 1
+                slug = f"{base_slug}-{counter}"
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class AthleteDiscipline(BaseModel):
@@ -172,3 +186,22 @@ class AthleteDiscipline(BaseModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class AthletePhoto(BaseModel):
+    """Store gallery photos associated with an athlete profile."""
+
+    athlete = models.ForeignKey(
+        "Athlete",
+        on_delete=models.CASCADE,
+        related_name="photos",
+    )
+    image = models.ImageField(upload_to="athlete_gallery/")
+    caption = models.CharField(max_length=255, blank=True)
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("position", "created_at")
+
+    def __str__(self):
+        return f"Photo for {self.athlete.full_name}"

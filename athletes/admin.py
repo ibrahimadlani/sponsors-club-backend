@@ -5,7 +5,7 @@
 
 from django.contrib import admin
 
-from .models import Athlete, Sport, SportDiscipline
+from .models import Athlete, AthletePhoto, Sport, SportDiscipline
 
 
 class SportDisciplineInline(admin.TabularInline):
@@ -31,6 +31,13 @@ class SportAdmin(admin.ModelAdmin):
     inlines = (SportDisciplineInline,)
 
 
+class AthletePhotoInline(admin.StackedInline):
+    """Inline management of gallery photos for an athlete."""
+
+    model = AthletePhoto
+    extra = 0
+
+
 @admin.register(Athlete)
 class AthleteAdmin(admin.ModelAdmin):
     """Provide rich admin filters for athlete management.
@@ -52,3 +59,4 @@ class AthleteAdmin(admin.ModelAdmin):
         "agent__display_name",
         "agent__user__email",
     )
+    inlines = (AthletePhotoInline,)
