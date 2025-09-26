@@ -318,7 +318,7 @@ classDiagram
         +file pdf
     }
 
-    User ||--o| AgentProfile : user
+    User "1" -- "0..1" AgentProfile : agent_profile
     User ||--o{ EmailVerificationToken : email_tokens
     User "1" -- "0..*" Organisation : owner
     User "1" -- "0..*" Collaborator : user
