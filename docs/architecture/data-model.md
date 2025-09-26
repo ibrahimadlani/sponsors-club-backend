@@ -319,85 +319,70 @@ classDiagram
     }
 
     User "1" -- "0..1" AgentProfile : agent_profile
-    User ||--o{ EmailVerificationToken : email_tokens
-    User "1" -- "0..*" Organisation : owner
+    User "1" -- "0..*" EmailVerificationToken : email_tokens
+    User "0..1" -- "0..*" Organisation : owner
     User "1" -- "0..*" Collaborator : user
-    User "1" -- "0..*" OrganisationInvite : used_by
+    User "0..1" -- "0..*" OrganisationInvite : used_by
     User "1" -- "0..*" Message : sender
     User "1" -- "0..*" Notification : notifications
     User "1" -- "0..*" ContractRevision : proposed_by
     User "1" -- "0..*" ContractVersion : created_by
     User "1" -- "0..*" ContractComment : author
-    User "1" -- "0..*" ContractLegalReview : requested_by / verified_by
+    User "1" -- "0..*" ContractLegalReview : requested_by
+    User "0..1" -- "0..*" ContractLegalReview : verified_by
     User "1" -- "0..*" ContractSigning : initiated_by
 
-    Organisation ||--o{ Collaborator : collaborators
-    Organisation ||--o{ OrganisationInvite : invites
-    Organisation ||--o{ Contract : contracts
-    Organisation ||--o{ Subscription : subscriptions
+    Organisation "1" -- "0..*" Collaborator : collaborators
+    Organisation "1" -- "0..*" OrganisationInvite : invites
+    Organisation "1" -- "0..*" Contract : contracts
+    Organisation "0..1" -- "0..*" Subscription : subscriptions
 
-    Collaborator ||--o{ OrganisationInvite : created_invites
-    Collaborator ||--o{ Follow : follows
-    Collaborator ||--o{ Thread : threads
-    Collaborator ||--o{ Contract : initiated_contracts
+    Collaborator "1" -- "0..*" OrganisationInvite : created_invites
+    Collaborator "1" -- "0..*" Follow : follows
+    Collaborator "1" -- "0..*" Thread : threads
+    Collaborator "0..1" -- "0..*" Contract : initiated_contracts
 
-    AgentProfile ||--o{ Athlete : athletes
-    AgentProfile ||--o{ Thread : threads
-    AgentProfile ||--o{ Contract : contracts
-    AgentProfile ||--o{ Subscription : subscriptions
+    AgentProfile "1" -- "0..*" Athlete : athletes
+    AgentProfile "1" -- "0..*" Thread : threads
+    AgentProfile "1" -- "0..*" Contract : contracts
+    AgentProfile "0..1" -- "0..*" Subscription : subscriptions
 
-    Sport ||--o{ SportDiscipline : disciplines
-    Sport ||--o{ Athlete : athletes
+    Sport "1" -- "0..*" SportDiscipline : disciplines
+    Sport "1" -- "0..*" Athlete : athletes
 
-    SportDiscipline ||--o{ AthleteDiscipline : discipline_links
-    Athlete ||--o{ AthleteDiscipline : discipline_links
-    Athlete ||--o{ AthletePhoto : photos
-    Athlete ||--o{ AthleteSocialAccount : social_accounts
-    Athlete ||--o{ Follow : follows
-    Athlete ||--o{ Thread : threads
+    SportDiscipline "1" -- "0..*" AthleteDiscipline : discipline_links
+    Athlete "1" -- "0..*" AthleteDiscipline : discipline_links
+    Athlete "1" -- "0..*" AthletePhoto : photos
+    Athlete "1" -- "0..*" AthleteSocialAccount : social_accounts
+    Athlete "1" -- "0..*" Follow : follows
+    Athlete "0..1" -- "0..*" Thread : threads
 
-    AthleteDiscipline }|--|| SportDiscipline : discipline
-    AthleteDiscipline }|--|| Athlete : athlete
+    AthleteDiscipline "0..*" -- "1" SportDiscipline : discipline
+    AthleteDiscipline "0..*" -- "1" Athlete : athlete
 
-    SocialPlatform ||--o{ AthleteSocialAccount : accounts
-    AthleteSocialAccount ||--o{ DailyStats : daily_stats
+    SocialPlatform "1" -- "0..*" AthleteSocialAccount : accounts
+    AthleteSocialAccount "1" -- "0..*" DailyStats : daily_stats
 
-    SubscriptionPlan ||--o{ Subscription : subscriptions
+    SubscriptionPlan "1" -- "0..*" Subscription : subscriptions
 
-    Thread ||--o{ Message : messages
-    Thread }o--|| Athlete : athlete
+    Thread "1" -- "0..*" Message : messages
+    Thread "0..*" -- "0..1" Athlete : athlete
 
-    Contract ||--o{ ContractClause : clauses
-    Contract ||--o{ ContractRevision : revisions
-    Contract ||--o{ ContractVersion : versions
-    Contract ||--o{ ContractComment : comments
-    Contract ||--|| ContractLegalReview : legal_review
-    Contract ||--|| ContractSigning : signing
-    Contract ||--|| ContractFile : file
+    Contract "1" -- "0..*" ContractClause : clauses
+    Contract "1" -- "0..*" ContractRevision : revisions
+    Contract "1" -- "0..*" ContractVersion : versions
+    Contract "1" -- "0..*" ContractComment : comments
+    Contract "1" -- "0..1" ContractLegalReview : legal_review
+    Contract "1" -- "0..1" ContractSigning : signing
+    Contract "1" -- "0..1" ContractFile : file
 
-    ContractClause ||--o{ ContractRevision : clauses_changed
-    ContractClause ||--o{ ContractComment : comments
+    ContractClause "0..*" -- "0..*" ContractRevision : clauses_changed
+    ContractClause "0..1" -- "0..*" ContractComment : comments
 
-    ContractRevision ||--o{ ContractVersion : resulting_versions
+    ContractRevision "0..1" -- "0..*" ContractVersion : resulting_versions
 
-    ContractVersion ||--o{ ContractComment : comments
-    ContractVersion }o--|| ContractRevision : source_revision
-
-    OrganisationInvite }o--|| User : used_by
-    OrganisationInvite }|--|| Organisation : organisation
-    OrganisationInvite }|--|| Collaborator : created_by
-
-    Subscription }o--|| Organisation : organisation
-    Subscription }o--|| AgentProfile : agent
-    Subscription }|--|| SubscriptionPlan : plan
-
-    Follow }|--|| Collaborator : collaborator
-    Follow }|--|| Athlete : athlete
-
-    Message }|--|| Thread : thread
-
-    DailyStats }|--|| AthleteSocialAccount : account
-```
+    ContractVersion "1" -- "0..*" ContractComment : comments
+    ContractVersion "0..*" -- "0..1" ContractRevision : source_revision
 ```
 
 ## Points d'attention
