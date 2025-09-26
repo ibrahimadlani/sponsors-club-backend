@@ -207,7 +207,7 @@ def test_collaborator_has_feature_uses_fallback(user_model):
     )
 
 
-def test_agent_meets_requirement(agent_user):
+def test_agent_meets_requirement(agent_user, agent_subscription):
     requirement = FEATURE_MATRIX["agent"]["messaging_initiate"]
     assert permissions.agent_meets_requirement(agent_user, requirement) is True
 
@@ -307,7 +307,7 @@ def test_get_collaborator_plan_features_uses_fallback(user_model):
     assert features["collaborator_invites"] is True
 
 
-def test_user_feature_requirement_agent(agent_user):
+def test_user_feature_requirement_agent(agent_user, agent_subscription):
     requirement, granted = permissions.user_feature_requirement(
         agent_user, "messaging_initiate"
     )
@@ -343,7 +343,7 @@ def test_user_feature_requirement_requires_authentication(user_model):
         password="pass1234",
     )
     requirement, granted = permissions.user_feature_requirement(user, "messaging_initiate")
-    assert requirement is None
+    assert requirement is FEATURE_MATRIX["agent"]["messaging_initiate"]
     assert granted is False
 
 
@@ -372,6 +372,8 @@ def test_feature_status_for_user_requires_account_type(user_model):
         email="unknown@example.com",
         password="pass1234",
     )
+    user.account_type = "UNKNOWN"
+    user.save(update_fields=["account_type"])
     assert permissions.feature_status_for_user(user) == []
 
 
