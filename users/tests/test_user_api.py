@@ -81,8 +81,6 @@ def test_register_collaborator_success(api_client, user_model):
         "last_name": "User",
         "phone_country_code": "+44",
         "phone_number": "2071234567",
-        "organisation_name": "Org Example",
-        "job_title": "Founder",
     }
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201

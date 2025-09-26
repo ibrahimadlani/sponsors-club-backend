@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 try:  # pragma: no cover - fallback path exercised only when dependency missing
     from dotenv import load_dotenv
-except ModuleNotFoundError:  # pragma: no cover - lightweight shim for constrained envs
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - lightweight shim for constrained envs
     def load_dotenv(*_args, **_kwargs):
         """Gracefully skip dotenv loading when the optional dependency is absent."""
 
@@ -156,6 +156,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -169,6 +172,7 @@ STORAGES = {
 # before collectstatic runs (the directory is ignored in git and backed by a
 # Docker volume in containerised environments).
 STATIC_ROOT.mkdir(parents=True, exist_ok=True)
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

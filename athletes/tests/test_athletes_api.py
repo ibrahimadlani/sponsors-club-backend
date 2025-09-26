@@ -4,11 +4,12 @@ from datetime import date
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import permissions, status
 from rest_framework.test import APIClient, APIRequestFactory
 
-from athletes.models import Athlete, Sport, SportDiscipline
+from athletes.models import Athlete, AthletePhoto, Sport, SportDiscipline
 from athletes.permissions import IsAgentUser, IsAthleteOwner
 from athletes.serializers import (
     AthletePublicSerializer,
@@ -18,6 +19,19 @@ from athletes.serializers import (
 from athletes.views import AthleteViewSet
 from payments.models import Subscription, SubscriptionPlan
 from users.models import AgentProfile
+
+
+SMALL_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc``\x00"
+    b"\x00\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def sample_image_file(name: str) -> SimpleUploadedFile:
+    """Return a minimal in-memory PNG for image uploads in tests."""
+
+    return SimpleUploadedFile(name, SMALL_PNG, content_type="image/png")
 
 
 @pytest.fixture
@@ -136,6 +150,8 @@ def test_athlete_serializer_create_success(agent_user, sport):
             "full_name": "Jane Doe",
             "birth_date": "1995-05-05",
             "nationality": "US",
+            "country": "United States",
+            "city": "New York",
             "bio": "Bio text",
             "social_links": {"twitter": "jane_doe"},
             "discipline_ids": [str(d.id) for d in sport.disciplines.all()],
@@ -147,7 +163,39 @@ def test_athlete_serializer_create_success(agent_user, sport):
     assert athlete.agent == agent_user.agent_profile
     assert athlete.sport == sport
     assert athlete.full_name == "Jane Doe"
+    assert athlete.country == "United States"
+    assert athlete.city == "New York"
     assert list(athlete.disciplines.order_by('name').values_list('name', flat=True)) == ["Professional 5v5", "Streetball"]
+
+
+@pytest.mark.django_db
+def test_athlete_serializer_adds_gallery_photos(agent_user, sport):
+    factory = APIRequestFactory()
+    request = factory.post("/api/athletes/")
+    request.user = agent_user
+    serializer = AthleteSerializer(
+        data={
+            "sport_id": sport.id,
+            "full_name": "Media Athlete",
+            "birth_date": "1992-03-03",
+            "nationality": "FR",
+            "country": "France",
+            "city": "Paris",
+            "new_photos": [
+                sample_image_file("gallery1.png"),
+                sample_image_file("gallery2.png"),
+            ],
+        },
+        context={"request": request},
+    )
+    assert serializer.is_valid(), serializer.errors
+    athlete = serializer.save()
+    athlete.refresh_from_db()
+    assert athlete.photos.count() == 2
+    positions = list(
+        athlete.photos.order_by("position").values_list("position", flat=True)
+    )
+    assert positions == [1, 2]
 
 
 @pytest.mark.django_db
@@ -207,8 +255,48 @@ def test_athlete_serializer_update_success(athlete, agent_user):
 def test_athlete_public_serializer(athlete):
     data = AthletePublicSerializer(athlete).data
     assert data["full_name"] == athlete.full_name
+    assert data["country"] == ""
+    assert data["city"] == ""
     assert "bio" not in data
     assert data["disciplines"] == []
+    assert data["card_photos"] == []
+    assert data["gallery_photos"] == []
+
+
+@pytest.mark.django_db
+def test_athlete_public_serializer_card_photos(athlete):
+    athlete.country = "France"
+    athlete.city = "Paris"
+    athlete.save(update_fields=["country", "city", "updated_at"])
+    for index in range(4):
+        AthletePhoto.objects.create(
+            athlete=athlete,
+            image=sample_image_file(f"carousel{index}.png"),
+            position=index,
+        )
+    data = AthletePublicSerializer(athlete).data
+    assert data["country"] == "France"
+    assert data["city"] == "Paris"
+    assert len(data["card_photos"]) == 3
+    assert all(photo_path.endswith(".png") for photo_path in data["card_photos"])
+    assert len(data["gallery_photos"]) == 4
+
+
+@pytest.mark.django_db
+def test_athlete_photos_endpoint(api_client, athlete):
+    for index in range(2):
+        AthletePhoto.objects.create(
+            athlete=athlete,
+            image=sample_image_file(f"gallery{index}.png"),
+            position=index,
+        )
+    url = reverse("athlete-photos", kwargs={"athlete_id": athlete.id})
+    response = api_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["athlete_id"] == str(athlete.id)
+    assert len(payload["photos"]) == 2
+    assert all(item["image"].endswith(".png") for item in payload["photos"])
 
 
 @pytest.mark.django_db

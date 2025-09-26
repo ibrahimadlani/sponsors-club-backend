@@ -53,17 +53,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=False,
         default=False,
     )
-    organisation_name = serializers.CharField(
-        write_only=True,
-        required=False,
-        allow_blank=True,
-    )
-    job_title = serializers.CharField(
-        write_only=True,
-        required=False,
-        allow_blank=True,
-    )
-
     class Meta:
         model = User
         fields = (
@@ -78,8 +67,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "phone_country_code",
             "phone_number",
             "date_of_birth",
-            "organisation_name",
-            "job_title",
         )
         read_only_fields = ("id",)
 
@@ -98,8 +85,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Create a user and any related agent or collaborator records."""
         display_name = validated_data.pop("display_name", None)
         is_self_represented = validated_data.pop("is_self_represented", False)
-        validated_data.pop("organisation_name", None)
-        validated_data.pop("job_title", None)
         password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:

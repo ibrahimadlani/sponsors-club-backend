@@ -281,6 +281,8 @@ class Command(BaseCommand):
                 full_name=faker.name(),
                 birth_date=date.today() - timedelta(days=birth_years * 365),
                 nationality=faker.country_code(representation="alpha-2"),
+                country=faker.country(),
+                city=faker.city(),
                 bio=faker.paragraph(nb_sentences=3),
                 social_links={
                     "instagram": faker.user_name(),
