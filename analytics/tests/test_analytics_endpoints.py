@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from analytics.models import AthleteSocialAccount, DailyStats, SocialPlatform
-from athletes.models import Athlete, Sport
+from athletes.models import Athlete, Sport, SportDiscipline
 
 
 @pytest.fixture
@@ -19,7 +19,14 @@ def instagram_platform():
 
 @pytest.fixture
 def stats_sport():
-    return Sport.objects.create(name="Volley", discipline="Team Sport")
+    sport = Sport.objects.create(name="Volley", emoji="🏐", category=Sport.Category.TEAM)
+    SportDiscipline.objects.create(
+        sport=sport,
+        name="Indoor Volleyball",
+        description="Six-player indoor format",
+        is_olympic=True,
+    )
+    return sport
 
 
 @pytest.fixture

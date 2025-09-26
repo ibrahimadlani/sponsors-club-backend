@@ -8,7 +8,7 @@ from django.urls import reverse
 from rest_framework import permissions, status
 from rest_framework.test import APIClient, APIRequestFactory
 
-from athletes.models import Athlete, Sport
+from athletes.models import Athlete, Sport, SportDiscipline
 from athletes.permissions import IsAgentUser, IsAthleteOwner
 from athletes.serializers import (
     AthletePublicSerializer,
@@ -22,7 +22,24 @@ from users.models import AgentProfile
 
 @pytest.fixture
 def sport():
-    return Sport.objects.create(name="Basketball", discipline="Team Sport")
+    sport = Sport.objects.create(
+        name="Basketball",
+        emoji="🏀",
+        category=Sport.Category.TEAM,
+    )
+    SportDiscipline.objects.create(
+        sport=sport,
+        name="Professional 5v5",
+        description="Standard full-court play",
+        is_olympic=True,
+    )
+    SportDiscipline.objects.create(
+        sport=sport,
+        name="Streetball",
+        description="3x3 outdoor variant",
+        is_olympic=False,
+    )
+    return sport
 
 
 @pytest.fixture
@@ -121,6 +138,7 @@ def test_athlete_serializer_create_success(agent_user, sport):
             "nationality": "US",
             "bio": "Bio text",
             "social_links": {"twitter": "jane_doe"},
+            "discipline_ids": [str(d.id) for d in sport.disciplines.all()],
         },
         context={"request": request},
     )
@@ -129,6 +147,7 @@ def test_athlete_serializer_create_success(agent_user, sport):
     assert athlete.agent == agent_user.agent_profile
     assert athlete.sport == sport
     assert athlete.full_name == "Jane Doe"
+    assert list(athlete.disciplines.order_by('name').values_list('name', flat=True)) == ["Professional 5v5", "Streetball"]
 
 
 @pytest.mark.django_db
@@ -189,13 +208,26 @@ def test_athlete_public_serializer(athlete):
     data = AthletePublicSerializer(athlete).data
     assert data["full_name"] == athlete.full_name
     assert "bio" not in data
+    assert data["disciplines"] == []
 
 
 @pytest.mark.django_db
 def test_sport_serializer(sport):
     data = SportSerializer(sport).data
     assert data["name"] == sport.name
-    assert data["discipline"] == sport.discipline
+    assert data["slug"] == sport.slug
+    assert data["disciplines"][0]["name"] == "Professional 5v5"
+
+
+@pytest.mark.django_db
+def test_sport_disciplines_endpoint(api_client, sport):
+    url = reverse("sport-disciplines", kwargs={"sport_id": sport.id})
+    response = api_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["sport"]["id"] == str(sport.id)
+    names = [item["name"] for item in payload["disciplines"]]
+    assert names == sorted(names)
 
 
 @pytest.mark.django_db
@@ -364,8 +396,8 @@ def test_athlete_update_success(athlete, agent_user):
 
 @pytest.mark.django_db
 def test_sport_list_view_orders_by_name():
-    Sport.objects.create(name="Z Sport", discipline="Z Disc")
-    Sport.objects.create(name="A Sport", discipline="A Disc")
+    Sport.objects.create(name="Z Sport")
+    Sport.objects.create(name="A Sport")
     client = APIClient()
     response = client.get(reverse("sports-list"))
     assert response.status_code == status.HTTP_200_OK
@@ -454,3 +486,45 @@ def test_agent_create_athlete_requires_plan_slot(agent_user, sport):
     response = client.post(url, payload, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json()["required_feature"] == "max_athletes"
+
+
+@pytest.mark.django_db
+def test_athlete_serializer_rejects_cross_sport_disciplines(agent_user, sport):
+    other_sport = Sport.objects.create(name="Swimming", emoji="🏊", category=Sport.Category.INDIVIDUAL)
+    other_discipline = SportDiscipline.objects.create(
+        sport=other_sport,
+        name="200m Medley",
+        description="All strokes",
+    )
+    factory = APIRequestFactory()
+    request = factory.post("/api/athletes/")
+    request.user = agent_user
+    serializer = AthleteSerializer(
+        data={
+            "sport_id": sport.id,
+            "full_name": "Cross Disc Athlete",
+            "birth_date": "1993-03-03",
+            "nationality": "FR",
+            "discipline_ids": [str(other_discipline.id)],
+        },
+        context={"request": request},
+    )
+    assert not serializer.is_valid()
+    assert "discipline_ids" in serializer.errors
+
+
+@pytest.mark.django_db
+def test_athlete_update_disciplines(agent_user, athlete, sport):
+    new_discipline = sport.disciplines.get(name="Streetball")
+    factory = APIRequestFactory()
+    request = factory.patch("/api/athletes/")
+    request.user = agent_user
+    serializer = AthleteSerializer(
+        athlete,
+        data={"discipline_ids": [str(new_discipline.id)]},
+        context={"request": request},
+        partial=True,
+    )
+    assert serializer.is_valid(), serializer.errors
+    updated = serializer.save()
+    assert list(updated.disciplines.values_list("name", flat=True)) == ["Streetball"]

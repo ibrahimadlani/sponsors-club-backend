@@ -6,18 +6,29 @@ APIs used to manage rosters. It enforces per-plan limits when creating athletes
 and restricts operations to the owning agent or invited collaborators.
 
 ## Data model
-- **`Sport`** captures the sport name and discipline, referenced by athletes.
+- **`Sport`** now stores the high-level taxonomy for a discipline set. Fields
+  include a unique `slug`, optional `emoji`, and `category` (team/individual/
+  mixed). Slugs are auto-generated from the sport name for stable URLs
+  and filtering.
+- **`SportDiscipline`** captures individual events within a sport (e.g.
+  "Professional 5v5", "Marathon"), providing its own slug, optional
+  `description`, and an `is_olympic` flag. Disciplines cascade when their
+  parent sport is removed.
 - **`Athlete`** links to a `Sport` and an owning `AgentProfile`. It stores core
   biography fields, cached social metrics (`followers_count_cached` and
   `engagement_rate_cached`), social links, and optional avatar uploads. Whether
   the agent is self-represented now lives on the owning `AgentProfile` record.
 
 ## Serializers
+- `SportSerializer` includes slug, category, and nested `SportDiscipline`
+  representations so clients can render available events without additional
+  round-trips.
 - `AthletePublicSerializer` exposes the readonly fields returned in nested
   contexts such as follows, messaging, and analytics.
 - `AthleteSerializer` is the write-capable serializer used by the management
   endpoints. It validates the requesting user has an `AgentProfile`, blocks agent
-  reassignment on updates, and enforces feature limits:
+  reassignment on updates, allows clients to supply optional `discipline_ids`
+  (validated against the selected sport), and enforces feature limits:
   - `get_agent_plan_features()` retrieves the current subscription allowances.
   - `user_feature_requirement("athlete_slots")` pairs with the
     `AGENT_FEATURES` matrix to build entitlement denial payloads via

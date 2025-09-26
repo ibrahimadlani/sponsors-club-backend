@@ -11,7 +11,7 @@ from core.permissions import get_agent_profile
 
 from .models import Athlete, Sport
 from .permissions import CanViewAthlete, IsAgentUser, IsAthleteOwner, IsCollaboratorUser
-from .serializers import AthleteSerializer, SportSerializer
+from .serializers import AthleteSerializer, SportDisciplineSerializer, SportSerializer
 
 
 class AthleteViewSet(viewsets.ModelViewSet):
@@ -21,7 +21,11 @@ class AthleteViewSet(viewsets.ModelViewSet):
     delegating domain checks to serializers and permission classes.
     """
 
-    queryset = Athlete.objects.select_related("sport", "agent__user").all()
+    queryset = (
+        Athlete.objects.select_related("sport", "agent__user")
+        .prefetch_related("disciplines")
+        .all()
+    )
 
     def get_serializer_class(self):
         """Return the serializer used for the current request cycle.
@@ -92,8 +96,10 @@ class MyAthletesView(generics.ListAPIView):
             # Returning ``none()`` avoids leaking data when an agent profile is
             # missing or misconfigured.
             return Athlete.objects.none()
-        return Athlete.objects.filter(agent=agent_profile).select_related(
-            "sport", "agent__user"
+        return (
+            Athlete.objects.filter(agent=agent_profile)
+            .select_related("sport", "agent__user")
+            .prefetch_related("disciplines")
         )
 
 
@@ -114,6 +120,26 @@ class SportListView(APIView):
         """
         # Sorting in the database keeps the response stable regardless of how
         # entries were added in migrations or fixtures.
-        sports = Sport.objects.all().order_by("name")
+        sports = Sport.objects.all().prefetch_related("disciplines").order_by("name")
         serializer = SportSerializer(sports, many=True)
         return Response(serializer.data)
+
+
+class SportDisciplinesView(APIView):
+    """Return the disciplines for a single sport."""
+
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request, sport_id):
+        sport = generics.get_object_or_404(
+            Sport.objects.prefetch_related("disciplines"), pk=sport_id
+        )
+        disciplines = sport.disciplines.order_by("name")
+        return Response(
+            {
+                "sport": SportSerializer(
+                    sport, context={"include_disciplines": False}
+                ).data,
+                "disciplines": SportDisciplineSerializer(disciplines, many=True).data,
+            }
+        )

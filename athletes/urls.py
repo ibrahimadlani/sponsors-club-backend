@@ -5,7 +5,12 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import AthleteViewSet, MyAthletesView, SportListView
+from .views import (
+    AthleteViewSet,
+    MyAthletesView,
+    SportDisciplinesView,
+    SportListView,
+)
 
 # DefaultRouter wires up standard CRUD endpoints such as /athletes/<id>/.
 router = DefaultRouter()
@@ -15,4 +20,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("me/athletes/", MyAthletesView.as_view(), name="my-athletes"),
     path("sports/", SportListView.as_view(), name="sports-list"),
+    path("sports/<uuid:sport_id>/disciplines/", SportDisciplinesView.as_view(), name="sport-disciplines"),
 ]

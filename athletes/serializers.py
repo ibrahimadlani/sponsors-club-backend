@@ -13,21 +13,45 @@ from core.permissions import (
 )
 from users.models import AgentProfile
 
-from .models import Athlete, Sport
+from .models import Athlete, Sport, SportDiscipline
+
+
+class SportDisciplineSerializer(serializers.ModelSerializer):
+    """Expose individual discipline metadata within a sport."""
+
+    class Meta:
+        model = SportDiscipline
+        fields = ("id", "name", "slug", "description", "is_olympic")
 
 
 class SportSerializer(serializers.ModelSerializer):
     """Serialize sport metadata for read operations."""
 
+    disciplines = SportDisciplineSerializer(many=True, read_only=True)
+
     class Meta:
         model = Sport
-        fields = ("id", "name", "discipline")
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "emoji",
+            "category",
+            "disciplines",
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.context.get("include_disciplines", True):
+            data.pop("disciplines", None)
+        return data
 
 
 class AthletePublicSerializer(serializers.ModelSerializer):
     """Expose a limited athlete payload for public endpoints."""
 
     sport = SportSerializer(read_only=True)
+    disciplines = SportDisciplineSerializer(many=True, read_only=True)
 
     class Meta:
         model = Athlete
@@ -35,6 +59,7 @@ class AthletePublicSerializer(serializers.ModelSerializer):
             "id",
             "full_name",
             "sport",
+            "disciplines",
             "nationality",
             "followers_count_cached",
             "engagement_rate_cached",
@@ -56,6 +81,13 @@ class AthleteSerializer(serializers.ModelSerializer):
         source="sport",
         write_only=True,
     )
+    disciplines = SportDisciplineSerializer(many=True, read_only=True)
+    discipline_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=SportDiscipline.objects.all(),
+        write_only=True,
+        required=False,
+    )
 
     class Meta:
         model = Athlete
@@ -69,6 +101,8 @@ class AthleteSerializer(serializers.ModelSerializer):
             "nationality",
             "bio",
             "social_links",
+            "disciplines",
+            "discipline_ids",
             "followers_count_cached",
             "engagement_rate_cached",
             "avatar",
@@ -82,6 +116,7 @@ class AthleteSerializer(serializers.ModelSerializer):
             "engagement_rate_cached",
             "created_at",
             "updated_at",
+            "disciplines",
         )
 
     def validate(self, attrs):
@@ -109,6 +144,20 @@ class AthleteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"agent": "Cannot reassign athlete agent."}
             )
+        sport = attrs.get("sport") or (self.instance.sport if self.instance else None)
+        discipline_ids = attrs.get("discipline_ids")
+        if discipline_ids and sport is None:
+            raise serializers.ValidationError(
+                {"discipline_ids": "Sport must be specified when selecting disciplines."}
+            )
+        if discipline_ids and sport:
+            invalid = [d for d in discipline_ids if d.sport_id != sport.id]
+            if invalid:
+                raise serializers.ValidationError(
+                    {
+                        "discipline_ids": "All disciplines must belong to the selected sport.",
+                    }
+                )
         return attrs
 
     def create(self, validated_data):
@@ -148,10 +197,13 @@ class AthleteSerializer(serializers.ModelSerializer):
                 message = "Athlete limit reached. Upgrade to add more athletes."
                 payload = requirement_denied_payload(requirement, message)
                 raise PermissionDenied(payload)
+        discipline_ids = validated_data.pop("discipline_ids", [])
         athlete = Athlete.objects.create(
             agent=agent_profile,
             **validated_data,
         )
+        if discipline_ids:
+            athlete.disciplines.set(discipline_ids)
         return athlete
 
     def update(self, instance, validated_data):
@@ -164,6 +216,9 @@ class AthleteSerializer(serializers.ModelSerializer):
         Returns:
             athletes.models.Athlete: Updated athlete instance.
         """
+        discipline_ids = validated_data.pop("discipline_ids", None)
         validated_data.pop("agent", None)
-        # Defer to DRF's default implementation once agent ownership is frozen.
-        return super().update(instance, validated_data)
+        athlete = super().update(instance, validated_data)
+        if discipline_ids is not None:
+            athlete.disciplines.set(discipline_ids)
+        return athlete
