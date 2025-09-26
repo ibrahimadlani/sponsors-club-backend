@@ -1,6 +1,6 @@
-# Diagramme UML de la base de données
+# Database UML Diagram
 
-Ce schéma couvre l'ensemble des modèles persistés dans Django pour l'application Sponsors Club. Il inclut les cardinalités, les champs principaux ainsi que les tables d'association.
+This schema covers every persisted Django model for the Sponsors Club application. It includes cardinalities, primary fields, and association tables.
 
 ```mermaid
 classDiagram
@@ -385,9 +385,9 @@ classDiagram
     ContractVersion "0..*" -- "0..1" ContractRevision : source_revision
 ```
 
-## Points d'attention
+## Key considerations
 
-- Les modèles héritent d'une base commune avec identifiants UUID et horodatages automatiques, ce qui facilite la réplication entre environnements. 【F:users/models.py†L19-L28】【F:athletes/models.py†L14-L33】
-- Le modèle `Subscription` applique une contrainte XOR : une souscription est liée soit à une organisation soit à un agent, mais jamais aux deux simultanément. 【F:payments/models.py†L81-L124】
-- Les révisions de contrats gèrent une relation plusieurs-à-plusieurs vers les clauses via `clauses_changed`, permettant de tracer précisément quelles dispositions ont été proposées puis versionnées. 【F:contracts/models.py†L123-L214】
-- `User` hérite de `PermissionsMixin`, maintenant les relations Django natives avec les groupes et permissions (`auth_group`, `auth_permission`) ; elles ne sont pas détaillées ici mais restent disponibles dans la base. 【F:users/models.py†L8-L18】
+- The models inherit from a shared base with UUID identifiers and automatic timestamps, simplifying replication across environments. 【F:users/models.py†L19-L28】【F:athletes/models.py†L14-L33】
+- The `Subscription` model enforces an XOR constraint: a subscription is linked either to an organisation or to an agent, but never to both simultaneously. 【F:payments/models.py†L81-L124】
+- Contract revisions maintain a many-to-many relationship to clauses via `clauses_changed`, allowing the product to track exactly which provisions were proposed and subsequently versioned. 【F:contracts/models.py†L123-L214】
+- `User` inherits from `PermissionsMixin`, keeping Django's native relations with groups and permissions (`auth_group`, `auth_permission`); they are not detailed here but remain available in the database. 【F:users/models.py†L8-L18】
