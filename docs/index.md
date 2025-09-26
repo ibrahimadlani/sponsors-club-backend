@@ -31,6 +31,7 @@ The project-level router (`core/urls.py`) wires each domain app under the `/api/
 - [Deployment runbook](operations/deployment.md)
 - [Background jobs & scheduling](operations/background-jobs.md)
 - [Feature entitlements reference](feature-entitlements.md)
+- [Modèle de données et diagramme UML](architecture/data-model.md)
 - [Proof-of-concept templates](poc/README.md)
 
 Interactive OpenAPI documentation is available at `/api/docs/` and `/api/redoc/`
