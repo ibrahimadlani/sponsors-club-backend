@@ -50,8 +50,8 @@ def test_fetch_account_stats_logs_and_returns_none(account, caplog):
 @pytest.mark.django_db
 def test_sync_all_accounts_iterates_over_accounts(account):
     second_platform = SocialPlatform.objects.create(
-        name=SocialPlatform.Platform.TWITTER,
-        base_url="https://twitter.com",
+        name=SocialPlatform.Platform.YOUTUBE,
+        base_url="https://youtube.com",
     )
     second = AthleteSocialAccount.objects.create(
         athlete=account.athlete,
