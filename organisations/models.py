@@ -76,9 +76,9 @@ class Collaborator(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=("organisation",),
+                fields=("organisation", "user"),
                 condition=models.Q(role="OWNER"),
-                name="unique_owner_per_organisation",
+                name="unique_owner_per_organisation_user",
             ),
         ]
 
