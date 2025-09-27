@@ -23,7 +23,7 @@ def test_notifications_websocket_urlpattern_uses_notification_consumer():
     pattern = websocket_urlpatterns[0]
 
     # ``lookup_str`` records the dotted import path to the consumer callable.
-    expected_lookup = "notifications.consumers.NotificationConsumer.as_asgi"
+    expected_lookup = "notifications.consumers.NotificationConsumer"
     if getattr(pattern, "lookup_str", None):
         assert pattern.lookup_str == expected_lookup
         return

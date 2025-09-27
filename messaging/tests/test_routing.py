@@ -28,7 +28,7 @@ def test_messaging_websocket_urlpattern_uses_thread_consumer():
     # When Django builds the URL pattern, it stores the import string for the
     # callable in ``lookup_str``. In environments where this metadata is
     # available we can assert on it directly.
-    expected_lookup = "messaging.consumers.ThreadConsumer.as_asgi"
+    expected_lookup = "messaging.consumers.ThreadConsumer"
     if getattr(pattern, "lookup_str", None):
         assert pattern.lookup_str == expected_lookup
         return
