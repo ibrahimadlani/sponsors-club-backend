@@ -6,6 +6,7 @@ import asyncio
 import sys
 import types
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 
 # Django Channels is not installed in the execution environment used for the
@@ -77,23 +78,35 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _instrument_consumer(consumer: NotificationConsumer) -> None:
+    """Attach AsyncMock helpers so the consumer can be exercised directly."""
+
+    if not hasattr(consumer, "channel_name"):
+        consumer.channel_name = "test-channel"
+
+    consumer.accept = AsyncMock()
+    consumer.close = AsyncMock()
+    consumer.send_json = AsyncMock()
+    consumer.channel_layer = DummyChannelLayer()
+
+
 def test_connect_rejects_anonymous_user():
     consumer = NotificationConsumer()
+    _instrument_consumer(consumer)
     consumer.scope = {"user": SimpleNamespace(is_authenticated=False)}
-    consumer.channel_layer = DummyChannelLayer()
 
     _run(consumer.connect())
 
     assert getattr(consumer, "group_name", None) is None
     assert consumer.channel_layer.add_calls == []
-    assert consumer.closed_code == 4401
+    consumer.close.assert_awaited_once_with(code=4401)
 
 
 def test_connect_authenticated_user_joins_group_and_accepts():
     consumer = NotificationConsumer()
+    _instrument_consumer(consumer)
     user = SimpleNamespace(id=42, is_authenticated=True)
     consumer.scope = {"user": user}
-    consumer.channel_layer = DummyChannelLayer()
 
     _run(consumer.connect())
 
@@ -101,37 +114,46 @@ def test_connect_authenticated_user_joins_group_and_accepts():
     assert consumer.channel_layer.add_calls == [
         ("user_42", consumer.channel_name)
     ]
-    assert consumer.accepted is True
-    assert consumer.closed_code is None
+    consumer.accept.assert_awaited_once()
+    consumer.close.assert_not_awaited()
 
 
 def test_disconnect_removes_group_and_calls_super():
-    consumer = NotificationConsumer()
-    user = SimpleNamespace(id=7, is_authenticated=True)
-    consumer.scope = {"user": user}
-    consumer.channel_layer = DummyChannelLayer()
+    with patch(
+        "notifications.consumers.AsyncJsonWebsocketConsumer.disconnect",
+        new_callable=AsyncMock,
+    ) as super_disconnect:
+        consumer = NotificationConsumer()
+        _instrument_consumer(consumer)
+        user = SimpleNamespace(id=7, is_authenticated=True)
+        consumer.scope = {"user": user}
 
-    _run(consumer.connect())
-    _run(consumer.disconnect(3000))
+        _run(consumer.connect())
+        _run(consumer.disconnect(3000))
 
-    assert consumer.channel_layer.discard_calls == [
-        ("user_7", consumer.channel_name)
-    ]
-    assert consumer.disconnected_code == 3000
+        assert consumer.channel_layer.discard_calls == [
+            ("user_7", consumer.channel_name)
+        ]
+        super_disconnect.assert_awaited_once_with(3000)
 
 
 def test_disconnect_without_group_name_skips_channel_layer_cleanup():
-    consumer = NotificationConsumer()
-    consumer.channel_layer = DummyChannelLayer()
+    with patch(
+        "notifications.consumers.AsyncJsonWebsocketConsumer.disconnect",
+        new_callable=AsyncMock,
+    ) as super_disconnect:
+        consumer = NotificationConsumer()
+        _instrument_consumer(consumer)
 
-    _run(consumer.disconnect(1001))
+        _run(consumer.disconnect(1001))
 
-    assert consumer.channel_layer.discard_calls == []
-    assert consumer.disconnected_code == 1001
+        assert consumer.channel_layer.discard_calls == []
+        super_disconnect.assert_awaited_once_with(1001)
 
 
 def test_notification_created_sends_structured_payload():
     consumer = NotificationConsumer()
+    _instrument_consumer(consumer)
 
     _run(
         consumer.notification_created(
@@ -139,16 +161,18 @@ def test_notification_created_sends_structured_payload():
         )
     )
 
-    assert consumer.sent_messages == [
+    consumer.send_json.assert_awaited_once()
+    assert consumer.send_json.await_args.args == (
         {
             "event": "notification.created",
             "notification": {"id": "notif-1", "detail": "hello"},
-        }
-    ]
+        },
+    )
 
 
 def test_notification_updated_sends_structured_payload():
     consumer = NotificationConsumer()
+    _instrument_consumer(consumer)
 
     _run(
         consumer.notification_updated(
@@ -156,9 +180,10 @@ def test_notification_updated_sends_structured_payload():
         )
     )
 
-    assert consumer.sent_messages == [
+    consumer.send_json.assert_awaited_once()
+    assert consumer.send_json.await_args.args == (
         {
             "event": "notification.updated",
             "notification": {"id": "notif-2", "read": True},
-        }
-    ]
+        },
+    )
