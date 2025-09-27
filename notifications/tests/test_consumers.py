@@ -28,6 +28,7 @@ if "channels" not in sys.modules:  # pragma: no cover - import-time guard
             self.closed_code = None
             self.sent_messages = []
             self.disconnected_code = None
+            self.base_send = self._base_send
 
         async def accept(self):
             self.accepted = True
@@ -37,6 +38,9 @@ if "channels" not in sys.modules:  # pragma: no cover - import-time guard
 
         async def send_json(self, content):
             self.sent_messages.append(content)
+
+        async def _base_send(self, message):
+            self.sent_messages.append(message)
 
         async def disconnect(self, code):
             self.disconnected_code = code
