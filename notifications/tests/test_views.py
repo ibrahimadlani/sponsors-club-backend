@@ -10,6 +10,7 @@ from rest_framework import status
 
 pytest.importorskip("channels")
 
+from core.feature_matrix import FEATURE_MATRIX
 from notifications.models import Notification
 
 
@@ -154,7 +155,9 @@ def test_notification_read_view_enforces_feature_requirement(api_client, agent_u
 
     denial = response.json()
     assert denial["required_feature"] == "notification_center"
-    assert denial["detail"].startswith("Upgrade required")
+    requirement = FEATURE_MATRIX["agent"]["notification_center"]
+    expected_detail = requirement.denied_message or "Upgrade required to access notifications."
+    assert denial["detail"] == expected_detail
     allowed_values = denial["allowed_values"]
     if allowed_values is not None:
         assert isinstance(allowed_values, (list, tuple))
