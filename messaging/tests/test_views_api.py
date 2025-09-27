@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from messaging.models import Message, Thread
+from organisations.models import Organisation
 from users.models import AgentProfile
 
 
@@ -18,18 +19,36 @@ def test_thread_list_returns_threads_for_agent(
     """Agents should only see threads where they participate."""
 
     collaborator = organisations_setup["collaborator"]
-    other_collaborator_user = user_model.objects.create_user(
-        email="other-collab@test.com",
+    other_owner_user = user_model.objects.create_user(
+        email="other-owner@test.com",
         password="pass1234",
         first_name="Other",
-        last_name="Collaborator",
+        last_name="Owner",
         account_type=user_model.AccountType.COLLABORATOR,
     )
+    other_organisation = Organisation.objects.create(
+        owner=other_owner_user,
+        name="Second Org",
+        type=collaborator.organisation.type,
+        industry="Tech",
+        description="Another organisation",
+        website_url="https://second.org",
+        email_contact="contact@second.org",
+        phone_contact="+33102030406",
+        address_city="Lyon",
+        address_country="FR",
+        address_postal_code="69000",
+        social_links={"linkedin": "https://linkedin.com/company/second-org"},
+        founded_year=2015,
+        employees_count=10,
+        budget_range="5k-20k",
+        sponsoring_focus=["sports individuels"],
+    )
     other_collaborator = collaborator.__class__.objects.create(
-        user=other_collaborator_user,
-        organisation=collaborator.organisation,
-        role=collaborator.__class__.Role.MEMBER,
-        job_title="Marketer",
+        user=other_owner_user,
+        organisation=other_organisation,
+        role=collaborator.__class__.Role.OWNER,
+        job_title="Founder",
     )
 
     recent_thread = Thread.objects.create(
