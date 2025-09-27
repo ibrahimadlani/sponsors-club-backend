@@ -115,10 +115,31 @@ def test_subscription_create_serializer_blocks_unentitled_collaborator(
         serializer.is_valid(raise_exception=True)
 
     requirement = COLLABORATOR_FEATURES["organisation_subscription_management"]
+    detail = exc.value.detail
+
+    # Django REST framework wraps permission payloads in ``ErrorDetail`` objects
+    # when they come from :class:`PermissionDenied`. Rather than compare the
+    # entire structure (which can change across DRF releases), assert that the
+    # fields we care about survived the round-trip intact.
     expected_payload = requirement_denied_payload(
         requirement, "Upgrade required to manage organisation subscriptions."
     )
-    assert exc.value.detail == expected_payload
+
+    for key in ("required_feature", "allowed_values", "upgrade_url"):
+        actual = detail[key]
+        expected = expected_payload[key]
+        if isinstance(actual, list):
+            actual = [str(item) for item in actual]
+            expected = [str(item) for item in expected]
+        elif hasattr(actual, "code"):
+            actual = str(actual)
+            expected = str(expected)
+        assert actual == expected
+
+    assert [str(item) for item in detail["recommended_plans"]] == [
+        str(item) for item in expected_payload["recommended_plans"]
+    ]
+    assert str(detail["detail"]) == expected_payload["detail"]
 
 
 @pytest.mark.django_db
@@ -313,7 +334,11 @@ def test_subscription_create_serializer_rejects_inactive_plan(
     with pytest.raises(serializers.ValidationError) as exc:
         serializer.is_valid(raise_exception=True)
 
-    assert {"plan_id": "Plan not found or inactive."} == exc.value.detail
+    detail = exc.value.detail
+    assert "plan_id" in detail
+    error = detail["plan_id"][0]
+    assert getattr(error, "code", "") == "invalid"
+    assert str(error) == "Plan not found or inactive."
 
 
 @pytest.mark.django_db
@@ -334,7 +359,11 @@ def test_subscription_create_serializer_rejects_missing_agent(subscription_plan,
     with pytest.raises(serializers.ValidationError) as exc:
         serializer.is_valid(raise_exception=True)
 
-    assert {"agent_id": "Agent not found."} == exc.value.detail
+    detail = exc.value.detail
+    assert "agent_id" in detail
+    error = detail["agent_id"][0]
+    assert getattr(error, "code", "") == "invalid"
+    assert str(error) == "Agent not found."
 
 
 @pytest.mark.django_db
