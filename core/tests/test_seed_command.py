@@ -20,6 +20,17 @@ def test_seed_command_populates_requested_entities():
     """Running the command creates the requested volume of demo data."""
     output = StringIO()
 
+    baseline_agents = AgentProfile.objects.count()
+    baseline_organisations = Organisation.objects.count()
+    baseline_owners = Collaborator.objects.filter(role=Collaborator.Role.OWNER).count()
+    baseline_sports = SportDiscipline.objects.count()
+    baseline_athletes = Athlete.objects.count()
+    baseline_accounts = AthleteSocialAccount.objects.count()
+    baseline_stats = DailyStats.objects.count()
+    baseline_platforms = set(
+        SocialPlatform.objects.values_list("name", flat=True)
+    )
+
     call_command(
         "seed",
         agents=2,
@@ -36,14 +47,22 @@ def test_seed_command_populates_requested_entities():
         == "Seed completed: 2 agents, 1 organisations, 2 sports, 3 athletes."
     )
 
-    assert AgentProfile.objects.count() == 2
-    assert Organisation.objects.count() == 1
-    assert Collaborator.objects.filter(role=Collaborator.Role.OWNER).count() == 1
-    assert SportDiscipline.objects.count() == 2
-    assert Athlete.objects.count() == 3
-    assert AthleteSocialAccount.objects.count() == 3
-    assert DailyStats.objects.count() == 3 * 5
-    assert SocialPlatform.objects.count() == len(SocialPlatform.Platform.choices)
+    assert AgentProfile.objects.count() == baseline_agents + 2
+    assert Organisation.objects.count() == baseline_organisations + 1
+    assert (
+        Collaborator.objects.filter(role=Collaborator.Role.OWNER).count()
+        == baseline_owners + 1
+    )
+    assert SportDiscipline.objects.count() == baseline_sports + 2
+    assert Athlete.objects.count() == baseline_athletes + 3
+    assert AthleteSocialAccount.objects.count() == baseline_accounts + 3
+    assert DailyStats.objects.count() == baseline_stats + (3 * 5)
+
+    expected_platforms = {choice for choice, _ in SocialPlatform.Platform.choices}
+    current_platforms = set(
+        SocialPlatform.objects.values_list("name", flat=True)
+    )
+    assert expected_platforms.issubset(baseline_platforms | current_platforms)
 
     for athlete in Athlete.objects.all():
         assert athlete.agent is not None
