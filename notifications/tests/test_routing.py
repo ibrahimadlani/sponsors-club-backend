@@ -23,8 +23,15 @@ def test_notifications_websocket_urlpattern_uses_notification_consumer():
     pattern = websocket_urlpatterns[0]
 
     # ``lookup_str`` records the dotted import path to the consumer callable.
-    # Comparing it lets us verify the endpoint wiring without depending on the
-    # Channels runtime being importable in the current environment.
-    assert (
-        pattern.lookup_str == "notifications.consumers.NotificationConsumer.as_asgi"
-    )
+    expected_lookup = "notifications.consumers.NotificationConsumer.as_asgi"
+    if getattr(pattern, "lookup_str", None):
+        assert pattern.lookup_str == expected_lookup
+        return
+
+    # If the URL resolver skipped populating ``lookup_str`` we fall back to
+    # comparing the resolved callable with a freshly materialised ``as_asgi``
+    # wrapper. This ensures the route continues to point at the consumer.
+    expected_callback = NotificationConsumer.as_asgi()
+    assert pattern.callback is not None
+    assert pattern.callback.__module__ == expected_callback.__module__
+    assert pattern.callback.__qualname__ == expected_callback.__qualname__

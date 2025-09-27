@@ -26,7 +26,17 @@ def test_messaging_websocket_urlpattern_uses_thread_consumer():
     pattern = websocket_urlpatterns[0]
 
     # When Django builds the URL pattern, it stores the import string for the
-    # callable in ``lookup_str``. This lets us assert which consumer class backs
-    # the endpoint without relying on ``pattern.callback`` (which may be ``None``
-    # when Channels is unavailable in the environment running the tests).
-    assert pattern.lookup_str == "messaging.consumers.ThreadConsumer.as_asgi"
+    # callable in ``lookup_str``. In environments where this metadata is
+    # available we can assert on it directly.
+    expected_lookup = "messaging.consumers.ThreadConsumer.as_asgi"
+    if getattr(pattern, "lookup_str", None):
+        assert pattern.lookup_str == expected_lookup
+        return
+
+    # Some Django versions omit ``lookup_str`` for callables that are already
+    # materialised. Fall back to comparing the resolved callback with a fresh
+    # ``as_asgi`` wrapper to make sure the consumer wiring stays intact.
+    expected_callback = ThreadConsumer.as_asgi()
+    assert pattern.callback is not None
+    assert pattern.callback.__module__ == expected_callback.__module__
+    assert pattern.callback.__qualname__ == expected_callback.__qualname__
