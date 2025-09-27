@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-import pytest
+from asgiref.sync import async_to_sync
 
 from messaging.consumers import ThreadConsumer
-from messaging.models import Thread
 
 
 class DummyChannelLayer:
@@ -26,10 +24,10 @@ class DummyChannelLayer:
         self.discard_calls.append((group, channel))
 
 
-def _run(coro):
-    """Execute the coroutine and return its result."""
+def _run(func, *args, **kwargs):
+    """Execute the coroutine function and return its result."""
 
-    return asyncio.run(coro)
+    return async_to_sync(func)(*args, **kwargs)
 
 
 def _instrument_consumer(consumer: ThreadConsumer) -> DummyChannelLayer:
@@ -53,82 +51,81 @@ def test_connect_rejects_anonymous_user():
         "url_route": {"kwargs": {"thread_id": "irrelevant"}},
     }
 
-    _run(consumer.connect())
+    _run(consumer.connect)
 
     assert not layer.add_calls
     consumer.close.assert_awaited_once_with(code=4401)
     consumer.accept.assert_not_awaited()
 
 
-@pytest.mark.django_db
-def test_connect_rejects_when_user_not_participant(agent_user, organisations_setup, user_model):
+def test_connect_rejects_when_user_not_participant():
     consumer = ThreadConsumer()
     layer = _instrument_consumer(consumer)
 
-    thread = Thread.objects.create(
-        collaborator=organisations_setup["collaborator"],
-        agent=agent_user.agent_profile,
-    )
-
-    outsider = user_model.objects.create_user(
-        email="outsider@test.com",
-        password="pass1234",
-        first_name="Outside",
-        last_name="User",
-        account_type=user_model.AccountType.AGENT,
-    )
+    outsider = SimpleNamespace(is_authenticated=True, id=99)
+    thread_id = "thread-123"
 
     consumer.scope = {
         "user": outsider,
-        "url_route": {"kwargs": {"thread_id": str(thread.id)}},
+        "url_route": {"kwargs": {"thread_id": thread_id}},
     }
 
-    _run(consumer.connect())
+    with patch.object(
+        ThreadConsumer, "_get_thread_for_user", new=AsyncMock(return_value=None)
+    ) as get_thread:
+        _run(consumer.connect)
 
+    get_thread.assert_awaited_once_with(thread_id, outsider.id)
     assert not layer.add_calls
     consumer.close.assert_awaited_once_with(code=4403)
     consumer.accept.assert_not_awaited()
 
 
-@pytest.mark.django_db
-def test_connect_accepts_when_user_in_thread(agent_user, organisations_setup):
+def test_connect_accepts_when_user_in_thread():
     consumer = ThreadConsumer()
     layer = _instrument_consumer(consumer)
 
-    thread = Thread.objects.create(
-        collaborator=organisations_setup["collaborator"],
-        agent=agent_user.agent_profile,
-    )
+    agent_user = SimpleNamespace(is_authenticated=True, id=123)
+    thread_id = "abc"
 
     consumer.scope = {
         "user": agent_user,
-        "url_route": {"kwargs": {"thread_id": str(thread.id)}},
+        "url_route": {"kwargs": {"thread_id": thread_id}},
     }
 
-    _run(consumer.connect())
+    thread = SimpleNamespace(id=thread_id)
 
+    with patch.object(
+        ThreadConsumer, "_get_thread_for_user", new=AsyncMock(return_value=thread)
+    ) as get_thread:
+        _run(consumer.connect)
+
+    get_thread.assert_awaited_once_with(thread_id, agent_user.id)
     assert consumer.thread_group_name == f"thread_{thread.id}"
     assert layer.add_calls == [(consumer.thread_group_name, consumer.channel_name)]
     consumer.accept.assert_awaited_once()
     consumer.close.assert_not_awaited()
 
 
-@pytest.mark.django_db
-def test_disconnect_removes_group_and_calls_super(agent_user, organisations_setup):
+def test_disconnect_removes_group_and_calls_super():
     consumer = ThreadConsumer()
     layer = _instrument_consumer(consumer)
-    thread = Thread.objects.create(
-        collaborator=organisations_setup["collaborator"],
-        agent=agent_user.agent_profile,
-    )
+    agent_user = SimpleNamespace(is_authenticated=True, id=7)
+    thread_id = "xyz"
     consumer.scope = {
         "user": agent_user,
-        "url_route": {"kwargs": {"thread_id": str(thread.id)}},
+        "url_route": {"kwargs": {"thread_id": thread_id}},
     }
+    thread = SimpleNamespace(id=thread_id)
 
     with patch("messaging.consumers.AsyncJsonWebsocketConsumer.disconnect", new_callable=AsyncMock) as super_disconnect:
-        _run(consumer.connect())
-        _run(consumer.disconnect(4000))
+        with patch.object(
+            ThreadConsumer,
+            "_get_thread_for_user",
+            new=AsyncMock(return_value=thread),
+        ):
+            _run(consumer.connect)
+        _run(consumer.disconnect, 4000)
 
     assert layer.discard_calls == [(consumer.thread_group_name, consumer.channel_name)]
     super_disconnect.assert_awaited_once_with(4000)
@@ -139,7 +136,7 @@ def test_disconnect_without_group_name_skips_cleanup():
     layer = _instrument_consumer(consumer)
 
     with patch("messaging.consumers.AsyncJsonWebsocketConsumer.disconnect", new_callable=AsyncMock) as super_disconnect:
-        _run(consumer.disconnect(1001))
+        _run(consumer.disconnect, 1001)
 
     assert not layer.discard_calls
     super_disconnect.assert_awaited_once_with(1001)
@@ -149,7 +146,7 @@ def test_receive_json_replies_to_ping():
     consumer = ThreadConsumer()
     _instrument_consumer(consumer)
 
-    _run(consumer.receive_json({"event": "ping"}))
+    _run(consumer.receive_json, {"event": "ping"})
 
     consumer.send_json.assert_awaited_once_with({"event": "pong"})
 
@@ -158,7 +155,7 @@ def test_receive_json_ignores_unknown_events():
     consumer = ThreadConsumer()
     _instrument_consumer(consumer)
 
-    _run(consumer.receive_json({"event": "ack"}))
+    _run(consumer.receive_json, {"event": "ack"})
 
     consumer.send_json.assert_not_awaited()
 
@@ -169,7 +166,7 @@ def test_message_created_forwards_payload():
 
     payload = {"payload": {"id": "msg-1"}}
 
-    _run(consumer.message_created(payload))
+    _run(consumer.message_created, payload)
 
     consumer.send_json.assert_awaited_once_with(
         {"event": "message.created", "message": payload["payload"]}
@@ -182,7 +179,7 @@ def test_message_read_forwards_payload():
 
     payload = {"payload": {"id": "msg-2", "read": True}}
 
-    _run(consumer.message_read(payload))
+    _run(consumer.message_read, payload)
 
     consumer.send_json.assert_awaited_once_with(
         {"event": "message.read", "message": payload["payload"]}
