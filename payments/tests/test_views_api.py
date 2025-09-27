@@ -48,7 +48,10 @@ def test_plan_list_view_returns_active_plans_sorted(api_client):
 
     assert response.status_code == status.HTTP_200_OK
     payload = response.json()
-    assert [item["id"] for item in payload] == [str(cheaper.id), str(expensive.id)]
+    assert len(payload) == 2
+    assert {item["id"] for item in payload} == {str(cheaper.id), str(expensive.id)}
+    prices = [Decimal(item["price"]) for item in payload]
+    assert prices == sorted(prices)
 
 
 @pytest.mark.django_db
