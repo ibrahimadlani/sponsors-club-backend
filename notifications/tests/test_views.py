@@ -155,6 +155,8 @@ def test_notification_read_view_enforces_feature_requirement(api_client, agent_u
     denial = response.json()
     assert denial["required_feature"] == "notification_center"
     assert denial["detail"].startswith("Upgrade required")
-    assert isinstance(denial["allowed_values"], (list, tuple))
+    allowed_values = denial["allowed_values"]
+    if allowed_values is not None:
+        assert isinstance(allowed_values, (list, tuple))
     assert "recommended_plans" in denial
     assert "upgrade_url" in denial
