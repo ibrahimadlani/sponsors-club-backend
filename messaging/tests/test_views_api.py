@@ -28,7 +28,7 @@ def test_thread_list_returns_threads_for_agent(
     other_collaborator = collaborator.__class__.objects.create(
         user=other_collaborator_user,
         organisation=collaborator.organisation,
-        role=collaborator.role,
+        role=collaborator.__class__.Role.MEMBER,
         job_title="Marketer",
     )
 
@@ -94,7 +94,7 @@ def test_thread_list_returns_threads_for_collaborator(
         user=other_agent_user,
         display_name="Agent Two",
     )
-    Thread.objects.create(
+    secondary_thread = Thread.objects.create(
         collaborator=collaborator,
         agent=other_agent_profile,
     )
@@ -106,7 +106,8 @@ def test_thread_list_returns_threads_for_collaborator(
     assert response.status_code == status.HTTP_200_OK
     payload = response.json()
     ids = [item["id"] for item in payload["results"]]
-    assert ids == [str(primary_thread.id)]
+    assert ids[0] == str(primary_thread.id)
+    assert set(ids) == {str(primary_thread.id), str(secondary_thread.id)}
 
 
 @pytest.mark.django_db
