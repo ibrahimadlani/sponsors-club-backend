@@ -2,19 +2,95 @@ import os
 import sys
 import uuid
 import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from itertools import cycle
 
 BASE_DT = datetime(2025, 1, 15, 10, 0, 0)
 
-COUNTRY_CODES = ["+34", "+32", "+41", "+352", "+39"]
+
+@dataclass(frozen=True)
+class PhoneNumberEntry:
+    code: str
+    number: str
+    grouping: tuple[int, ...]
 
 
-def cycle_country_code(idx: int) -> str:
-    return COUNTRY_CODES[idx % len(COUNTRY_CODES)]
+class PhoneNumberGenerator:
+    def __init__(self) -> None:
+        self.schemas = [
+            {
+                "code": "+34",
+                "patterns": [
+                    {"prefix": "612", "total_length": 9, "base": 485230, "grouping": (3, 3, 3)},
+                    {"prefix": "934", "total_length": 9, "base": 218745, "grouping": (3, 3, 3)},
+                    {"prefix": "722", "total_length": 9, "base": 604913, "grouping": (3, 3, 3)},
+                ],
+            },
+            {
+                "code": "+32",
+                "patterns": [
+                    {"prefix": "0470", "total_length": 10, "base": 182334, "grouping": (4, 2, 2, 2)},
+                    {"prefix": "0498", "total_length": 10, "base": 267415, "grouping": (4, 2, 2, 2)},
+                    {"prefix": "0466", "total_length": 10, "base": 905221, "grouping": (4, 2, 2, 2)},
+                ],
+            },
+            {
+                "code": "+41",
+                "patterns": [
+                    {"prefix": "079", "total_length": 10, "base": 6124800, "grouping": (3, 3, 2, 2)},
+                    {"prefix": "078", "total_length": 10, "base": 4231750, "grouping": (3, 3, 2, 2)},
+                    {"prefix": "044", "total_length": 10, "base": 2853690, "grouping": (3, 3, 2, 2)},
+                ],
+            },
+            {
+                "code": "+352",
+                "patterns": [
+                    {"prefix": "621", "total_length": 9, "base": 834275, "grouping": (3, 2, 2, 2)},
+                    {"prefix": "691", "total_length": 9, "base": 452138, "grouping": (3, 2, 2, 2)},
+                    {"prefix": "278", "total_length": 9, "base": 906541, "grouping": (3, 2, 2, 2)},
+                ],
+            },
+            {
+                "code": "+39",
+                "patterns": [
+                    {"prefix": "331", "total_length": 10, "base": 7426810, "grouping": (3, 3, 2, 2)},
+                    {"prefix": "347", "total_length": 10, "base": 5184620, "grouping": (3, 3, 2, 2)},
+                    {"prefix": "320", "total_length": 10, "base": 9061245, "grouping": (3, 3, 2, 2)},
+                ],
+            },
+        ]
+        self._schema_cycle = cycle(range(len(self.schemas)))
+        self._counters = {schema["code"]: 0 for schema in self.schemas}
 
+    def next_entry(self) -> PhoneNumberEntry:
+        schema_idx = next(self._schema_cycle)
+        schema = self.schemas[schema_idx]
+        code = schema["code"]
+        usage_count = self._counters[code]
+        patterns = schema["patterns"]
+        pattern = patterns[usage_count % len(patterns)]
+        block = usage_count // len(patterns)
+        rest_length = pattern["total_length"] - len(pattern["prefix"])
+        remainder = f"{pattern['base'] + block:0{rest_length}d}"
+        number = f"{pattern['prefix']}{remainder}"
+        self._counters[code] = usage_count + 1
+        return PhoneNumberEntry(code=code, number=number, grouping=pattern["grouping"])
 
-def ten_digit_number(base: int, offset: int) -> str:
-    return f"{base + offset:010d}"
+    @staticmethod
+    def display(entry: PhoneNumberEntry) -> str:
+        parts: list[str] = []
+        idx = 0
+        for group in entry.grouping:
+            segment = entry.number[idx : idx + group]
+            if not segment:
+                break
+            parts.append(segment)
+            idx += group
+        if idx < len(entry.number):
+            parts.append(entry.number[idx:])
+        local = " ".join(parts)
+        return f"{entry.code} {local}"
 
 
 def iso(dt: datetime) -> str:
@@ -32,6 +108,7 @@ def add(objects: list, model: str, fields: dict, pk: str | None = None) -> str:
 def build_fixture() -> list[dict]:
     objects: list[dict] = []
     password_hash = "pbkdf2_sha256$600000$Nf1JSucDbGkFARSXcttRQD$N/J0GcH+3KSNcfsYbFAPOYHiphFBCpzC0eBVRYmllCA="
+    phone_gen = PhoneNumberGenerator()
 
     # Subscription plans
     plans = [
@@ -340,6 +417,7 @@ def build_fixture() -> list[dict]:
 
     for idx, (first, last, username) in enumerate(agent_infos):
         email = f"{username}@example.com"
+        phone_entry = phone_gen.next_entry()
         user_id = add(
             objects,
             "users.user",
@@ -347,8 +425,8 @@ def build_fixture() -> list[dict]:
                 "email": email,
                 "first_name": first,
                 "last_name": last,
-                "phone_country_code": cycle_country_code(idx),
-                "phone_number": ten_digit_number(6000000000, idx),
+                "phone_country_code": phone_entry.code,
+                "phone_number": phone_entry.number,
                 "date_of_birth": "1985-05-15",
                 "email_verified": True,
                 "password": password_hash,
@@ -413,6 +491,7 @@ def build_fixture() -> list[dict]:
     collaborator_user_ids: list[str] = []
     collaborator_user_lookup: dict[str, str] = {}
     for idx, (first, last, username) in enumerate(collaborator_infos):
+        phone_entry = phone_gen.next_entry()
         user_id = add(
             objects,
             "users.user",
@@ -420,8 +499,8 @@ def build_fixture() -> list[dict]:
                 "email": f"{username}@brands.example.com",
                 "first_name": first,
                 "last_name": last,
-                "phone_country_code": cycle_country_code(idx + len(agent_infos)),
-                "phone_number": ten_digit_number(7000000000, idx),
+                "phone_country_code": phone_entry.code,
+                "phone_number": phone_entry.number,
                 "date_of_birth": "1990-04-20",
                 "email_verified": True,
                 "password": password_hash,
@@ -454,6 +533,7 @@ def build_fixture() -> list[dict]:
     collaborator_idx = 0
     enterprise_owner_user = collaborator_user_ids[collaborator_idx]
     collaborator_idx += 1
+    enterprise_phone = phone_gen.next_entry()
     enterprise_org_id = add(
         objects,
         "organisations.organisation",
@@ -468,7 +548,7 @@ def build_fixture() -> list[dict]:
             "description": enterprise_org["description"],
             "website_url": enterprise_org["website_url"],
             "email_contact": "contact@global-sports.example.com",
-            "phone_contact": f"{cycle_country_code(0)}{ten_digit_number(8100000000, 0)}",
+            "phone_contact": PhoneNumberGenerator.display(enterprise_phone),
             "address_city": enterprise_org["address_city"],
             "address_country": enterprise_org["address_country"],
             "address_postal_code": enterprise_org["address_postal_code"],
@@ -545,6 +625,7 @@ def build_fixture() -> list[dict]:
     for idx, (name, slug, org_type) in enumerate(pro_orgs):
         owner_user = collaborator_user_ids[collaborator_idx]
         collaborator_idx += 1
+        org_phone = phone_gen.next_entry()
         org_id = add(
             objects,
             "organisations.organisation",
@@ -559,7 +640,7 @@ def build_fixture() -> list[dict]:
                 "description": f"{name} recherche des opportunités de sponsoring ciblées.",
                 "website_url": f"https://{slug}.example.com",
                 "email_contact": f"hello@{slug}.example.com",
-                "phone_contact": f"{cycle_country_code(idx + 1)}{ten_digit_number(8200000000, idx)}",
+                "phone_contact": PhoneNumberGenerator.display(org_phone),
                 "address_city": "Lyon",
                 "address_country": "France",
                 "address_postal_code": "69002",
@@ -619,6 +700,7 @@ def build_fixture() -> list[dict]:
     for idx, (name, slug, org_type) in enumerate(free_orgs):
         owner_user = collaborator_user_ids[collaborator_idx]
         collaborator_idx += 1
+        org_phone = phone_gen.next_entry()
         org_id = add(
             objects,
             "organisations.organisation",
@@ -633,7 +715,7 @@ def build_fixture() -> list[dict]:
                 "description": f"{name} explore les partenariats locaux.",
                 "website_url": f"https://{slug}.example.com",
                 "email_contact": f"contact@{slug}.example.com",
-                "phone_contact": f"{cycle_country_code(idx + 1 + len(pro_orgs))}{ten_digit_number(8300000000, idx)}",
+                "phone_contact": PhoneNumberGenerator.display(org_phone),
                 "address_city": "Bordeaux",
                 "address_country": "France",
                 "address_postal_code": "33000",
