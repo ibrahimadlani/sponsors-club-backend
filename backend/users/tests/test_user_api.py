@@ -34,26 +34,12 @@ def test_user_password_hash_updates(user_model):
 
 
 @pytest.mark.django_db
-def test_register_agent_requires_display_name(api_client):
-    url = reverse("users:register")
-    payload = {
-        "email": "newagent@example.com",
-        "password": "pass1234",
-        "account_type": "AGENT",
-    }
-    response = api_client.post(url, payload, format="json")
-    assert response.status_code == 400
-    assert "display_name" in response.data
-
-
-@pytest.mark.django_db
 def test_register_agent_success(api_client, user_model):
     url = reverse("users:register")
     payload = {
         "email": "newagent@example.com",
         "password": "pass1234",
         "account_type": "AGENT",
-        "display_name": "Agent Nouveau",
         "first_name": "Agent",
         "last_name": "Nouveau",
     }
@@ -61,6 +47,22 @@ def test_register_agent_success(api_client, user_model):
     assert response.status_code == 201
     user = user_model.objects.get(email="newagent@example.com")
     assert AgentProfile.objects.filter(user=user, display_name="Agent Nouveau").exists()
+
+
+@pytest.mark.django_db
+def test_register_agent_uses_email_when_no_name(api_client, user_model):
+    url = reverse("users:register")
+    payload = {
+        "email": "noname@example.com",
+        "password": "pass1234",
+        "account_type": "AGENT",
+    }
+    response = api_client.post(url, payload, format="json")
+    assert response.status_code == 201
+    user = user_model.objects.get(email="noname@example.com")
+    assert AgentProfile.objects.filter(
+        user=user, display_name="noname@example.com"
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -229,13 +231,13 @@ def test_register_serializer_representation(api_client):
             "email": "rep@example.com",
             "password": "pass1234",
             "account_type": "AGENT",
-            "display_name": "Rep Agent",
             "first_name": "Rep",
             "last_name": "Agent",
         }
     )
     assert serializer.is_valid()
     user = serializer.save()
+    assert user.agent_profile.display_name == "Rep Agent"
     # ensure to_representation returns expected shape
     rep = serializer.to_representation(user)
     assert rep["email"] == "rep@example.com"
