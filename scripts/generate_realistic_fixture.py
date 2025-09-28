@@ -400,6 +400,7 @@ def build_fixture() -> list[dict]:
     ]
 
     collaborator_user_ids: list[str] = []
+    collaborator_user_lookup: dict[str, str] = {}
     for idx, (first, last, username) in enumerate(collaborator_infos):
         user_id = add(
             objects,
@@ -485,6 +486,7 @@ def build_fixture() -> list[dict]:
         },
     )
     enterprise_collaborator_ids.append(owner_collab_id)
+    collaborator_user_lookup[owner_collab_id] = enterprise_owner_user
 
     job_titles = [
         "Responsable activation",
@@ -514,6 +516,7 @@ def build_fixture() -> list[dict]:
             },
         )
         enterprise_collaborator_ids.append(collab_id)
+        collaborator_user_lookup[collab_id] = user
 
     organisation_subscriptions: list[tuple[str, list[str]]] = [
         (enterprise_org_id, plan_ids["org-enterprise"])
@@ -572,6 +575,7 @@ def build_fixture() -> list[dict]:
             },
         )
         member_ids = [owner_collab_id]
+        collaborator_user_lookup[owner_collab_id] = owner_user
         for m in range(2):
             user = collaborator_user_ids[collaborator_idx]
             collaborator_idx += 1
@@ -588,6 +592,7 @@ def build_fixture() -> list[dict]:
                 },
             )
             member_ids.append(collab_id)
+            collaborator_user_lookup[collab_id] = user
         pro_org_collaborators.append(member_ids)
         organisation_subscriptions.append((org_id, plan_ids["org-pro"]))
 
@@ -644,6 +649,7 @@ def build_fixture() -> list[dict]:
             },
         )
         free_org_collaborators.append([owner_collab_id])
+        collaborator_user_lookup[owner_collab_id] = owner_user
 
     assert collaborator_idx == len(collaborator_user_ids), (
         collaborator_idx,
@@ -875,13 +881,14 @@ def build_fixture() -> list[dict]:
         organisation_ids[-1],
         organisation_ids[0],
     ]
-    initiators = [
+    initiator_collaborators = [
         enterprise_collaborator_ids[0],
         pro_org_collaborators[0][0],
         pro_org_collaborators[1][0],
         free_org_collaborators[0][0],
         enterprise_collaborator_ids[1],
     ]
+    initiator_users = [collaborator_user_lookup[collab_id] for collab_id in initiator_collaborators]
     contract_agents = [
         agent_profile_ids[12],
         agent_profile_ids[13],
@@ -901,7 +908,7 @@ def build_fixture() -> list[dict]:
             {
                 "organisation": contract_orgs[idx],
                 "agent": contract_agents[idx],
-                "initiated_by": initiators[idx],
+                "initiated_by": initiator_collaborators[idx],
                 "status": status,
                 "title": title,
                 "effective_date": "2025-03-01" if status in {"signing", "active"} else None,
@@ -920,7 +927,7 @@ def build_fixture() -> list[dict]:
             {
                 "contract": contract_id,
                 "number": 1,
-                "created_by": initiators[idx],
+                "created_by": initiator_users[idx],
                 "source_revision": None,
                 "notes": "Version initiale générée automatiquement.",
                 "created_at": iso(BASE_DT + timedelta(days=idx * 2, minutes=30)),
@@ -966,7 +973,7 @@ def build_fixture() -> list[dict]:
                 "contract": contract_ids[idx],
                 "version": version_id,
                 "clause": contract_clause_ids[idx * 3],
-                "author": initiators[idx],
+                "author": initiator_users[idx],
                 "body": "Annotation interne pour préciser les conditions.",
                 "created_at": iso(BASE_DT + timedelta(days=idx * 2, hours=4)),
                 "updated_at": iso(BASE_DT + timedelta(days=idx * 2, hours=4)),
