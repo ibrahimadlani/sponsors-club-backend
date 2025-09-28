@@ -35,26 +35,12 @@ def test_user_password_hash_updates(user_model):
 
 
 @pytest.mark.django_db
-def test_register_agent_requires_display_name(api_client):
+def test_register_agent_defaults_display_name(api_client, user_model):
     url = reverse("users:register")
     payload = {
         "email": "newagent@example.com",
         "password": "pass1234",
         "account_type": "AGENT",
-    }
-    response = api_client.post(url, payload, format="json")
-    assert response.status_code == 400
-    assert "display_name" in response.data
-
-
-@pytest.mark.django_db
-def test_register_agent_success(api_client, user_model):
-    url = reverse("users:register")
-    payload = {
-        "email": "newagent@example.com",
-        "password": "pass1234",
-        "account_type": "AGENT",
-        "display_name": "Agent Nouveau",
         "first_name": "Agent",
         "last_name": "Nouveau",
         "phone_country_code": "+33",
@@ -68,6 +54,25 @@ def test_register_agent_success(api_client, user_model):
     assert user.phone_country_code == "+33"
     assert user.phone_number == "0102030405"
     assert user.agent_profile.is_self_represented is True
+
+
+@pytest.mark.django_db
+def test_register_agent_accepts_display_name_override(api_client, user_model):
+    url = reverse("users:register")
+    payload = {
+        "email": "customagent@example.com",
+        "password": "pass1234",
+        "account_type": "AGENT",
+        "display_name": "Agent Nouveau",
+        "first_name": "Agent",
+        "last_name": "Nouveau",
+        "phone_country_code": "+33",
+        "phone_number": "0102030405",
+    }
+    response = api_client.post(url, payload, format="json")
+    assert response.status_code == 201
+    user = user_model.objects.get(email="customagent@example.com")
+    assert AgentProfile.objects.filter(user=user, display_name="Agent Nouveau").exists()
 
 
 @pytest.mark.django_db

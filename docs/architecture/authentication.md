@@ -11,7 +11,8 @@ This service combines Django session auth with JWT-based APIs so both the admin 
 ## Registration workflow
 
 1. `POST /api/users/register/` hits `RegisterView`, which permits anonymous access and validates payloads with `RegisterSerializer`.
-2. Agents must supply a `display_name`; collaborator-specific fields are optional and reserved for future onboarding flows.
+2. Agent registrations automatically derive an initial `display_name` from the submitted first/last name (or email when absent);
+   collaborator-specific fields remain optional and reserved for future onboarding flows.
 3. During creation the serializer persists the `users.User`, hashes the password, and auto-creates an `AgentProfile` when the account type is `AGENT`.
 4. The response is normalized through `UserSerializer`, returning the canonical user fields for immediate client use.
 
@@ -23,7 +24,6 @@ Content-Type: application/json
   "email": "agent@example.com",
   "password": "test1234",
   "account_type": "AGENT",
-  "display_name": "Example Agency",
   "first_name": "Ada",
   "last_name": "Lovelace"
 }

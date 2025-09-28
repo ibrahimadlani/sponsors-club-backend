@@ -70,16 +70,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id",)
 
-    def validate(self, attrs):
-        """Ensure required companion fields are provided per account type."""
-        account_type = attrs.get("account_type", User.AccountType.AGENT)
-        display_name = attrs.get("display_name")
-        if account_type == User.AccountType.AGENT and not display_name:
-            raise serializers.ValidationError(
-                {"display_name": "This field is required for agent accounts."}
-            )
-        return attrs
-
     @transaction.atomic
     def create(self, validated_data):
         """Create a user and any related agent or collaborator records."""
