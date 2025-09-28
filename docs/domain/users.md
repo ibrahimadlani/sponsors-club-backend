@@ -17,9 +17,10 @@ endpoints. It also exposes JWT login/refresh routes via DRF Simple JWT.
 
 ## Serializers and workflows
 - `RegisterSerializer` handles both agent and collaborator sign-ups. Agent
-  registrations require a `display_name` and automatically create an
-  `AgentProfile`. (Collaborator onboarding into organisations is managed by the
-  organisations app.)
+  registrations automatically create an `AgentProfile` whose display name
+  defaults to the provided first/last name combination or the user's email when
+  names are omitted. (Collaborator onboarding into organisations is managed by
+  the organisations app.)
 - `MeUpdateSerializer` updates core user fields and, when provided, synchronises
   the agent profile's `display_name`.
 - `RolesDataBuilder` collects the authenticated user's collaborations and agent
