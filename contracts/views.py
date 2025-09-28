@@ -227,8 +227,10 @@ class ContractViewSet(
             seen.add(organisation.id)
 
         agents = [
-            {"id": str(agent.id), "display_name": agent.display_name}
-            for agent in AgentProfile.objects.all().order_by("display_name")
+            {"id": str(agent.id), "name": agent.name}
+            for agent in AgentProfile.objects.all()
+            .select_related("user")
+            .order_by("user__first_name", "user__last_name", "user__email")
         ]
 
         statuses = [

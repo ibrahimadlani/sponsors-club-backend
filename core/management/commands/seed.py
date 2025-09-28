@@ -148,7 +148,6 @@ class Command(BaseCommand):
             )
             AgentProfile.objects.create(
                 user=user,
-                display_name=full_name,
                 bio=faker.paragraph(nb_sentences=3),
             )
             # Re-accessing ``user.agent_profile`` ensures the relation is loaded

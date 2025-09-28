@@ -30,7 +30,6 @@ classDiagram
         +UUID id
         +datetime created_at
         +datetime updated_at
-        +string display_name
         +text bio
         +bool is_self_represented
     }

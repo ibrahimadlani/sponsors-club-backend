@@ -144,7 +144,6 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("display_name", models.CharField(max_length=255)),
                 ("bio", models.TextField(blank=True)),
                 (
                     "user",

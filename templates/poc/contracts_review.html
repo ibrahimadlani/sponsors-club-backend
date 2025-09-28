@@ -406,7 +406,7 @@
             parts.push(`Organisation • ${state.contract.organisation.name}`);
         }
         if (state.contract.agent) {
-            parts.push(`Agent • ${state.contract.agent.display_name}`);
+            parts.push(`Agent • ${state.contract.agent.name}`);
         }
         if (state.contract.updated_at) {
             const date = new Date(state.contract.updated_at);

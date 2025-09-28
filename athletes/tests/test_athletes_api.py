@@ -69,7 +69,7 @@ def other_agent_user(user_model):
         first_name="Other",
         last_name="Agent",
     )
-    AgentProfile.objects.create(user=user, display_name="Other Agent")
+    AgentProfile.objects.create(user=user)
     return user
 
 

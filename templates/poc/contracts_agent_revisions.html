@@ -528,7 +528,7 @@
 
         if (state.roles && state.roles.agent_profile) {
             const agentLine = document.createElement('span');
-            agentLine.textContent = `Profil agent : ${state.roles.agent_profile.display_name}`;
+            agentLine.textContent = `Profil agent : ${state.roles.agent_profile.name}`;
             identitySummary.appendChild(agentLine);
         } else {
             const infoLine = document.createElement('span');
@@ -609,7 +609,7 @@
 
         const infoItems = [];
         if (contract.agent) {
-            infoItems.push(`Agent : ${contract.agent.display_name}`);
+            infoItems.push(`Agent : ${contract.agent.name}`);
         }
         if (contract.initiated_by) {
             infoItems.push(`Créé par : ${contract.initiated_by.email}`);

@@ -12,7 +12,7 @@ This service combines Django session auth with JWT-based APIs so both the admin 
 
 1. `POST /api/users/register/` hits `RegisterView`, which permits anonymous access and validates payloads with `RegisterSerializer`.
 2. During creation the serializer persists the `users.User`, hashes the password, and auto-creates an `AgentProfile` when the account type is `AGENT`.
-3. Agent profiles derive their `display_name` from the supplied first/last name or fall back to the email address when names are omitted.
+3. Agent profiles expose a derived name based on the supplied first/last name or, when both are missing, the email address.
 4. The response is normalized through `UserSerializer`, returning the canonical user fields for immediate client use.
 
 ```http
@@ -38,7 +38,7 @@ Tokens are standard SimpleJWT payloads, so extra claims can be injected later wi
 
 ## Self-service endpoints
 
-- **`GET /api/users/me/`** – Returns the authenticated user. `PATCH`/`PUT` accepts `MeUpdateSerializer`, which updates contact fields and synchronizes the agent display name when relevant.
+- **`GET /api/users/me/`** – Returns the authenticated user. `PATCH`/`PUT` accepts `MeUpdateSerializer`, which updates contact fields and toggles the agent profile's self-representation flag when provided.
 - **`GET /api/users/me/roles/`** – Aggregates roles via `RolesDataBuilder`, exposing agent profile details plus a list of organisation collaborations (id, name, role).
 - **`GET /api/users/me/entitlements/`** – Calls `feature_status_for_user` to enumerate feature gates, returning the account type, grant status, upgrade links, and recommended plans. This powers in-app upgrade prompts.
 

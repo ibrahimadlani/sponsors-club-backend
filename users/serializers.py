@@ -71,12 +71,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:
-            default_display_name = (
-                f"{user.first_name} {user.last_name}"
-            ).strip() or user.email
             AgentProfile.objects.create(
                 user=user,
-                display_name=default_display_name,
                 is_self_represented=is_self_represented,
             )
         send_email_verification(user)
@@ -90,7 +86,6 @@ class RegisterSerializer(serializers.ModelSerializer):
 class MeUpdateSerializer(serializers.ModelSerializer):
     """Allow the authenticated user to update their profile details."""
 
-    display_name = serializers.CharField(required=False, allow_blank=True)
     is_self_represented = serializers.BooleanField(required=False)
 
     class Meta:
@@ -102,13 +97,11 @@ class MeUpdateSerializer(serializers.ModelSerializer):
             "phone_country_code",
             "phone_number",
             "date_of_birth",
-            "display_name",
             "is_self_represented",
         )
 
     def update(self, instance, validated_data):
         """Update the user object and related agent profile when needed."""
-        display_name = validated_data.pop("display_name", None)
         is_self_represented = validated_data.pop("is_self_represented", None)
         update_fields = []
         for attr, value in validated_data.items():
@@ -122,15 +115,12 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
         if (
             instance.account_type == User.AccountType.AGENT
-            and (display_name is not None or is_self_represented is not None)
+            and is_self_represented is not None
         ):
             agent_profile, _ = AgentProfile.objects.get_or_create(
                 user=instance,
             )
             profile_updates: list[str] = []
-            if display_name is not None:
-                agent_profile.display_name = display_name
-                profile_updates.append("display_name")
             if is_self_represented is not None:
                 agent_profile.is_self_represented = is_self_represented
                 profile_updates.append("is_self_represented")
@@ -146,13 +136,20 @@ class MeUpdateSerializer(serializers.ModelSerializer):
         if instance.account_type == User.AccountType.AGENT:
             agent_profile = (
                 AgentProfile.objects.filter(user=instance)
-                .only("id", "display_name", "is_self_represented")
+                .select_related("user")
+                .only(
+                    "id",
+                    "is_self_represented",
+                    "user__first_name",
+                    "user__last_name",
+                    "user__email",
+                )
                 .first()
             )
             if agent_profile is not None:
                 data["agent_profile"] = {
                     "id": str(agent_profile.id),
-                    "display_name": agent_profile.display_name,
+                    "name": agent_profile.name,
                     "is_self_represented": agent_profile.is_self_represented,
                 }
         return data
@@ -191,7 +188,7 @@ class RolesDataBuilder:
         if agent_profile is not None:
             agent_info = {
                 "id": str(agent_profile.id),
-                "display_name": agent_profile.display_name,
+                "name": agent_profile.name,
                 "is_self_represented": agent_profile.is_self_represented,
             }
 

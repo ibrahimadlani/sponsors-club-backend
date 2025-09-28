@@ -180,7 +180,7 @@ def test_subscription_create_serializer_validates_agent_scope(
         last_name="User",
         account_type=user_model.AccountType.AGENT,
     )
-    agent_profile = AgentProfile.objects.create(user=agent_user, display_name="Agent")
+    agent_profile = AgentProfile.objects.create(user=agent_user)
 
     request = build_request(
         agent_user,
@@ -220,7 +220,7 @@ def test_subscription_create_serializer_rejects_foreign_agent(
         last_name="Two",
         account_type=user_model.AccountType.AGENT,
     )
-    agent_profile = AgentProfile.objects.create(user=agent_user, display_name="Agent Two")
+    agent_profile = AgentProfile.objects.create(user=agent_user)
 
     request = build_request(owner, {})
     serializer = SubscriptionCreateSerializer(
@@ -245,7 +245,7 @@ def test_subscription_create_serializer_allows_staff_to_manage_foreign_agent(
         last_name="Agent",
         account_type=user_model.AccountType.AGENT,
     )
-    agent_profile = AgentProfile.objects.create(user=agent_user, display_name="Managed")
+    agent_profile = AgentProfile.objects.create(user=agent_user)
 
     staff_user = user_model.objects.create_user(
         email="staff@example.com",
@@ -296,7 +296,7 @@ def test_subscription_create_serializer_rejects_multiple_scopes(
     subscription_plan, organisation_owner
 ):
     user, organisation, _ = organisation_owner
-    agent_profile = AgentProfile.objects.create(user=user, display_name="Dual")
+    agent_profile = AgentProfile.objects.create(user=user)
     request = build_request(user, {})
     serializer = SubscriptionCreateSerializer(
         data={
@@ -375,7 +375,7 @@ def test_subscription_create_serializer_update_not_supported(subscription_plan, 
         last_name="Four",
         account_type=user_model.AccountType.AGENT,
     )
-    agent_profile = AgentProfile.objects.create(user=agent_user, display_name="Agent Four")
+    agent_profile = AgentProfile.objects.create(user=agent_user)
     request = build_request(agent_user, {})
     serializer = SubscriptionCreateSerializer(
         data={"plan_id": subscription_plan.id, "agent_id": agent_profile.id},
@@ -399,7 +399,7 @@ def test_stripe_checkout_session_serializer_reuses_subscription_validation(
         last_name="Five",
         account_type=user_model.AccountType.AGENT,
     )
-    agent_profile = AgentProfile.objects.create(user=agent_user, display_name="Agent Five")
+    agent_profile = AgentProfile.objects.create(user=agent_user)
 
     request = build_request(agent_user, {})
     serializer = StripeCheckoutSessionSerializer(
