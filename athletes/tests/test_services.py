@@ -117,7 +117,7 @@ def test_sport_list_payload_serializes_disciplines():
         name="Track",
         slug="cycling-track",
     )
-    running = create_sport("Running")
+    running = create_sport("Running") #noqa
 
     payload = sport_list_payload()
 
