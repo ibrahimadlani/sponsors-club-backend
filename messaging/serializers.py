@@ -41,7 +41,7 @@ class AgentProfileSummarySerializer(serializers.ModelSerializer):
     underlying user.
     """
 
-    name = serializers.CharField(source="name", read_only=True)
+    name = serializers.CharField(read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
