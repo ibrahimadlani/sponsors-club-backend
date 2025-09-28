@@ -41,7 +41,7 @@ class OrganisationSummarySerializer(serializers.ModelSerializer):
 class AgentSummarySerializer(serializers.ModelSerializer):
     """Render a minimal agent representation for contract payloads."""
 
-    name = serializers.CharField(source="name", read_only=True)
+    name = serializers.CharField(read_only=True)
 
     class Meta:
         model = AgentProfile
