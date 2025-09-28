@@ -9,6 +9,7 @@ import sys
 import types
 from collections.abc import Generator
 from contextlib import contextmanager
+from decimal import Decimal
 
 import django
 import pytest
@@ -319,7 +320,17 @@ def fixture_organisations_setup(user_model):
         job_title="Owner",
     )
 
-    plan = SubscriptionPlan.objects.get(code="org-enterprise")
+    plan, _ = SubscriptionPlan.objects.get_or_create(
+        code="org-enterprise",
+        defaults={
+            "name": "Org Enterprise",
+            "price": Decimal("249.00"),
+            "currency": "EUR",
+            "max_athletes": 500,
+            "max_collaborators": 50,
+            "features": {"messaging_tier": "enterprise"},
+        },
+    )
     subscription = Subscription.objects.create(
         organisation=organisation,
         plan=plan,
@@ -339,7 +350,17 @@ def fixture_organisations_setup(user_model):
 def fixture_agent_subscription(agent_user):
     """Create an agent subscription tied to the agent_user fixture."""
 
-    plan = SubscriptionPlan.objects.get(code="agent-agency")
+    plan, _ = SubscriptionPlan.objects.get_or_create(
+        code="agent-agency",
+        defaults={
+            "name": "Agency",
+            "price": Decimal("149.00"),
+            "currency": "EUR",
+            "max_athletes": 200,
+            "max_collaborators": 10,
+            "features": {"messaging_tier": "pro_plus"},
+        },
+    )
     subscription = Subscription.objects.create(
         agent=agent_user.agent_profile,
         plan=plan,
