@@ -22,6 +22,30 @@ def test_sport_discipline_slug_deduplicates():
 
 
 @pytest.mark.django_db
+def test_athlete_slug_deduplicates(agent_user):
+    sport = Sport.objects.create(name="Boxing")
+    agent = AgentProfile.objects.get(user=agent_user)
+
+    first = Athlete.objects.create(
+        sport=sport,
+        agent=agent,
+        full_name="Jane Doe",
+        birth_date="1998-05-05",
+        nationality="GB",
+    )
+    second = Athlete.objects.create(
+        sport=sport,
+        agent=agent,
+        full_name="Jane-Doe",
+        birth_date="1998-05-05",
+        nationality="GB",
+    )
+
+    assert first.slug == "jane-doe"
+    assert second.slug.startswith("jane-doe-")
+
+
+@pytest.mark.django_db
 def test_athlete_discipline_clean_valid(agent_user):
     sport = Sport.objects.create(name="Swimming")
     discipline = SportDiscipline.objects.create(sport=sport, name="200m Freestyle")
