@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import json
 from datetime import datetime, timedelta
@@ -989,7 +990,7 @@ def main() -> None:
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as fp:
         json.dump(fixture, fp, ensure_ascii=False, indent=2)
-    print(f"Wrote {len(fixture)} records to {output_path}")
+    print(f"Wrote {len(fixture)} records to {output_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":
