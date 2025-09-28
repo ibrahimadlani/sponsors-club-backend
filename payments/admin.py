@@ -54,7 +54,9 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_filter = ("status", "plan")
     search_fields = (
         "organisation__name",
-        "agent__display_name",
+        "agent__user__email",
+        "agent__user__first_name",
+        "agent__user__last_name",
         "stripe_customer_id",
         "stripe_subscription_id",
     )

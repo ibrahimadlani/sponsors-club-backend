@@ -70,7 +70,6 @@ def test_thread_list_returns_threads_for_agent(
     )
     outsider_profile = AgentProfile.objects.create(
         user=outsider_user,
-        display_name="Other Agent",
     )
     Thread.objects.create(
         collaborator=other_collaborator,
@@ -111,7 +110,6 @@ def test_thread_list_returns_threads_for_collaborator(
     )
     other_agent_profile = AgentProfile.objects.create(
         user=other_agent_user,
-        display_name="Agent Two",
     )
     secondary_thread = Thread.objects.create(
         collaborator=collaborator,
@@ -222,7 +220,6 @@ def test_thread_messages_view_get_denies_non_participant(
     )
     other_agent_profile = AgentProfile.objects.create(
         user=other_agent_user,
-        display_name="Agent Three",
     )
     thread = Thread.objects.create(
         collaborator=collaborator,

@@ -68,9 +68,15 @@ class ContractAdmin(admin.ModelAdmin):
 
     list_display = ("title", "organisation", "agent", "status", "effective_date")
     list_filter = ("status", "organisation")
-    # Searching by organisation name or agent display name mirrors the data
-    # request wording we receive from account managers.
-    search_fields = ("title", "organisation__name", "agent__display_name")
+    # Searching by organisation name or agent contact mirrors support requests
+    # received from account managers.
+    search_fields = (
+        "title",
+        "organisation__name",
+        "agent__user__email",
+        "agent__user__first_name",
+        "agent__user__last_name",
+    )
     inlines = [ContractClauseInline]
 
 

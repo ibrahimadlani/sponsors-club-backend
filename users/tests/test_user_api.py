@@ -50,14 +50,15 @@ def test_register_agent_success(api_client, user_model):
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201
     user = user_model.objects.get(email="newagent@example.com")
-    assert AgentProfile.objects.filter(user=user, display_name="Agent Nouveau").exists()
+    assert AgentProfile.objects.filter(user=user).exists()
+    assert user.agent_profile.name == "Agent Nouveau"
     assert user.phone_country_code == "+33"
     assert user.phone_number == "0102030405"
     assert user.agent_profile.is_self_represented is True
 
 
 @pytest.mark.django_db
-def test_register_agent_defaults_display_name(api_client, user_model):
+def test_register_agent_defaults_name(api_client, user_model):
     url = reverse("users:register")
     payload = {
         "email": "noname@example.com",
@@ -67,7 +68,7 @@ def test_register_agent_defaults_display_name(api_client, user_model):
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201
     user = user_model.objects.get(email="noname@example.com")
-    assert user.agent_profile.display_name == "noname@example.com"
+    assert user.agent_profile.name == "noname@example.com"
 
 
 @pytest.mark.django_db
@@ -110,7 +111,6 @@ def test_me_update_updates_fields(api_client, agent_user):
         "email": "updated@example.com",
         "first_name": "Updated",
         "last_name": "Name",
-        "display_name": "Updated Agent",
         "phone_country_code": "+1",
         "phone_number": "5551112222",
         "is_self_represented": True,
@@ -121,26 +121,12 @@ def test_me_update_updates_fields(api_client, agent_user):
     assert agent_user.email == "updated@example.com"
     assert agent_user.first_name == "Updated"
     assert agent_user.last_name == "Name"
-    assert agent_user.agent_profile.display_name == "Updated Agent"
+    assert agent_user.agent_profile.name == "Updated Name"
     assert agent_user.agent_profile.is_self_represented is True
     assert agent_user.phone_country_code == "+1"
     assert agent_user.phone_number == "5551112222"
     assert response.data["agent_profile"]["is_self_represented"] is True
-
-
-@pytest.mark.django_db
-def test_me_update_display_name_only(api_client, agent_user):
-    serializer = MeUpdateSerializer(
-        agent_user,
-        data={"display_name": "Solo Update"},
-        partial=True,
-        context={"request": None},
-    )
-    assert serializer.is_valid()
-    serializer.save()
-    agent_user.refresh_from_db()
-    assert agent_user.agent_profile.display_name == "Solo Update"
-    assert agent_user.agent_profile.is_self_represented is False
+    assert response.data["agent_profile"]["name"] == "Updated Name"
 
 
 @pytest.mark.django_db
@@ -189,9 +175,7 @@ def test_roles_builder_with_agent_and_owner(agent_user, organisations_setup):
     builder = RolesDataBuilder(agent_user)
     data = builder.build()
     assert data["is_agent"] is True
-    assert (
-        data["agent_profile"]["display_name"] == agent_user.agent_profile.display_name
-    )
+    assert data["agent_profile"]["name"] == agent_user.agent_profile.name
     assert data["agent_profile"]["is_self_represented"] is False
 
     # Add collaborator membership to cover collaboration branch
@@ -277,7 +261,7 @@ def test_user_save_updates_password_hash(user_model):
 
 @pytest.mark.django_db
 def test_agent_profile_str(agent_user):
-    assert str(agent_user.agent_profile) == agent_user.agent_profile.display_name
+    assert str(agent_user.agent_profile) == agent_user.agent_profile.name
 
 
 @pytest.mark.django_db

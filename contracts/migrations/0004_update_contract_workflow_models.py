@@ -64,7 +64,6 @@ def ensure_contract_agents(apps, schema_editor):
         placeholder_user.save()
         agent = AgentProfile.objects.create(
             user=placeholder_user,
-            display_name="Default Agent",
         )
 
     Contract.objects.filter(agent__isnull=True).update(agent=agent)

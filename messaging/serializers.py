@@ -41,13 +41,14 @@ class AgentProfileSummarySerializer(serializers.ModelSerializer):
     underlying user.
     """
 
+    name = serializers.CharField(source="name", read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
         """Serializer configuration."""
 
         model = AgentProfile
-        fields = ("id", "display_name", "user_email", "is_self_represented")
+        fields = ("id", "name", "user_email", "is_self_represented")
         ref_name = "MessagingAgentSummary"
 
 

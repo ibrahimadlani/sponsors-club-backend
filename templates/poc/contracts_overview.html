@@ -417,7 +417,7 @@
         for (const item of items) {
             const option = document.createElement('option');
             option.value = item.id;
-            option.textContent = item.name || item.display_name;
+            option.textContent = item.name || item.email;
             select.appendChild(option);
         }
         if (select === organisationSelect) {
@@ -618,7 +618,7 @@
             organisationCell.textContent = contract.organisation ? contract.organisation.name : '—';
 
             const agentCell = document.createElement('td');
-            agentCell.textContent = contract.agent ? contract.agent.display_name : '—';
+            agentCell.textContent = contract.agent ? contract.agent.name : '—';
 
             const updatedCell = document.createElement('td');
             updatedCell.textContent = formatDate(contract.updated_at);

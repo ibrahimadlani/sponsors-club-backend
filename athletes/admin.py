@@ -56,7 +56,8 @@ class AthleteAdmin(admin.ModelAdmin):
     search_fields = (
         "full_name",
         "sport__name",
-        "agent__display_name",
         "agent__user__email",
+        "agent__user__first_name",
+        "agent__user__last_name",
     )
     inlines = (AthletePhotoInline,)

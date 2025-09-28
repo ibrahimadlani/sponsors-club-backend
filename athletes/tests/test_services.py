@@ -68,7 +68,7 @@ def test_my_athletes_queryset_filters_by_agent(agent_user, user_model):
         first_name="Other",
         last_name="Agent",
     )
-    other_agent = AgentProfile.objects.create(user=other_user, display_name="Other Agent")
+    other_agent = AgentProfile.objects.create(user=other_user)
     create_athlete(agent=other_agent, sport=sport, name="Away Athlete")
 
     queryset = my_athletes_queryset(agent_user.agent_profile)

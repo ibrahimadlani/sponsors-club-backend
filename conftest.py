@@ -273,7 +273,7 @@ def fixture_agent_user(user_model):
         last_name="User",
         account_type=user_model.AccountType.AGENT,
     )
-    AgentProfile.objects.create(user=user, display_name="Agent One")
+    AgentProfile.objects.create(user=user)
     return user
 
 
