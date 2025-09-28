@@ -6,6 +6,16 @@ from datetime import datetime, timedelta
 
 BASE_DT = datetime(2025, 1, 15, 10, 0, 0)
 
+COUNTRY_CODES = ["+34", "+32", "+41", "+352", "+39"]
+
+
+def cycle_country_code(idx: int) -> str:
+    return COUNTRY_CODES[idx % len(COUNTRY_CODES)]
+
+
+def ten_digit_number(base: int, offset: int) -> str:
+    return f"{base + offset:010d}"
+
 
 def iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -337,8 +347,8 @@ def build_fixture() -> list[dict]:
                 "email": email,
                 "first_name": first,
                 "last_name": last,
-                "phone_country_code": "+33",
-                "phone_number": f"0600{idx:04d}",
+                "phone_country_code": cycle_country_code(idx),
+                "phone_number": ten_digit_number(6000000000, idx),
                 "date_of_birth": "1985-05-15",
                 "email_verified": True,
                 "password": password_hash,
@@ -410,8 +420,8 @@ def build_fixture() -> list[dict]:
                 "email": f"{username}@brands.example.com",
                 "first_name": first,
                 "last_name": last,
-                "phone_country_code": "+33",
-                "phone_number": f"0700{idx:04d}",
+                "phone_country_code": cycle_country_code(idx + len(agent_infos)),
+                "phone_number": ten_digit_number(7000000000, idx),
                 "date_of_birth": "1990-04-20",
                 "email_verified": True,
                 "password": password_hash,
@@ -458,7 +468,7 @@ def build_fixture() -> list[dict]:
             "description": enterprise_org["description"],
             "website_url": enterprise_org["website_url"],
             "email_contact": "contact@global-sports.example.com",
-            "phone_contact": "+33123456789",
+            "phone_contact": f"{cycle_country_code(0)}{ten_digit_number(8100000000, 0)}",
             "address_city": enterprise_org["address_city"],
             "address_country": enterprise_org["address_country"],
             "address_postal_code": enterprise_org["address_postal_code"],
@@ -532,7 +542,7 @@ def build_fixture() -> list[dict]:
     ]
 
     pro_org_collaborators: list[list[str]] = []
-    for name, slug, org_type in pro_orgs:
+    for idx, (name, slug, org_type) in enumerate(pro_orgs):
         owner_user = collaborator_user_ids[collaborator_idx]
         collaborator_idx += 1
         org_id = add(
@@ -549,7 +559,7 @@ def build_fixture() -> list[dict]:
                 "description": f"{name} recherche des opportunités de sponsoring ciblées.",
                 "website_url": f"https://{slug}.example.com",
                 "email_contact": f"hello@{slug}.example.com",
-                "phone_contact": "+33111222333",
+                "phone_contact": f"{cycle_country_code(idx + 1)}{ten_digit_number(8200000000, idx)}",
                 "address_city": "Lyon",
                 "address_country": "France",
                 "address_postal_code": "69002",
@@ -606,7 +616,7 @@ def build_fixture() -> list[dict]:
     ]
 
     free_org_collaborators: list[list[str]] = []
-    for name, slug, org_type in free_orgs:
+    for idx, (name, slug, org_type) in enumerate(free_orgs):
         owner_user = collaborator_user_ids[collaborator_idx]
         collaborator_idx += 1
         org_id = add(
@@ -623,7 +633,7 @@ def build_fixture() -> list[dict]:
                 "description": f"{name} explore les partenariats locaux.",
                 "website_url": f"https://{slug}.example.com",
                 "email_contact": f"contact@{slug}.example.com",
-                "phone_contact": "+33455667788",
+                "phone_contact": f"{cycle_country_code(idx + 1 + len(pro_orgs))}{ten_digit_number(8300000000, idx)}",
                 "address_city": "Bordeaux",
                 "address_country": "France",
                 "address_postal_code": "33000",
