@@ -1,5 +1,7 @@
 """Tests for message read state updates."""
 
+import uuid
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -81,3 +83,40 @@ def test_sender_cannot_mark_message_as_read(message_setup):
     assert payload["detail"] == "Only the message recipient may update read status."
     message.refresh_from_db()
     assert message.is_read is False
+
+
+@pytest.mark.django_db
+def test_message_read_returns_404_for_missing_message(agent_user):
+    """Missing messages return a 404 response."""
+
+    client = APIClient()
+    client.force_authenticate(user=agent_user)
+    url = reverse("message-read", args=[uuid.uuid4()])
+
+    response = client.patch(url, {"is_read": True}, format="json")
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Message not found."
+
+
+@pytest.mark.django_db
+def test_message_read_denies_unrelated_user(message_setup, user_model):
+    """Non participants cannot mutate read status."""
+
+    message = message_setup["message"]
+    outsider = user_model.objects.create_user(
+        email="outsider@test.com",
+        password="pass1234",
+        first_name="Out",
+        last_name="Sider",
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=outsider)
+    url = reverse("message-read", args=[message.id])
+
+    response = client.patch(url, {"is_read": True}, format="json")
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()["detail"] == "Access denied."
