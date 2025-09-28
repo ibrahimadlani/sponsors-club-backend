@@ -33,6 +33,13 @@ class BaseModel(models.Model):
         abstract = True
 
 
+class SubscriptionPlanManager(models.Manager):
+    """Enable natural key lookups based on the immutable plan code."""
+
+    def get_by_natural_key(self, code: str):  # type: ignore[override]
+        return self.get(code=code)
+
+
 class SubscriptionPlan(BaseModel):
     """Commercial plan offered to organisations or agents.
 
@@ -48,6 +55,8 @@ class SubscriptionPlan(BaseModel):
         stripe_price_id (CharField): Cached identifier of the Stripe price.
         is_active (BooleanField): Flag to hide deprecated plans from sale.
     """
+
+    objects = SubscriptionPlanManager()
 
     code = models.CharField(max_length=100, unique=True)
     name = models.CharField(max_length=255)
@@ -68,6 +77,15 @@ class SubscriptionPlan(BaseModel):
         """
 
         return f"{self.name} ({self.code})"
+
+    def natural_key(self) -> tuple[str]:
+        """Expose the plan code as a natural key for fixtures.
+
+        Returns:
+            tuple[str]: Single element tuple containing the unique plan code.
+        """
+
+        return (self.code,)
 
 
 class Subscription(BaseModel):

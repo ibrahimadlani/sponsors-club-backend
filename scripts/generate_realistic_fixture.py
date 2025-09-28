@@ -137,27 +137,10 @@ def build_fixture() -> list[dict]:
         },
     ]
 
-    plan_ids: dict[str, str] = {}
-    for index, plan in enumerate(plans):
-        plan_id = add(
-            objects,
-            "payments.subscriptionplan",
-            {
-                "code": plan["code"],
-                "name": plan["name"],
-                "price": plan["price"],
-                "currency": plan["currency"],
-                "max_athletes": plan["max_athletes"],
-                "max_collaborators": plan["max_collaborators"],
-                "features": plan["features"],
-                "stripe_product_id": f"prod_{plan['code']}",
-                "stripe_price_id": f"price_{plan['code']}",
-                "is_active": True,
-                "created_at": iso(BASE_DT + timedelta(minutes=index)),
-                "updated_at": iso(BASE_DT + timedelta(minutes=index)),
-            },
-        )
-        plan_ids[plan["code"]] = plan_id
+    # Plans are seeded via migrations; capture their natural keys for FK references.
+    plan_ids: dict[str, list[str]] = {}
+    for plan in plans:
+        plan_ids[plan["code"]] = [plan["code"]]
 
     # Sports and disciplines
     sports_data = [
@@ -532,7 +515,7 @@ def build_fixture() -> list[dict]:
         )
         enterprise_collaborator_ids.append(collab_id)
 
-    organisation_subscriptions: list[tuple[str, str]] = [
+    organisation_subscriptions: list[tuple[str, list[str]]] = [
         (enterprise_org_id, plan_ids["org-enterprise"])
     ]
 
