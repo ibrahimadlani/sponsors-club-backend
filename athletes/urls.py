@@ -6,6 +6,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AthleteBySlugView,
     AthletePhotoListView,
     AthleteViewSet,
     MyAthletesView,
@@ -22,6 +23,11 @@ urlpatterns = [
     path("me/athletes/", MyAthletesView.as_view(), name="my-athletes"),
     path("sports/", SportListView.as_view(), name="sports-list"),
     path("sports/<uuid:sport_id>/disciplines/", SportDisciplinesView.as_view(), name="sport-disciplines"),
+    path(
+        "athletes/slug/<slug:slug>/",
+        AthleteBySlugView.as_view(),
+        name="athlete-by-slug",
+    ),
     path(
         "athletes/<uuid:athlete_id>/photos/",
         AthletePhotoListView.as_view(),

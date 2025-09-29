@@ -196,7 +196,6 @@ class RolesDataBuilder:
             {
                 "id": str(collaboration.id),
                 "organisation_id": str(collaboration.organisation_id),
-                "organisation_name": collaboration.organisation.name,
                 "role": collaboration.role,
             }
             for collaboration in Collaborator.objects.filter(
