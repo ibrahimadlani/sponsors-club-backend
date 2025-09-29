@@ -31,6 +31,36 @@ def test_agent_profile_str_falls_back_to_user_email(user_model):
 
 
 @pytest.mark.django_db
+def test_user_slug_is_generated_from_name(user_model):
+    user = user_model.objects.create_user(
+        email="named@example.com",
+        password="pass1234",
+        first_name="Named",
+        last_name="User",
+    )
+
+    assert user.slug == "named-user"
+
+
+@pytest.mark.django_db
+def test_user_slug_deduplicates(user_model):
+    user_model.objects.create_user(
+        email="duplicate1@example.com",
+        password="pass1234",
+        first_name="Same",
+        last_name="Name",
+    )
+    other = user_model.objects.create_user(
+        email="duplicate2@example.com",
+        password="pass1234",
+        first_name="Same",
+        last_name="Name",
+    )
+
+    assert other.slug.startswith("same-name-")
+
+
+@pytest.mark.django_db
 def test_email_verification_token_verify_rejects_expired_token(user_model):
     user = user_model.objects.create_user(email="expire@example.com", password="pass1234")
     raw_token = EmailVerificationToken.issue_for_user(user)

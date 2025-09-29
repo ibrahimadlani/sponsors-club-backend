@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import feature_status_for_user
+from .models import User
 from .serializers import (
     EmailVerificationConfirmSerializer,
     MeUpdateSerializer,
@@ -86,3 +87,12 @@ class VerifyEmailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Email address verified."})
+
+
+class UserBySlugView(generics.RetrieveAPIView):
+    """Public endpoint returning a user record resolved by slug."""
+
+    permission_classes = (permissions.AllowAny,)
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    lookup_field = "slug"

@@ -8,6 +8,7 @@ from .views import (
     MeRolesView,
     MeView,
     RegisterView,
+    UserBySlugView,
     VerifyEmailView,
 )
 
@@ -21,4 +22,5 @@ urlpatterns = [
     path("me/roles/", MeRolesView.as_view(), name="me_roles"),
     path("me/entitlements/", MeEntitlementsView.as_view(), name="me_entitlements"),
     path("verify-email/", VerifyEmailView.as_view(), name="verify_email"),
+    path("slug/<slug:slug>/", UserBySlugView.as_view(), name="detail_by_slug"),
 ]

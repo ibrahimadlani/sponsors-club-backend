@@ -12,6 +12,7 @@ from django.contrib.auth.models import (
 )
 from django.db import models
 from django.db.models import Q
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
@@ -84,6 +85,7 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         choices=AccountType.choices,
         default=AccountType.AGENT,
     )
+    slug = models.SlugField(max_length=255, unique=True, blank=True, null=True)
 
     objects = UserManager()
 
@@ -118,9 +120,33 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
             self.phone_country_code = None
         if self.phone_number == "":
             self.phone_number = None
+        if not self.slug:
+            self.slug = self._generate_unique_slug()
         if self.password and self.password != self.password_hash:
             self.password_hash = self.password
         super().save(*args, **kwargs)
+
+    def _generate_unique_slug(self) -> str:
+        """Return a slug derived from the user's name or email."""
+
+        base_parts = [part for part in [self.first_name, self.last_name] if part]
+        base_slug = slugify(" ".join(base_parts))
+        if not base_slug and self.email:
+            base_slug = slugify(self.email.split("@")[0])
+        if not base_slug:
+            base_slug = uuid.uuid4().hex[:8]
+
+        slug_candidate = base_slug
+        counter = 1
+        user_model = type(self)
+        while (
+            user_model.objects.filter(slug=slug_candidate)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            counter += 1
+            slug_candidate = f"{base_slug}-{counter}"
+        return slug_candidate
 
 
 class AgentProfile(BaseModel):

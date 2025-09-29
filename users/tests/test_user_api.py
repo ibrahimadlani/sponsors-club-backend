@@ -55,6 +55,7 @@ def test_register_agent_success(api_client, user_model):
     assert user.phone_country_code == "+33"
     assert user.phone_number == "0102030405"
     assert user.agent_profile.is_self_represented is True
+    assert response.data["slug"] == user.slug
 
 
 @pytest.mark.django_db
@@ -91,6 +92,24 @@ def test_register_collaborator_success(api_client, user_model):
     assert not Collaborator.objects.filter(user=user).exists()
     assert user.phone_country_code == "+44"
     assert user.phone_number == "2071234567"
+    assert response.data["slug"] == user.slug
+
+
+@pytest.mark.django_db
+def test_user_detail_by_slug_endpoint(api_client, user_model):
+    user = user_model.objects.create_user(
+        email="slugged@example.com",
+        password="pass1234",
+        first_name="Slugged",
+        last_name="User",
+    )
+
+    url = reverse("users:detail_by_slug", kwargs={"slug": user.slug})
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert response.data["id"] == str(user.id)
+    assert response.data["slug"] == user.slug
 
 
 @pytest.mark.django_db
@@ -295,6 +314,7 @@ def test_register_serializer_representation(api_client):
     assert rep["phone_number"] == "3012345678"
     assert rep["email"] == "rep@example.com"
     assert rep["account_type"] == "AGENT"
+    assert rep["slug"] == user.slug
     assert user.agent_profile.is_self_represented is True
 
 

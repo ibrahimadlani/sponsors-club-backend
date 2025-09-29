@@ -16,6 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id",
+            "slug",
             "email",
             "first_name",
             "last_name",
@@ -31,6 +32,7 @@ class UserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "slug",
             "account_type",
             "is_active",
             "is_staff",
@@ -196,7 +198,6 @@ class RolesDataBuilder:
             {
                 "id": str(collaboration.id),
                 "organisation_id": str(collaboration.organisation_id),
-                "organisation_name": collaboration.organisation.name,
                 "role": collaboration.role,
             }
             for collaboration in Collaborator.objects.filter(
