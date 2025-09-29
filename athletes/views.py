@@ -13,6 +13,7 @@ from .models import Athlete, Sport
 from .permissions import CanViewAthlete, IsAgentUser, IsAthleteOwner, IsCollaboratorUser
 from .serializers import (
     AthletePhotoSerializer,
+    AthletePublicSerializer,
     AthleteSerializer,
     SportDisciplineSerializer,
     SportSerializer,
@@ -80,6 +81,23 @@ class AthleteViewSet(viewsets.ModelViewSet):
                 validated updates for the athlete.
         """
         serializer.save()
+
+
+class AthleteBySlugView(generics.RetrieveAPIView):
+    """Retrieve an athlete profile using its slug identifier."""
+
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = AthletePublicSerializer
+    lookup_field = "slug"
+
+    def get_queryset(self):
+        """Return athletes with related data eager loaded for public display."""
+
+        return (
+            Athlete.objects.select_related("sport", "agent__user")
+            .prefetch_related("disciplines", "photos")
+            .all()
+        )
 
 
 class MyAthletesView(generics.ListAPIView):

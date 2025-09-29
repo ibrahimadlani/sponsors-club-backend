@@ -168,6 +168,7 @@ def test_roles_endpoint_includes_collaborations(
     assert response.data["collaborations"][0]["organisation_id"] == str(
         organisations_setup["organisation"].id
     )
+    assert "organisation_name" not in response.data["collaborations"][0]
 
 
 @pytest.mark.django_db
@@ -188,6 +189,7 @@ def test_roles_builder_with_agent_and_owner(agent_user, organisations_setup):
     data = builder.build()
     assert len(data["collaborations"]) == 1
     assert data["agent_profile"]["is_self_represented"] is False
+    assert "organisation_name" not in data["collaborations"][0]
 
 
 @pytest.mark.django_db
