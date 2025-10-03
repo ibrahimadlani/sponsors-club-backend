@@ -38,18 +38,17 @@ def test_user_password_hash_updates(user_model):
 def test_register_agent_success(api_client, user_model):
     url = reverse("users:register")
     payload = {
-        "email": "newagent@example.com",
+        "email": "customagent@example.com",
         "password": "pass1234",
         "account_type": "AGENT",
         "first_name": "Agent",
         "last_name": "Nouveau",
         "phone_country_code": "+33",
         "phone_number": "0102030405",
-        "is_self_represented": True,
     }
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201
-    user = user_model.objects.get(email="newagent@example.com")
+    user = user_model.objects.get(email=payload["email"])
     assert AgentProfile.objects.filter(user=user).exists()
     assert user.agent_profile.name == "Agent Nouveau"
     assert user.phone_country_code == "+33"
