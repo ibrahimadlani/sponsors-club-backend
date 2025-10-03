@@ -46,7 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     is_self_represented = serializers.BooleanField(
         write_only=True,
         required=False,
-        default=False,
+        default=True,
     )
     class Meta:
         model = User
@@ -67,7 +67,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         """Create a user and any related agent or collaborator records."""
-        is_self_represented = validated_data.pop("is_self_represented", False)
+        is_self_represented = validated_data.pop("is_self_represented", True)
         password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         if user.account_type == User.AccountType.AGENT:

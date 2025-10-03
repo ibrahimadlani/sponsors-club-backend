@@ -48,7 +48,7 @@ def test_register_agent_success(api_client, user_model):
     }
     response = api_client.post(url, payload, format="json")
     assert response.status_code == 201
-    user = user_model.objects.get(email="newagent@example.com")
+    user = user_model.objects.get(email=payload["email"])
     assert AgentProfile.objects.filter(user=user).exists()
     assert user.agent_profile.name == "Agent Nouveau"
     assert user.phone_country_code == "+33"
