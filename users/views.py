@@ -125,12 +125,18 @@ class TokenObtainPairWithProfileSerializer(TokenObtainPairSerializer):
         role = token.get("role")
         if role == getattr(user.__class__.AccountType, "AGENT", "AGENT"):
             has_athlete = False
-            if hasattr(user, "agent_profile") and user.agent_profile_id:
+            if hasattr(user, "agent_profile"):
                 if Athlete is not None:
                     has_athlete = Athlete.objects.filter(agent=user.agent_profile).exists()
             token["agent_has_athlete"] = has_athlete
+            # Default: agents are not collaborators
+            token["collaborator_has_org"] = False
+            # If the agent is also a collaborator, drop the claim entirely
+            if Collaborator is not None and Collaborator.objects.filter(user=user).exists():
+                if "collaborator_has_org" in token:
+                    del token["collaborator_has_org"]
         elif role == getattr(user.__class__.AccountType, "COLLABORATOR", "COLLABORATOR"):
-            # Only collaborators get this claim
+            # Collaborators get an explicit collaborator_has_org flag
             is_collaborator = False
             if Collaborator is not None:
                 is_collaborator = Collaborator.objects.filter(user=user).exists()

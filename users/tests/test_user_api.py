@@ -87,7 +87,8 @@ def test_register_collaborator_success(api_client, user_model):
     assert response.status_code == 201
     user = user_model.objects.get(email="org@example.com")
     assert user.account_type == user_model.AccountType.COLLABORATOR
-    assert not Organisation.objects.filter(owner=user).exists()
+    # Owner now references a Collaborator; querying by User must follow relation
+    assert not Organisation.objects.filter(owner__user=user).exists()
     assert not Collaborator.objects.filter(user=user).exists()
     assert user.phone_country_code == "+44"
     assert user.phone_number == "2071234567"

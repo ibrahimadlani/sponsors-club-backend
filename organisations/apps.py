@@ -8,3 +8,7 @@ class OrganisationsConfig(AppConfig):
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "organisations"
+
+    def ready(self):  # pragma: no cover - import-time side effects
+        # Import signal handlers so any future hooks register during app load.
+        from . import signals  # noqa: F401

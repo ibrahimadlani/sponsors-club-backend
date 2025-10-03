@@ -27,7 +27,8 @@ def test_thread_list_returns_threads_for_agent(
         account_type=user_model.AccountType.COLLABORATOR,
     )
     other_organisation = Organisation.objects.create(
-        owner=other_owner_user,
+        # Owner now expects Collaborator; create organisation first then link via collaborator
+        owner=None,
         name="Second Org",
         type=collaborator.organisation.type,
         industry="Tech",

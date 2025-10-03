@@ -1,72 +1,56 @@
 # Users domain
 
-## Overview
-The users app implements the custom user model, agent profiles, registration,
-self-service profile updates, role aggregation, and feature entitlement
-endpoints. It also exposes JWT login/refresh routes via DRF Simple JWT.
+## Purpose
+The `users` app provides the platform-wide identity layer: custom user model, agent profiles, registration flows, JWT authentication, self-service profile management, role discovery, and feature entitlement endpoints. Other domain apps depend on it for authentication and collaboration lookups.
 
 ## Data model
-- **`User`** extends Django's auth system with email-as-username, account type
-  (`AGENT` or `COLLABORATOR`), profile metadata, a unique email constraint, and a
-  `phone_country_code`/`phone_number` pair that must be unique when both values
-  are present. The model mirrors Django's password hash into a `password_hash`
-  field for legacy compatibility. `UserManager` powers email-based creation.
-- **`AgentProfile`** is a one-to-one extension for agent accounts, storing an
-  `is_self_represented` flag used to tailor the agent experience and an
-  optional bio. The human-friendly name exposed through the API is derived from
-  the related user's first/last name or, when absent, their email address.
+- **`User`** – Email-as-username model with explicit `AccountType` choices (`AGENT`, `COLLABORATOR`). Stores profile fields (first/last name, phone, date of birth) and mirrors Django's hashed password into `password_hash` for compatibility with external tooling. Email is unique. The `(phone_country_code, phone_number)` pair is unique when both values are provided.
+- **`AgentProfile`** – One-to-one extension for agent accounts that records `is_self_represented`, optional bio, and derives a display name from the linked user. Presence of a profile indicates the user should be treated as an agent in entitlements.
 
-## Serializers and workflows
-- `RegisterSerializer` handles both agent and collaborator sign-ups. Agent
-  registrations automatically create an `AgentProfile` and rely on the user
-  record to expose a readable name. (Collaborator onboarding into organisations
-  is managed by the organisations app.)
-- `MeUpdateSerializer` updates core user fields and toggles the agent profile's
-  `is_self_represented` flag when provided.
-- `RolesDataBuilder` collects the authenticated user's collaborations and agent
-  info for the `/me/roles/` endpoint, returning a shape validated by
-  `RolesSerializer`.
+## Key workflows & serializers
+- **`RegisterSerializer`** accepts either agent or collaborator registrations. Agent sign-ups automatically create an `AgentProfile`. Collaborator onboarding into organisations is managed through the `organisations` app.
+- **`MeUpdateSerializer`** updates mutable fields on the authenticated user and can toggle `AgentProfile.is_self_represented` when supplied.
+- **`RolesDataBuilder` / `RolesSerializer`** aggregate role information for `/me/roles/`, including whether the user is an agent, a summary of the agent profile, the first organisation collaboration, and an ordered list of all collaboration IDs. The builder performs two targeted queries (one for the profile, one `values_list` on `Collaborator`).
+- **`MeEntitlementsView`** is a thin wrapper around `core.permissions.feature_status_for_user`, returning the evaluated feature flags plus upgrade metadata.
+- **JWT views** (`TokenObtainPairWithProfileView`, `TokenRefreshView`) extend Simple JWT login with custom claims (see below).
 
-## Feature entitlements
-`MeEntitlementsView` calls `core.permissions.feature_status_for_user()` to return
-all feature flags and upgrade guidance for the current user. This endpoint
-underpins the entitlement-aware UX across the platform.
-
-## API surface
-Routes are mounted under `/api/users/`.
-
+## API surface (`/api/users/…`)
 | Method | Route | Description | Auth |
 | --- | --- | --- | --- |
 | `POST` | `/register/` | Create an agent or collaborator account. | Public |
-| `POST` | `/login/` | Obtain JWT access/refresh tokens (Simple JWT). | Public |
+| `POST` | `/login/` | Obtain JWT access/refresh tokens. | Public |
 | `POST` | `/refresh/` | Refresh a JWT token pair. | Public |
 | `GET` | `/me/` | Retrieve the authenticated user's profile. | Authenticated |
-| `PUT/PATCH` | `/me/` | Update profile fields and, for agents, representation status. | Authenticated |
-| `GET` | `/me/roles/` | Return agent profile metadata and organisation collaborations. | Authenticated |
-| `GET` | `/me/entitlements/` | Return the user's feature entitlements. | Authenticated |
+| `PUT/PATCH` | `/me/` | Update core profile fields (agents can toggle representation). | Authenticated |
+| `GET` | `/me/roles/` | Return aggregated role/collaboration metadata. | Authenticated |
+| `GET` | `/me/entitlements/` | Return evaluated feature entitlements. | Authenticated |
 
-All views leverage DRF generic classes with default pagination behaviour where
-applicable (only listing endpoints paginate globally).
+All endpoints use DRF generics. There are no list endpoints here, so pagination is not applied.
 
-### Custom JWT claims
-- Identity: `email`, `prenom` (first_name), `nom` (last_name), `role`, optional `plan`.
-- Agents: `agent_has_athlete` (boolean) when `role == AGENT`.
-- Collaborators: `collaborator_has_org` (boolean) when `role == COLLABORATOR`.
+## Custom JWT claims
+- **Identity:** `email`, `prenom` (first name), `nom` (last name), `role`, optional `plan` hint when available.
+- **Agents:** `agent_has_athlete` records whether the linked `AgentProfile` manages any athletes. `collaborator_has_org` is set to `False` unless the agent is also a collaborator; in that case the claim is omitted entirely.
+- **Collaborators:** `collaborator_has_org` reflects whether the user holds at least one `Collaborator` record.
 
-### /me/roles response shape
-The roles endpoint now returns a single organisation reference instead of a list.
-
-Example:
+## `/me/roles/` response contract
 ```
 {
-  "is_agent": false,
-  "agent_profile": null,
-  "collaboration": "<organisation_uuid>" | null
+  "is_agent": true | false,
+  "agent_profile": {
+    "id": "<uuid>",
+    "name": "<display_name>",
+    "is_self_represented": true | false
+  } | null,
+  "collaboration": "<organisation_uuid>" | null,
+  "collaborations": ["<organisation_uuid>", …]
 }
-
-Performance
-- `/users/me/roles/` performs O(1) queries, selecting at most one `AgentProfile`
-  (for agents) and a single organisation id via a targeted `values_list(...).first()`
-  on `Collaborator`. An index on `(user, created_at)` accelerates this lookup for
-  large tables.
 ```
+The first collaboration acts as the “primary” one for consumers that only need a single reference, while the list supports richer UI surfaces.
+
+## Interactions with other domains
+- Collaborator membership is owned by the `organisations` app. The users app never creates organisation records directly beyond collaborating with invitations.
+- Feature entitlements are resolved through `core.permissions`, which inspects subscriptions stored by the `payments` app.
+
+## Testing touchpoints
+- Pytest fixtures in `conftest.py` provision `owner_user`, collaborators, and subscriptions used throughout the suite.
+- Unit tests cover registration flows, JWT claim generation, and the roles/entitlements endpoints. When adding new fields ensure serializers and tests stay aligned.

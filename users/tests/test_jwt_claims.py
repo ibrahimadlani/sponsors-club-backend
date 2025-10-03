@@ -1,5 +1,7 @@
 """Tests for custom JWT claims injected at login."""
 
+import pytest
+
 import jwt
 from django.urls import reverse
 from rest_framework import status
@@ -26,6 +28,9 @@ def login_get_access(client, email, password):
 
 def decode(token):
     return jwt.decode(token, django_settings.SECRET_KEY, algorithms=["HS256"])  # SimpleJWT default
+
+
+pytestmark = pytest.mark.django_db
 
 
 def test_agent_flags_without_athlete_and_not_collaborator(api_client):

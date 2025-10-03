@@ -160,6 +160,7 @@ class RolesSerializer(serializers.Serializer):
 
     is_agent = serializers.BooleanField()
     agent_profile = serializers.DictField(allow_null=True)
+    collaborations = serializers.ListField(child=serializers.UUIDField(), allow_empty=True)
     collaboration = serializers.UUIDField(allow_null=True)
 
     def create(self, validated_data):
@@ -192,17 +193,19 @@ class RolesDataBuilder:
                 "is_self_represented": agent_profile.is_self_represented,
             }
 
-        # Only expose a single organisation reference (or null) for collaborators
-        collab = (
+        # Expose both all collaborations and a single primary reference
+        qs = (
             Collaborator.objects.filter(user=self.user)
             .order_by("created_at")
             .values_list("organisation_id", flat=True)
-            .first()
         )
+        collaborations = list(qs)
+        collab = collaborations[0] if collaborations else None
 
         return {
             "is_agent": agent_info is not None,
             "agent_profile": agent_info,
+            "collaborations": collaborations,
             "collaboration": collab,
         }
 

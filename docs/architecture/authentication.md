@@ -1,19 +1,19 @@
 # Authentication & Account Lifecycle
 
-This service combines Django session auth with JWT-based APIs so both the admin and SPA clients can interact with the same backend. The core wiring lives in the `users` app, backed by Django REST Framework (DRF) class-based views and SimpleJWT views for token issuance.
+The platform combines Django session authentication with JWT bearer tokens so staff tooling and third-party clients can share the same backend. Core wiring lives in the `users` app and is implemented with Django REST Framework (DRF) plus Simple JWT.
 
 ## Authentication stack
 
-- **Enabled mechanisms** – DRF registers both `SessionAuthentication` and `JWTAuthentication`, letting browsers reuse login sessions while API clients rely on `Authorization: Bearer` headers.
-- **User model** – A custom `users.User` model stores account metadata, links to optional `AgentProfile` records, and drives feature checks.
-- **URL entry points** – `users.urls` exposes registration, JWT issuance, token refresh, and self-service endpoints under `/api/users/`.
+- **Enabled backends** – DRF registers `SessionAuthentication` and `JWTAuthentication`. Browsers reuse Django sessions while SPAs and mobile clients present `Authorization: Bearer <token>`.
+- **Identity store** – The custom `users.User` model carries account metadata and links to optional `AgentProfile` records, which are used by the entitlement system.
+- **URL surface** – `users.urls` exposes registration, login/refresh, profile, roles, and entitlements under `/api/users/`.
 
 ## Registration workflow
 
-1. `POST /api/users/register/` hits `RegisterView`, which permits anonymous access and validates payloads with `RegisterSerializer`.
-2. During creation the serializer persists the `users.User`, hashes the password, and auto-creates an `AgentProfile` when the account type is `AGENT`.
-3. Agent profiles expose a derived name based on the supplied first/last name or, when both are missing, the email address.
-4. The response is normalized through `UserSerializer`, returning the canonical user fields for immediate client use.
+1. `POST /api/users/register/` (handled by `RegisterView`) validates input with `RegisterSerializer`.
+2. The serializer creates the user, hashes the password, and provisions an `AgentProfile` when the account type is `AGENT`.
+3. Agent profile names are derived from the supplied first/last name or fall back to the email address.
+4. The response uses `UserSerializer`, so clients always receive a consistent representation.
 
 ```http
 POST /api/users/register/
@@ -30,20 +30,26 @@ Content-Type: application/json
 
 ## JWT lifecycle
 
-- **Login** – `POST /api/users/login/` delegates to SimpleJWT's `TokenObtainPairView`, issuing `access` and `refresh` tokens when the email/password pair is valid.
-- **Refresh** – `POST /api/users/refresh/` exchanges a valid refresh token for a new access token via `TokenRefreshView`.
-- **Revocation** – There is no server-side blacklist; clients should drop refresh tokens on logout or rely on their expiry window.
+- **Login** – `POST /api/users/login/` hits `TokenObtainPairWithProfileView`. On success it issues an `access` and `refresh` token pair enriched with identity claims (see below).
+- **Refresh** – `POST /api/users/refresh/` exchanges a valid refresh token for a new access token using Simple JWT's `TokenRefreshView`.
+- **Logout** – There is no server-side revocation list; clients should discard refresh tokens or wait for them to expire.
 
-Tokens are standard SimpleJWT payloads, so extra claims can be injected later without touching local code.
+### Custom access-token claims
+- `email`, `prenom`, `nom`, and `role` for identity.
+- Optional `plan` when the user has an associated subscription plan hint.
+- `agent_has_athlete` for agents managing at least one athlete.
+- `collaborator_has_org`:
+  - Agents receive `false` unless they are also collaborators (claim omitted in that case).
+  - Collaborators receive a boolean based on membership.
 
 ## Self-service endpoints
 
-- **`GET /api/users/me/`** – Returns the authenticated user. `PATCH`/`PUT` accepts `MeUpdateSerializer`, which updates contact fields and toggles the agent profile's self-representation flag when provided.
-- **`GET /api/users/me/roles/`** – Aggregates roles via `RolesDataBuilder`, exposing agent profile details plus a list of organisation collaborations (id, name, role).
-- **`GET /api/users/me/entitlements/`** – Calls `feature_status_for_user` to enumerate feature gates, returning the account type, grant status, upgrade links, and recommended plans. This powers in-app upgrade prompts.
+- **`GET /api/users/me/`** – Returns the authenticated user. `PUT/PATCH` accepts `MeUpdateSerializer`, updating contact details and `AgentProfile.is_self_represented` when supplied.
+- **`GET /api/users/me/roles/`** – Uses `RolesDataBuilder` to return `is_agent`, a summarised `agent_profile`, the first organisation collaboration, and a list of all collaborator organisation IDs.
+- **`GET /api/users/me/entitlements/`** – Calls `feature_status_for_user` to enumerate every feature requirement for the current account type, including grant status, recommended plans, and upgrade URLs. Downstream apps use this data to surface upgrade CTAs.
 
-All three endpoints require authentication and are safe to call with either session cookies or bearer tokens.
+All endpoints require authentication and support both cookie and bearer auth.
 
-## Account roles & permissions
+## Role derivation & entitlements
 
-Role data and entitlements are additive: registering as an agent automatically provisions the agent profile, while collaborator roles derive from `organisations.Collaborator` memberships. Entitlements read subscription metadata from the payments subsystem so downstream apps (messaging, follows, contracts) can block actions when a plan is insufficient.
+Roles are additive: registering as an agent creates the agent profile, while collaborator roles stem from `organisations.Collaborator` records (ownership, membership) created via the organisations app. Entitlements read subscription metadata from the `payments` app to decide whether operations such as messaging, follows, or contract workflows should proceed.

@@ -86,7 +86,8 @@ def test_organisation_get_owner_id(organisations_setup):
     """Return the owner collaborator identifier when present."""
     organisation = organisations_setup["organisation"]
     collaborator = organisations_setup["collaborator"]
-    assert organisation.owner == collaborator.user
+    # Owner field now points to Collaborator; compare nested user
+    assert organisation.owner.user == collaborator.user
     assert organisation.get_owner_id() == collaborator.id
     collaborator.delete()
     assert organisation.get_owner_id() is None
@@ -146,7 +147,7 @@ def test_organisation_create_serializer(factory, user_model):
     organisation = serializer.save()
     user.refresh_from_db()
     assert user.account_type == user_model.AccountType.COLLABORATOR
-    assert organisation.owner == user
+    assert organisation.owner.user == user
     assert Collaborator.objects.filter(
         user=user, organisation=organisation, role=Collaborator.Role.OWNER
     ).exists()
@@ -462,7 +463,7 @@ def test_organisation_create_view_collaborator_success(user_model):
     response = client.post(list_url, payload, format="json")
     assert response.status_code == status.HTTP_201_CREATED
     organisation = Organisation.objects.get(name=payload["name"])
-    assert organisation.owner == user
+    assert organisation.owner.user == user
     user.refresh_from_db()
     assert user.account_type == user_model.AccountType.COLLABORATOR
     assert Collaborator.objects.filter(
@@ -751,7 +752,7 @@ def test_transfer_ownership(owner_client, organisation, member_collaborator):
     organisation.refresh_from_db()
     member_collaborator.refresh_from_db()
     assert member_collaborator.role == Collaborator.Role.OWNER
-    assert organisation.owner == member_collaborator.user
+    assert organisation.owner.user == member_collaborator.user
 
 
 @pytest.mark.django_db

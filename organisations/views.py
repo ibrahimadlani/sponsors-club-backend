@@ -301,7 +301,8 @@ class OrganisationViewSet(
 
         new_owner.role = Collaborator.Role.OWNER
         new_owner.save(update_fields=["role", "updated_at"])
-        organisation.owner = new_owner.user
+        # Persist owner as collaborator object
+        organisation.owner = new_owner
         organisation.save(update_fields=["owner", "updated_at"])
 
         return Response(CollaboratorSerializer(new_owner).data)

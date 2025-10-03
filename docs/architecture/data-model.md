@@ -319,7 +319,6 @@ classDiagram
 
     User "1" -- "0..1" AgentProfile : agent_profile
     User "1" -- "0..*" EmailVerificationToken : email_tokens
-    User "0..1" -- "0..*" Organisation : owner
     User "1" -- "0..*" Collaborator : user
     User "0..1" -- "0..*" OrganisationInvite : used_by
     User "1" -- "0..*" Message : sender
@@ -332,6 +331,7 @@ classDiagram
     User "1" -- "0..*" ContractSigning : initiated_by
 
     Organisation "1" -- "0..*" Collaborator : collaborators
+    Organisation "0..1" -- "1" Collaborator : owner
     Organisation "1" -- "0..*" OrganisationInvite : invites
     Organisation "1" -- "0..*" Contract : contracts
     Organisation "0..1" -- "0..*" Subscription : subscriptions
@@ -388,5 +388,6 @@ classDiagram
 
 - The models inherit from a shared base with UUID identifiers and automatic timestamps, simplifying replication across environments. 【F:users/models.py†L19-L28】【F:athletes/models.py†L14-L33】
 - The `Subscription` model enforces an XOR constraint: a subscription is linked either to an organisation or to an agent, but never to both simultaneously. 【F:payments/models.py†L81-L124】
+- `Organisation.owner` references the `Collaborator` representing the owner, so ownership and collaborator permissions always stay aligned (see `organisations/models.py`).
 - Contract revisions maintain a many-to-many relationship to clauses via `clauses_changed`, allowing the product to track exactly which provisions were proposed and subsequently versioned. 【F:contracts/models.py†L123-L214】
 - `User` inherits from `PermissionsMixin`, keeping Django's native relations with groups and permissions (`auth_group`, `auth_permission`); they are not detailed here but remain available in the database. 【F:users/models.py†L8-L18】
