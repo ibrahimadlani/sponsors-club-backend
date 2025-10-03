@@ -1,7 +1,7 @@
 """URL configuration for the users API endpoints."""
 
 from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     MeEntitlementsView,
@@ -9,13 +9,14 @@ from .views import (
     MeView,
     RegisterView,
     VerifyEmailView,
+    TokenObtainPairWithProfileView,
 )
 
 app_name = "users"
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
-    path("login/", TokenObtainPairView.as_view(), name="login"),
+    path("login/", TokenObtainPairWithProfileView.as_view(), name="login"),
     path("refresh/", TokenRefreshView.as_view(), name="refresh"),
     path("me/", MeView.as_view(), name="me"),
     path("me/roles/", MeRolesView.as_view(), name="me_roles"),
