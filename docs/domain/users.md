@@ -47,3 +47,26 @@ Routes are mounted under `/api/users/`.
 
 All views leverage DRF generic classes with default pagination behaviour where
 applicable (only listing endpoints paginate globally).
+
+### Custom JWT claims
+- Identity: `email`, `prenom` (first_name), `nom` (last_name), `role`, optional `plan`.
+- Agents: `agent_has_athlete` (boolean) when `role == AGENT`.
+- Collaborators: `collaborator_has_org` (boolean) when `role == COLLABORATOR`.
+
+### /me/roles response shape
+The roles endpoint now returns a single organisation reference instead of a list.
+
+Example:
+```
+{
+  "is_agent": false,
+  "agent_profile": null,
+  "collaboration": "<organisation_uuid>" | null
+}
+
+Performance
+- `/users/me/roles/` performs O(1) queries, selecting at most one `AgentProfile`
+  (for agents) and a single organisation id via a targeted `values_list(...).first()`
+  on `Collaborator`. An index on `(user, created_at)` accelerates this lookup for
+  large tables.
+```

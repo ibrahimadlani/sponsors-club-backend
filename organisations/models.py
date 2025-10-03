@@ -111,7 +111,21 @@ class Collaborator(BaseModel):
                 condition=models.Q(role="OWNER"),
                 name="unique_owner_per_organisation",
             ),
+            # Enforce that a user can only be linked to a single organisation globally
+            models.UniqueConstraint(
+                fields=("user",),
+                name="unique_collaborator_user_global",
+            ),
         ]
+        indexes = [
+            models.Index(fields=("user", "created_at"), name="collab_user_created_idx"),
+        ]
+
+    def clean(self):
+        # Prevent a user from being linked to multiple organisations at once
+        if self.user_id and Collaborator.objects.filter(user_id=self.user_id).exclude(pk=self.pk).exists():
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"user": "Cet utilisateur est déjà rattaché à une organisation."})
 
     def __str__(self):
         return f"{self.user} - {self.organisation.name} ({self.role})"

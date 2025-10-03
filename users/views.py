@@ -129,12 +129,12 @@ class TokenObtainPairWithProfileSerializer(TokenObtainPairSerializer):
                 if Athlete is not None:
                     has_athlete = Athlete.objects.filter(agent=user.agent_profile).exists()
             token["agent_has_athlete"] = has_athlete
-
-            # Also check if the same user is linked as collaborator to any organisation
+        elif role == getattr(user.__class__.AccountType, "COLLABORATOR", "COLLABORATOR"):
+            # Only collaborators get this claim
             is_collaborator = False
             if Collaborator is not None:
                 is_collaborator = Collaborator.objects.filter(user=user).exists()
-            token["agent_is_collaborator_linked_to_org"] = is_collaborator
+            token["collaborator_has_org"] = is_collaborator
         return token
 
 

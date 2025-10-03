@@ -12,9 +12,12 @@ from .models import Collaborator, Organisation, OrganisationInvite
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
-    """Expose organisation data including the cached owner identifier."""
+    """Expose organisation data with robust owner identifier.
 
-    owner_id = serializers.UUIDField(source="get_owner_id", read_only=True)
+    Prefer direct FK owner when present; otherwise fall back to collaborator owner id.
+    """
+
+    owner_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Organisation
@@ -43,6 +46,13 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "owner_id",
         )
         read_only_fields = ("id", "slug", "created_at", "updated_at", "owner_id")
+
+    def get_owner_id(self, obj: Organisation):
+        # Direct FK takes precedence
+        if getattr(obj, "owner_id", None):
+            return str(obj.owner_id)
+        # Fallback to collaborator owner id
+        return obj.get_owner_id()
 
 
 class OrganisationListFilter(serializers.Serializer):
