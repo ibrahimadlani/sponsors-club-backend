@@ -11,18 +11,18 @@ endpoints. It also exposes JWT login/refresh routes via DRF Simple JWT.
   `phone_country_code`/`phone_number` pair that must be unique when both values
   are present. The model mirrors Django's password hash into a `password_hash`
   field for legacy compatibility. `UserManager` powers email-based creation.
-- **`AgentProfile`** is a one-to-one extension for agent accounts, storing a
-  `display_name`, an `is_self_represented` flag used to tailor the agent
-  experience, and an optional bio.
+- **`AgentProfile`** is a one-to-one extension for agent accounts, storing an
+  `is_self_represented` flag used to tailor the agent experience and an
+  optional bio. The human-friendly name exposed through the API is derived from
+  the related user's first/last name or, when absent, their email address.
 
 ## Serializers and workflows
 - `RegisterSerializer` handles both agent and collaborator sign-ups. Agent
-  registrations automatically create an `AgentProfile`, seeding its
-  `display_name` from the provided first/last name (or email when absent).
-  (Collaborator onboarding into organisations is managed by the
-  organisations app.)
-- `MeUpdateSerializer` updates core user fields and, when provided, synchronises
-  the agent profile's `display_name`.
+  registrations automatically create an `AgentProfile` and rely on the user
+  record to expose a readable name. (Collaborator onboarding into organisations
+  is managed by the organisations app.)
+- `MeUpdateSerializer` updates core user fields and toggles the agent profile's
+  `is_self_represented` flag when provided.
 - `RolesDataBuilder` collects the authenticated user's collaborations and agent
   info for the `/me/roles/` endpoint, returning a shape validated by
   `RolesSerializer`.
@@ -41,7 +41,7 @@ Routes are mounted under `/api/users/`.
 | `POST` | `/login/` | Obtain JWT access/refresh tokens (Simple JWT). | Public |
 | `POST` | `/refresh/` | Refresh a JWT token pair. | Public |
 | `GET` | `/me/` | Retrieve the authenticated user's profile. | Authenticated |
-| `PUT/PATCH` | `/me/` | Update profile fields and, for agents, display name. | Authenticated |
+| `PUT/PATCH` | `/me/` | Update profile fields and, for agents, representation status. | Authenticated |
 | `GET` | `/me/roles/` | Return agent profile metadata and organisation collaborations. | Authenticated |
 | `GET` | `/me/entitlements/` | Return the user's feature entitlements. | Authenticated |
 

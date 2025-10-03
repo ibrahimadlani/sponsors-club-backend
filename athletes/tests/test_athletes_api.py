@@ -69,7 +69,7 @@ def other_agent_user(user_model):
         first_name="Other",
         last_name="Agent",
     )
-    AgentProfile.objects.create(user=user, display_name="Other Agent")
+    AgentProfile.objects.create(user=user)
     return user
 
 
@@ -94,6 +94,16 @@ def test_sport_str(sport):
 @pytest.mark.django_db
 def test_athlete_str(athlete):
     assert str(athlete) == athlete.full_name
+
+
+@pytest.mark.django_db
+def test_retrieve_athlete_by_slug(api_client, athlete):
+    url = reverse("athlete-by-slug", kwargs={"slug": athlete.slug})
+    response = api_client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == str(athlete.id)
+    assert response.data["slug"] == athlete.slug
+    assert response.data["full_name"] == athlete.full_name
 
 
 @pytest.mark.django_db

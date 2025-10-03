@@ -104,8 +104,8 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         """Return the most informative representation for administrators."""
-        display_name = f"{self.first_name} {self.last_name}".strip()
-        return display_name or self.email
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name or self.email
 
     def set_password(self, raw_password):
         """Persist the password hash on both Django and legacy fields."""
@@ -129,14 +129,17 @@ class AgentProfile(BaseModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="agent_profile"
     )
-    display_name = models.CharField(max_length=255)
     bio = models.TextField(blank=True)
     is_self_represented = models.BooleanField(default=False)
 
     def __str__(self):
-        """Return the display name or fall back to the related user."""
-        if self.display_name:
-            return str(self.display_name)
+        """Return the related user's preferred representation."""
+        return str(self.user)
+
+    @property
+    def name(self) -> str:
+        """Return a human-friendly representation for API consumers."""
+
         return str(self.user)
 
 

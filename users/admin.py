@@ -92,11 +92,16 @@ class UserAdmin(BaseUserAdmin):
 class AgentProfileAdmin(admin.ModelAdmin):
     """Admin configuration for managing agent profiles."""
 
-    list_display = ("user", "display_name", "is_self_represented")
+    list_display = ("user", "agent_name", "is_self_represented")
     list_filter = ("is_self_represented",)
     search_fields = (
-        "display_name",
         "user__email",
         "user__first_name",
         "user__last_name",
     )
+
+    @admin.display(description="Name")
+    def agent_name(self, obj):  # noqa: D401
+        """Return the friendly name derived from the related user."""
+
+        return obj.name

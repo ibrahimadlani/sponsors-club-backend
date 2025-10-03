@@ -3,6 +3,8 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from core.permissions import feature_status_for_user
 from .serializers import (
@@ -86,3 +88,33 @@ class VerifyEmailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Email address verified."})
+
+
+class TokenObtainPairWithProfileSerializer(TokenObtainPairSerializer):
+    """Extend JWT payload with user profile claims.
+
+    Adds first/last names, email, account role, and plan when available.
+    """
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Core identity
+        token["email"] = getattr(user, "email", None)
+        token["prenom"] = getattr(user, "first_name", None)
+        token["nom"] = getattr(user, "last_name", None)
+        # Business context
+        token["role"] = getattr(user, "account_type", None)
+        # Optional: attach subscription/plan info if present on user
+        plan = getattr(user, "plan", None)
+        if plan is None:
+            # Fallback: check a related profile or organisation membership if your domain uses it
+            # Keep minimal and safe by not querying extra relations eagerly.
+            plan = getattr(getattr(user, "agent_profile", None), "plan", None)
+        if plan is not None:
+            token["plan"] = plan
+        return token
+
+
+class TokenObtainPairWithProfileView(TokenObtainPairView):
+    serializer_class = TokenObtainPairWithProfileSerializer
