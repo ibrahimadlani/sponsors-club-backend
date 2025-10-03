@@ -12,9 +12,14 @@ from .models import Collaborator, Organisation, OrganisationInvite
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
-    """Expose organisation data including the cached owner identifier."""
+    """Expose organisation data with robust owner identifier.
 
-    owner_id = serializers.UUIDField(source="get_owner_id", read_only=True)
+    Prefer direct FK owner when present; otherwise fall back to collaborator owner id.
+    """
+
+    # Now owner_id exposes the collaborator id; also include owner_user_id for convenience
+    owner_id = serializers.SerializerMethodField()
+    owner_user_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Organisation
@@ -41,8 +46,18 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "owner_id",
+            "owner_user_id",
         )
-        read_only_fields = ("id", "slug", "created_at", "updated_at", "owner_id")
+        read_only_fields = ("id", "slug", "created_at", "updated_at", "owner_id", "owner_user_id")
+
+    def get_owner_id(self, obj: Organisation):
+        # Return collaborator id (current FK) or fallback discovery
+        collab_id = obj.owner_id or obj.get_owner_id()
+        return str(collab_id) if collab_id else None
+
+    def get_owner_user_id(self, obj: Organisation):
+        user = obj.owner_user
+        return str(user.id) if user else None
 
 
 class OrganisationListFilter(serializers.Serializer):
@@ -102,15 +117,17 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
                 }
             )
         organisation = Organisation.objects.create(
-            owner=user,
             **validated_data,
         )
-        Collaborator.objects.create(
+        # Create owner collaborator then link as owner FK
+        owner_collab = Collaborator.objects.create(
             user=user,
             organisation=organisation,
             role=Collaborator.Role.OWNER,
             job_title="Owner",
         )
+        organisation.owner = owner_collab
+        organisation.save(update_fields=["owner", "updated_at"])
         return organisation
 
 

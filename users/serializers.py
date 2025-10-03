@@ -156,11 +156,12 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
 
 class RolesSerializer(serializers.Serializer):
-    """Represent the various collaborations and agent details for a user."""
+    """Represent the user's roles and single collaboration reference."""
 
     is_agent = serializers.BooleanField()
     agent_profile = serializers.DictField(allow_null=True)
-    collaborations = serializers.ListField(child=serializers.DictField())
+    collaborations = serializers.ListField(child=serializers.UUIDField(), allow_empty=True)
+    collaboration = serializers.UUIDField(allow_null=True)
 
     def create(self, validated_data):
         """Disallow creation via this read-only serializer."""
@@ -192,21 +193,20 @@ class RolesDataBuilder:
                 "is_self_represented": agent_profile.is_self_represented,
             }
 
-        collaborations = [
-            {
-                "id": str(collaboration.id),
-                "organisation_id": str(collaboration.organisation_id),
-                "role": collaboration.role,
-            }
-            for collaboration in Collaborator.objects.filter(
-                user=self.user
-            ).select_related("organisation")
-        ]
+        # Expose both all collaborations and a single primary reference
+        qs = (
+            Collaborator.objects.filter(user=self.user)
+            .order_by("created_at")
+            .values_list("organisation_id", flat=True)
+        )
+        collaborations = list(qs)
+        collab = collaborations[0] if collaborations else None
 
         return {
             "is_agent": agent_info is not None,
             "agent_profile": agent_info,
             "collaborations": collaborations,
+            "collaboration": collab,
         }
 
 

@@ -6,7 +6,7 @@ The project uses `pytest` with `pytest-django` for unit and integration tests. C
 ```bash
 pytest
 ```
-`pytest.ini` configures discovery patterns (`tests.py`, `test_*.py`, `*_tests.py`) and adds `--cov=. --cov-report=term-missing --cov-fail-under=98` to every invocation. The suite therefore produces per-file coverage output across the entire Django project and fails if overall coverage drops below 98%.
+`pytest.ini` configures discovery patterns (`tests.py`, `test_*.py`, `*_tests.py`) and adds `--cov=. --cov-report=term-missing --cov-fail-under=95` to every invocation. The suite therefore produces per-file coverage output across the entire Django project and fails if overall coverage drops below 95%.
 
 To narrow the scope to a single module or test, provide its import path:
 ```bash

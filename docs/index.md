@@ -1,40 +1,50 @@
-# Sponsors Club Backend Documentation
+# Sponsors Club Backend – Documentation Hub
 
-## Platform overview
-- **Tech stack:** Python 3.11 on Django 4.2 with Django REST Framework and django-filter providing the API backbone. The production container bakes dependencies into a virtual environment and runs Gunicorn via the `scripts/entrypoint.sh` helper.
-- **Database:** SQLite is the default development database, with migrations applied through standard Django management commands or the bundled `scripts/migrate.sh` script for containerized deployments.
-- **Authentication:** Session authentication coexists with JWT tokens from `djangorestframework_simplejwt`, giving first-party clients and external integrations flexible login flows.
-- **Interactive docs:** When `drf-yasg` is installed (it is included in `requirements.txt`), interactive OpenAPI documentation is served at `/api/docs/` and `/api/redoc/`.
+Welcome to the central reference for the Sponsors Club backend. The repository is organised so that developers can jump straight to the information needed to build, test, or operate the platform.
 
-## Application map
-| App | Responsibility |
-| --- | -------------- |
-| `analytics` | Models and APIs to sync and expose athlete social metrics and reports. |
-| `athletes` | Athlete and sport profiles, including entitlement-aware serializers. |
-| `contracts` | Contract templates, revisions, and workflow management. |
-| `follows` | Follow relationships between organisations and athletes, with quota enforcement. |
-| `messaging` | Threaded conversations, message serialization, and permissions. |
-| `notifications` | User-facing notifications with read-state tracking. |
-| `organisations` | Organisation records, collaborators, invitations, and related APIs. |
-| `payments` | Subscription plans, billing state, and entitlement evaluation helpers. |
-| `users` | Custom user model, registration, login, role discovery, and JWT endpoints. |
+## Quick facts
+- **Runtime:** Python 3.11, Django 4.2, Django REST Framework, django-filter.
+- **Auth stack:** Session auth for staff/UI flows plus JWT tokens via `djangorestframework_simplejwt` for API clients.
+- **Primary datastore:** SQLite in development, PostgreSQL in production (configured through `DATABASES` environment overrides). Migrations run with standard Django commands or the provided helper scripts.
+- **API documentation:** Install `drf-yasg` to expose `/api/schema/`, `/api/docs/` (Swagger UI), and `/api/redoc/`.
+- **Core project module:** `core/` contains settings, routing, custom permissions, and reusable utilities shared across domain apps.
 
-Core project configuration lives in `core/` (settings, URL routing, WSGI), and shared fixtures plus demo tooling are implemented under `core/management/commands/`.
+## How the documentation is organised
 
-## API surface
-The project-level router (`core/urls.py`) wires each domain app under the `/api/` prefix, exposes authentication helpers under `/api/users/`, payment and notification namespaces, and provides two proof-of-concept HTML templates at `/poc/login/` and `/poc/messaging/` for manual workflows.
-
-## Documentation index
+### 1. Getting started
 - [Local development setup](setup/local-development.md)
-- [Database seeding](setup/data-seeding.md)
-- [Testing guide](testing.md)
+- [Database seeding guide](setup/data-seeding.md)
+- [Testing strategy and tooling](testing.md)
+
+### 2. Architecture & platform internals
+- [Architecture overview](architecture/overview.md)
+- [Authentication flows & security](architecture/authentication.md)
+- [Integrations & external touchpoints](architecture/integration.md)
+- [Data model reference](architecture/data-model.md)
+- [Feature entitlement engine](architecture/feature-entitlements.md)
+
+### 3. Domain guides
+Each domain app has a dedicated chapter that covers models, API contracts, permissions, and interactions with other areas of the platform.
+- [Analytics](domain/analytics.md)
+- [Analytics permissions](domain/analytics-permissions.md)
+- [Athletes](domain/athletes.md)
+- [Contracts](domain/contracts.md)
+- [Follows](domain/follows.md)
+- [Messaging](domain/messaging.md)
+- [Notifications](domain/notifications.md)
+- [Organisations](domain/organisations.md)
+- [Payments](domain/payments.md)
+- [Users](domain/users.md)
+
+### 4. Operations & delivery
 - [Deployment runbook](operations/deployment.md)
-- [Background jobs & scheduling](operations/background-jobs.md)
-- [Feature entitlements reference](feature-entitlements.md)
-- [Data model and UML diagram](architecture/data-model.md)
-- [Proof-of-concept templates](poc/README.md)
+- [Background jobs & scheduled tasks](operations/background-jobs.md)
 
-Interactive OpenAPI documentation is available at `/api/docs/` and `/api/redoc/`
-when `DRF_YASG_ENABLED` is set to `true`.
+### 5. Reference & exploratory material
+- [Feature entitlements quick reference](feature-entitlements.md)
+- [Proof-of-concept HTML flows](poc/README.md)
 
-Each guide focuses on actionable steps. Domain- and architecture-specific chapters can build upon this foundation using the same folder structure (`architecture/`, `domain/`, `operations/`, etc.).
+## Navigating the API
+The global router (`core/urls.py`) mounts domain routes under `/api/…`. Refer to the architecture overview for a full map of URL namespaces and to the domain guides for per-resource contracts. Two HTML proof-of-concept views live under `/poc/` for manual testing.
+
+> **Tip:** Each Markdown file is intentionally self-contained—follow links within a section to drill down without jumping back to this index.

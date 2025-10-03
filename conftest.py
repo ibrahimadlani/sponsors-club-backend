@@ -296,7 +296,6 @@ def fixture_organisations_setup(user_model):
         account_type=user_model.AccountType.COLLABORATOR,
     )
     organisation = Organisation.objects.create(
-        owner=owner,
         name="Test Org",
         type=Organisation.Type.BRAND,
         industry="Tech",
@@ -319,6 +318,9 @@ def fixture_organisations_setup(user_model):
         role=Collaborator.Role.OWNER,
         job_title="Owner",
     )
+    organisation.owner = collaborator
+    if hasattr(organisation, "save"):
+        organisation.save(update_fields=["owner", "updated_at"])
 
     plan, _ = SubscriptionPlan.objects.get_or_create(
         code="org-enterprise",

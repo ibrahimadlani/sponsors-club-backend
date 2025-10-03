@@ -87,7 +87,8 @@ def test_register_collaborator_success(api_client, user_model):
     assert response.status_code == 201
     user = user_model.objects.get(email="org@example.com")
     assert user.account_type == user_model.AccountType.COLLABORATOR
-    assert not Organisation.objects.filter(owner=user).exists()
+    # Owner now references a Collaborator; querying by User must follow relation
+    assert not Organisation.objects.filter(owner__user=user).exists()
     assert not Collaborator.objects.filter(user=user).exists()
     assert user.phone_country_code == "+44"
     assert user.phone_number == "2071234567"
@@ -165,10 +166,9 @@ def test_roles_endpoint_includes_collaborations(
     assert response.status_code == 200
     assert response.data["is_agent"] is False
     assert len(response.data["collaborations"]) == 1
-    assert response.data["collaborations"][0]["organisation_id"] == str(
+    assert response.data["collaboration"] == str(
         organisations_setup["organisation"].id
     )
-    assert "organisation_name" not in response.data["collaborations"][0]
 
 
 @pytest.mark.django_db
@@ -189,7 +189,7 @@ def test_roles_builder_with_agent_and_owner(agent_user, organisations_setup):
     data = builder.build()
     assert len(data["collaborations"]) == 1
     assert data["agent_profile"]["is_self_represented"] is False
-    assert "organisation_name" not in data["collaborations"][0]
+    assert "collaboration" in data
 
 
 @pytest.mark.django_db
