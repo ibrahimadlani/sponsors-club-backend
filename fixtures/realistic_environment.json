@@ -535,7 +535,6 @@
     "pk": "9a6970e1-45de-4078-803a-902639953069",
     "fields": {
       "user": "2594dfcc-f014-42d9-a8bf-7518b7d977a5",
-      "display_name": "Alice Dupont",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T10:15:00Z",
@@ -568,7 +567,6 @@
     "pk": "06ea05c6-aa8f-4a81-9fca-e82763b4d6d0",
     "fields": {
       "user": "0a997e46-ce9c-455b-bf49-850c5b2bb4e8",
-      "display_name": "Bruno Martin",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T11:15:00Z",
@@ -601,7 +599,6 @@
     "pk": "4c50de0e-360d-41a9-aa54-d26b8d296a08",
     "fields": {
       "user": "1c73da52-0213-4376-9f31-49108a0255a4",
-      "display_name": "Chloé Laurent",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T12:15:00Z",
@@ -634,7 +631,6 @@
     "pk": "89f298b5-812d-4e9a-8073-b2c56a81f6ae",
     "fields": {
       "user": "471984da-ded4-4a1c-8dcb-47f11b9b1863",
-      "display_name": "David Bernard",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T13:15:00Z",
@@ -667,7 +663,6 @@
     "pk": "c6a24848-8bc5-4d90-9c05-92da3830a9bb",
     "fields": {
       "user": "0bfad13d-4f92-47f6-9d51-f80c4a23cd44",
-      "display_name": "Emma Girard",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T14:15:00Z",
@@ -700,7 +695,6 @@
     "pk": "93190d39-770e-4d7c-8998-d39d3713606e",
     "fields": {
       "user": "34d6b342-b447-4477-9bc0-38a901f01a02",
-      "display_name": "Fabien Moreau",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T15:15:00Z",
@@ -733,7 +727,6 @@
     "pk": "5651f2bf-738f-477d-87e2-1fc20c24aca4",
     "fields": {
       "user": "d09c3247-0bdd-445b-b67e-520d49f0468c",
-      "display_name": "Gaëlle Robert",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": true,
       "created_at": "2025-01-15T16:15:00Z",
@@ -766,7 +759,6 @@
     "pk": "6d14e419-dc80-47f3-a478-fb77a5c63c9f",
     "fields": {
       "user": "95848bc0-8a90-4cd9-a022-8fab4121ad46",
-      "display_name": "Hugo Petit",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T17:15:00Z",
@@ -799,7 +791,6 @@
     "pk": "4065662a-cc0b-4e12-8ba3-a58b473cf3cb",
     "fields": {
       "user": "c9c70753-5337-49fa-887d-920a3bb8bf87",
-      "display_name": "Isabelle Lefevre",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T18:15:00Z",
@@ -832,7 +823,6 @@
     "pk": "711298f2-5a2b-49f1-a92e-8c054461eb7c",
     "fields": {
       "user": "f7e8bb26-d7cf-4e99-a659-2a6fb7f9933d",
-      "display_name": "Julien Caron",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T19:15:00Z",
@@ -865,7 +855,6 @@
     "pk": "ae81e894-7bc2-4536-8b03-7007eda30e88",
     "fields": {
       "user": "a853c7b0-49c5-4bd4-b3a8-06459c50e09e",
-      "display_name": "Karim Leroy",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T20:15:00Z",
@@ -898,7 +887,6 @@
     "pk": "8ff063e4-9986-41e8-afce-4424f2fd6c5f",
     "fields": {
       "user": "07861bd0-6ec4-4e7b-9e76-7ccb88f26cb1",
-      "display_name": "Laura Fontaine",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T21:15:00Z",
@@ -931,7 +919,6 @@
     "pk": "37c17c87-9d03-462a-a0cb-4c44d2adadf9",
     "fields": {
       "user": "d4c49916-ead4-478e-8afe-d14b0dd970b8",
-      "display_name": "Mathieu Perrin",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T22:15:00Z",
@@ -964,7 +951,6 @@
     "pk": "4dd41b7e-518a-4246-bc20-d703bdb9b79f",
     "fields": {
       "user": "c1a3e91f-452d-405a-a5e2-539adfe88753",
-      "display_name": "Nadia Roche",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-15T23:15:00Z",
@@ -997,7 +983,6 @@
     "pk": "6beddb27-a210-4c30-85d3-d971d484e304",
     "fields": {
       "user": "01e9eaba-11f0-49ba-a4e9-f9ca83a95373",
-      "display_name": "Olivier Lemaitre",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T00:15:00Z",
@@ -1030,7 +1015,6 @@
     "pk": "6739de21-a590-461d-8537-6cc6fc2cf929",
     "fields": {
       "user": "78b686f7-a33b-45fe-a9c9-2ca2d72714cd",
-      "display_name": "Pauline Marchand",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T01:15:00Z",
@@ -1063,7 +1047,6 @@
     "pk": "20262a02-dbff-4beb-8c8d-e0141070c73d",
     "fields": {
       "user": "9ddfc5f4-8696-47f3-a2f4-8274c9528fe3",
-      "display_name": "Quentin Blanchard",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T02:15:00Z",
@@ -1096,7 +1079,6 @@
     "pk": "df25e9f8-b6e3-4ebf-ae01-44aaadf73e6b",
     "fields": {
       "user": "14b68397-bd78-44cc-b987-98d2ce0af21e",
-      "display_name": "Romain Allard",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T03:15:00Z",
@@ -1129,7 +1111,6 @@
     "pk": "f814e2f6-f68b-4d72-af36-43828a8af531",
     "fields": {
       "user": "ea6b4431-77bc-414f-aa0d-5f08f4d66dea",
-      "display_name": "Sophie Garnier",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T04:15:00Z",
@@ -1162,7 +1143,6 @@
     "pk": "d36a51a0-78a1-4a2c-b108-0287b1efb106",
     "fields": {
       "user": "b4ee73fb-6552-44e6-aef5-6dd674a67f7d",
-      "display_name": "Thomas Barbier",
       "bio": "Agent sportif expérimenté accompagnant des talents européens.",
       "is_self_represented": false,
       "created_at": "2025-01-16T05:15:00Z",
@@ -1805,7 +1785,7 @@
     "fields": {
       "name": "Global Sports Partners",
       "slug": "global-sports-partners",
-      "owner": "dd56d450-f621-436d-84ff-f32f22fe0b84",
+      "owner": null,
       "type": "AGENCY",
       "industry": "Marketing sportif",
       "logo": "",
@@ -1957,7 +1937,7 @@
     "fields": {
       "name": "HexaTech",
       "slug": "hexatech",
-      "owner": "460eca05-309b-4e87-ba77-89960f558b69",
+      "owner": null,
       "type": "STARTUP",
       "industry": "Communication",
       "logo": "",
@@ -2025,7 +2005,7 @@
     "fields": {
       "name": "LuxeMode",
       "slug": "luxemode",
-      "owner": "1719cb06-29f9-491c-a365-43f7e71d13b4",
+      "owner": null,
       "type": "BRAND",
       "industry": "Communication",
       "logo": "",
@@ -2093,7 +2073,7 @@
     "fields": {
       "name": "GreenEnergy",
       "slug": "greenenergy",
-      "owner": "bd502515-115e-438e-9af2-dab6dcac5cf5",
+      "owner": null,
       "type": "SME",
       "industry": "Communication",
       "logo": "",
@@ -2161,7 +2141,7 @@
     "fields": {
       "name": "Alpes Aventures",
       "slug": "alpes-aventures",
-      "owner": "b323b9b6-3b6b-434e-8324-5250cd04ba19",
+      "owner": null,
       "type": "ASSOCIATION",
       "industry": "Communication",
       "logo": "",
@@ -2229,7 +2209,7 @@
     "fields": {
       "name": "Digital Fans",
       "slug": "digital-fans",
-      "owner": "1970b447-dbd4-4a9c-98a6-a579aa85d43f",
+      "owner": null,
       "type": "STARTUP",
       "industry": "Communication",
       "logo": "",
@@ -2297,7 +2277,7 @@
     "fields": {
       "name": "Atelier Gourmand",
       "slug": "atelier-gourmand",
-      "owner": "c0ace607-a914-4a6e-8f31-d58630683323",
+      "owner": null,
       "type": "SME",
       "industry": "Artisanat",
       "logo": "",
@@ -2338,7 +2318,7 @@
     "fields": {
       "name": "Studio Nova",
       "slug": "studio-nova",
-      "owner": "b568b1e9-761d-44c7-a637-0603f3dd4a4d",
+      "owner": null,
       "type": "STARTUP",
       "industry": "Artisanat",
       "logo": "",
@@ -2379,7 +2359,7 @@
     "fields": {
       "name": "Club Urbain",
       "slug": "club-urbain",
-      "owner": "97b9d374-da27-4b3d-8b79-88afd1f8a759",
+      "owner": null,
       "type": "ASSOCIATION",
       "industry": "Artisanat",
       "logo": "",
@@ -2420,7 +2400,7 @@
     "fields": {
       "name": "Maison Riviera",
       "slug": "maison-riviera",
-      "owner": "f003c7aa-b939-4cd1-8899-7b60efd2697e",
+      "owner": null,
       "type": "BRAND",
       "industry": "Artisanat",
       "logo": "",
@@ -2461,7 +2441,7 @@
     "fields": {
       "name": "MediaPulse",
       "slug": "mediapulse",
-      "owner": "af20fac5-d239-4a12-a0eb-d3399c021e56",
+      "owner": null,
       "type": "OTHER",
       "industry": "Artisanat",
       "logo": "",
@@ -5654,6 +5634,284 @@
       "body": "Annotation interne pour préciser les conditions.",
       "created_at": "2025-01-23T14:00:00Z",
       "updated_at": "2025-01-23T14:00:00Z"
+    }
+  },
+  {
+    "model": "analytics.socialplatform",
+    "pk": "3e3eed40-8199-489d-a066-0767e0f7d3a0",
+    "fields": {
+      "name": "instagram",
+      "base_url": "https://www.instagram.com/",
+      "created_at": "2025-01-18T08:00:00Z",
+      "updated_at": "2025-01-18T08:00:00Z"
+    }
+  },
+  {
+    "model": "analytics.athletesocialaccount",
+    "pk": "096ba141-c101-4992-a7f8-d8351cdf91e3",
+    "fields": {
+      "athlete": "0a41790b-b62b-42c9-9466-d95cdd4270c4",
+      "platform": "3e3eed40-8199-489d-a066-0767e0f7d3a0",
+      "username": "alice.dupont.officiel",
+      "external_id": "inst_948273615",
+      "access_token": "ya29.A0AVvZVh-sample-token-instagram",
+      "is_active": true,
+      "created_at": "2025-01-18T08:05:00Z",
+      "updated_at": "2025-01-18T08:05:00Z"
+    }
+  },
+  {
+    "model": "analytics.dailystats",
+    "pk": "e1fd8c19-db96-41c7-a029-f0035ba512e4",
+    "fields": {
+      "account": "096ba141-c101-4992-a7f8-d8351cdf91e3",
+      "date": "2025-01-20",
+      "followers": 15000,
+      "following": 480,
+      "posts_count": 215,
+      "likes": 420,
+      "comments": 95,
+      "shares": 30,
+      "views": 58000,
+      "watch_time": 1230.5,
+      "engagement_rate": 3.6333,
+      "top_post": {
+        "id": "IG-20250119-A",
+        "url": "https://www.instagram.com/p/C4KQ1A1/",
+        "likes": 320,
+        "comments": 45
+      },
+      "created_at": "2025-01-20T06:00:00Z",
+      "updated_at": "2025-01-20T06:00:00Z"
+    }
+  },
+  {
+    "model": "analytics.dailystats",
+    "pk": "0a64fba3-0f56-4e08-8ec1-fc01b169e528",
+    "fields": {
+      "account": "096ba141-c101-4992-a7f8-d8351cdf91e3",
+      "date": "2025-01-21",
+      "followers": 15120,
+      "following": 482,
+      "posts_count": 216,
+      "likes": 460,
+      "comments": 110,
+      "shares": 35,
+      "views": 61000,
+      "watch_time": 1288.2,
+      "engagement_rate": 4.0013,
+      "top_post": {
+        "id": "IG-20250120-B",
+        "url": "https://www.instagram.com/p/C4KZ59h/",
+        "likes": 354,
+        "comments": 58
+      },
+      "created_at": "2025-01-21T06:00:00Z",
+      "updated_at": "2025-01-21T06:00:00Z"
+    }
+  },
+  {
+    "model": "analytics.dailystats",
+    "pk": "995f285f-2585-45e0-bc5d-7e610266fd03",
+    "fields": {
+      "account": "096ba141-c101-4992-a7f8-d8351cdf91e3",
+      "date": "2025-01-22",
+      "followers": 15210,
+      "following": 483,
+      "posts_count": 217,
+      "likes": 505,
+      "comments": 118,
+      "shares": 42,
+      "views": 64500,
+      "watch_time": 1312.7,
+      "engagement_rate": 4.3721,
+      "top_post": {
+        "id": "IG-20250121-C",
+        "url": "https://www.instagram.com/p/C4LQ2s9/",
+        "likes": 389,
+        "comments": 61
+      },
+      "created_at": "2025-01-22T06:00:00Z",
+      "updated_at": "2025-01-22T06:00:00Z"
+    }
+  },
+  {
+    "model": "analytics.dailystats",
+    "pk": "b0d0322b-0ae1-4a90-9db3-8f319d766dde",
+    "fields": {
+      "account": "096ba141-c101-4992-a7f8-d8351cdf91e3",
+      "date": "2025-01-23",
+      "followers": 15340,
+      "following": 485,
+      "posts_count": 218,
+      "likes": 548,
+      "comments": 130,
+      "shares": 48,
+      "views": 67250,
+      "watch_time": 1356.4,
+      "engagement_rate": 4.7327,
+      "top_post": {
+        "id": "IG-20250122-D",
+        "url": "https://www.instagram.com/p/C4L_gZr/",
+        "likes": 410,
+        "comments": 70
+      },
+      "created_at": "2025-01-23T06:00:00Z",
+      "updated_at": "2025-01-23T06:00:00Z"
+    }
+  },
+  {
+    "model": "messaging.thread",
+    "pk": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+    "fields": {
+      "collaborator": "f4c67d33-ef1a-4fc5-8c25-046bc8616ebc",
+      "agent": "9a6970e1-45de-4078-803a-902639953069",
+      "athlete": "0a41790b-b62b-42c9-9466-d95cdd4270c4",
+      "last_message_at": "2025-01-24T10:45:00Z",
+      "created_at": "2025-01-24T08:55:00Z",
+      "updated_at": "2025-01-24T10:45:00Z"
+    }
+  },
+  {
+    "model": "messaging.thread",
+    "pk": "b85af28b-8764-4b12-8310-03859f394cd4",
+    "fields": {
+      "collaborator": "2f0a640c-bea3-45ac-9a99-6e93dd6ce5ac",
+      "agent": "d36a51a0-78a1-4a2c-b108-0287b1efb106",
+      "athlete": "6d0f6dc3-cbbc-43e8-ad65-1b9a31f65ed1",
+      "last_message_at": "2025-01-25T11:20:00Z",
+      "created_at": "2025-01-25T09:10:00Z",
+      "updated_at": "2025-01-25T11:20:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "13b0cb2a-2c72-44aa-9983-29c94962dbf1",
+    "fields": {
+      "thread": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+      "sender": "2594dfcc-f014-42d9-a8bf-7518b7d977a5",
+      "content": "Bonjour Amélie, merci pour votre brief. Souhaitez-vous que nous préparions une proposition complète avant lundi ?",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-24T09:05:00Z",
+      "updated_at": "2025-01-24T09:05:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "2315f094-ad9c-4a80-a5fd-34547e15a9f0",
+    "fields": {
+      "thread": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+      "sender": "dd56d450-f621-436d-84ff-f32f22fe0b84",
+      "content": "Bonjour Thomas, oui s'il vous plaît. Nous avons besoin d'un angle digital orienté athlètes féminines.",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-24T09:12:00Z",
+      "updated_at": "2025-01-24T09:12:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "b645e23a-92ae-4cca-81a1-aa1fe00c6f14",
+    "fields": {
+      "thread": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+      "sender": "2594dfcc-f014-42d9-a8bf-7518b7d977a5",
+      "content": "Parfait, je peux vous partager un premier outline avec Alice et deux autres profils d'ici ce soir.",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-24T09:30:00Z",
+      "updated_at": "2025-01-24T09:30:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "4755217c-d1b3-4173-bd9c-476405fe9b06",
+    "fields": {
+      "thread": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+      "sender": "dd56d450-f621-436d-84ff-f32f22fe0b84",
+      "content": "Super, pensez également à préciser le calendrier média et les formats clés.",
+      "attachment": "",
+      "is_read": false,
+      "created_at": "2025-01-24T10:02:00Z",
+      "updated_at": "2025-01-24T10:02:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "ca199280-2751-4fec-8d25-f70025d1ef3e",
+    "fields": {
+      "thread": "a83d48d0-2ce3-4c8a-a670-001a9ba2bc68",
+      "sender": "2594dfcc-f014-42d9-a8bf-7518b7d977a5",
+      "content": "Noté. Je vous envoie un document structuré avant 18h avec les KPIs pressentis.",
+      "attachment": "",
+      "is_read": false,
+      "created_at": "2025-01-24T10:45:00Z",
+      "updated_at": "2025-01-24T10:45:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "217536e8-3337-47d9-87c2-377dd0349026",
+    "fields": {
+      "thread": "b85af28b-8764-4b12-8310-03859f394cd4",
+      "sender": "460eca05-309b-4e87-ba77-89960f558b69",
+      "content": "Bonjour Thomas, avez-vous pu avancer sur la renégociation pour Bruno ?",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-25T09:15:00Z",
+      "updated_at": "2025-01-25T09:15:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "04f60346-6a65-4d40-8136-d06d7d9c0ac3",
+    "fields": {
+      "thread": "b85af28b-8764-4b12-8310-03859f394cd4",
+      "sender": "b4ee73fb-6552-44e6-aef5-6dd674a67f7d",
+      "content": "Bonjour Claire, oui. Le club est ouvert à prolonger avec un bonus performance, je vous en dis plus dans la journée.",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-25T09:42:00Z",
+      "updated_at": "2025-01-25T09:42:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "b9ba1272-6665-4f72-8b3f-caf17166304d",
+    "fields": {
+      "thread": "b85af28b-8764-4b12-8310-03859f394cd4",
+      "sender": "460eca05-309b-4e87-ba77-89960f558b69",
+      "content": "Excellent. Nous devons intégrer une activation retail en avril, est-ce compatible avec son agenda ?",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-25T10:05:00Z",
+      "updated_at": "2025-01-25T10:05:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "2f472694-1688-49e9-a11b-c3afdab09300",
+    "fields": {
+      "thread": "b85af28b-8764-4b12-8310-03859f394cd4",
+      "sender": "b4ee73fb-6552-44e6-aef5-6dd674a67f7d",
+      "content": "Je viens de vérifier avec Bruno, il est disponible la semaine du 15 avril. Je propose un point commun mardi pour finaliser.",
+      "attachment": "",
+      "is_read": true,
+      "created_at": "2025-01-25T10:37:00Z",
+      "updated_at": "2025-01-25T10:37:00Z"
+    }
+  },
+  {
+    "model": "messaging.message",
+    "pk": "6a6a9a52-03ab-4474-9559-e74925e4430c",
+    "fields": {
+      "thread": "b85af28b-8764-4b12-8310-03859f394cd4",
+      "sender": "460eca05-309b-4e87-ba77-89960f558b69",
+      "content": "Mardi 9h30 me convient, merci pour la réactivité.",
+      "attachment": "",
+      "is_read": false,
+      "created_at": "2025-01-25T11:20:00Z",
+      "updated_at": "2025-01-25T11:20:00Z"
     }
   }
 ]
