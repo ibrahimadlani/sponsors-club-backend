@@ -113,6 +113,28 @@ class TokenObtainPairWithProfileSerializer(TokenObtainPairSerializer):
             plan = getattr(getattr(user, "agent_profile", None), "plan", None)
         if plan is not None:
             token["plan"] = plan
+
+        # Role-based flags
+        try:
+            from athletes.models import Athlete
+            from organisations.models import Collaborator
+        except Exception:  # pragma: no cover - import guards for optional apps
+            Athlete = None  # type: ignore
+            Collaborator = None  # type: ignore
+
+        role = token.get("role")
+        if role == getattr(user.__class__.AccountType, "AGENT", "AGENT"):
+            has_athlete = False
+            if hasattr(user, "agent_profile") and user.agent_profile_id:
+                if Athlete is not None:
+                    has_athlete = Athlete.objects.filter(agent=user.agent_profile).exists()
+            token["agent_has_athlete"] = has_athlete
+
+            # Also check if the same user is linked as collaborator to any organisation
+            is_collaborator = False
+            if Collaborator is not None:
+                is_collaborator = Collaborator.objects.filter(user=user).exists()
+            token["agent_is_collaborator_linked_to_org"] = is_collaborator
         return token
 
 
