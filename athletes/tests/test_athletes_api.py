@@ -1,11 +1,12 @@
 """Integration tests for the athletes API endpoints."""
 
-from datetime import date
+from datetime import date, datetime, time
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.test import APIClient, APIRequestFactory
 
@@ -32,6 +33,12 @@ def sample_image_file(name: str) -> SimpleUploadedFile:
     """Return a minimal in-memory PNG for image uploads in tests."""
 
     return SimpleUploadedFile(name, SMALL_PNG, content_type="image/png")
+
+
+def aware_datetime(value: date) -> datetime:
+    """Return a timezone-aware midnight datetime for the given date."""
+
+    return timezone.make_aware(datetime.combine(value, time.min))
 
 
 @pytest.fixture
@@ -529,8 +536,8 @@ def test_agent_create_athlete_limit_enforced(agent_user, sport):
         agent=agent_user.agent_profile,
         plan=plan,
         status=Subscription.Status.ACTIVE,
-        start_at=date(2025, 1, 1),
-        current_period_end=date(2025, 12, 31),
+        start_at=aware_datetime(date(2025, 1, 1)),
+        current_period_end=aware_datetime(date(2025, 12, 31)),
     )
 
     Athlete.objects.create(
@@ -568,8 +575,8 @@ def test_agent_create_athlete_requires_plan_slot(agent_user, sport):
         agent=agent_user.agent_profile,
         plan=plan,
         status=Subscription.Status.ACTIVE,
-        start_at=date(2025, 1, 1),
-        current_period_end=date(2025, 12, 31),
+        start_at=aware_datetime(date(2025, 1, 1)),
+        current_period_end=aware_datetime(date(2025, 12, 31)),
     )
 
     client = APIClient()

@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 import stripe
+from stripe import InvalidRequestError
 
 from payments.models import Subscription, SubscriptionPlan
 
@@ -200,7 +201,7 @@ def test_checkout_session_creation_recovers_from_missing_product(
             self.data = []
 
     def fake_product_retrieve(product_id):
-        raise stripe.error.InvalidRequestError(
+        raise InvalidRequestError(
             message="No such product",
             param="product",
             code="resource_missing",

@@ -21,8 +21,7 @@ from users.models import AgentProfile
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def organisation_owner(user_model):
+def organisation_owner(user_model, db):
     user = user_model.objects.create_user(
         email="owner@example.com",
         password="pass1234",
@@ -41,8 +40,7 @@ def organisation_owner(user_model):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def subscription_plan():
+def subscription_plan(db):
     return SubscriptionPlan.objects.create(
         code="custom-plan",
         name="Custom Plan",

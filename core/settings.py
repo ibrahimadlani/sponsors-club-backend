@@ -60,6 +60,7 @@ INSTALLED_APPS = [
 ]
 
 DRF_YASG_ENABLED = importlib.util.find_spec("drf_yasg") is not None
+SWAGGER_USE_COMPAT_RENDERERS = False
 if DRF_YASG_ENABLED:
     INSTALLED_APPS.append("drf_yasg")
 
