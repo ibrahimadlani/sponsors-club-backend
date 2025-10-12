@@ -8,7 +8,6 @@ from typing import Any, Dict, Iterable, Optional
 
 from django.apps import apps
 from django.conf import settings as django_settings
-from django.utils import timezone
 
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -429,24 +428,24 @@ def _build_entitlements_map(user, plan_features: Dict[str, Any]) -> dict:
 
     entitlements: Dict[str, Dict[str, Any]] = {}
     statuses = feature_status_for_user(user)
-    for status in statuses:
+    for feature_status in statuses:
         suggestion = None
-        if not status.get("granted") and status.get("recommended_plans"):
-            suggestion = status["recommended_plans"][0]
+        if not feature_status.get("granted") and feature_status.get("recommended_plans"):
+            suggestion = feature_status["recommended_plans"][0]
         entry: Dict[str, Any] = {
-            "granted": bool(status.get("granted")),
+            "granted": bool(feature_status.get("granted")),
             "upgrade_suggestion": suggestion,
         }
         if suggestion:
             entry["suggested_plan"] = suggestion
-        plan_value = plan_features.get(status.get("required_feature"))
+        plan_value = plan_features.get(feature_status.get("required_feature"))
         numeric_value = _coerce_numeric(plan_value)
         if numeric_value is not None:
             entry["limit"] = numeric_value
-        upgrade_url = status.get("upgrade_url")
-        if not status.get("granted") and upgrade_url:
+        upgrade_url = feature_status.get("upgrade_url")
+        if not feature_status.get("granted") and upgrade_url:
             entry["upgrade_url"] = upgrade_url
-        entitlements[status.get("code")] = entry
+        entitlements[feature_status.get("code")] = entry
     return entitlements
 
 
