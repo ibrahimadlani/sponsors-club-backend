@@ -1,10 +1,14 @@
 """Messaging thread creation integration tests."""
 
+from datetime import date
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from athletes.models import Athlete, Sport
+from follows.models import Follow
 from organisations.models import Collaborator
 
 
@@ -89,3 +93,54 @@ def test_collaborator_can_create_thread(owner_user, agent_user):
     response = client.post(url, payload, format="json")
     assert response.status_code == status.HTTP_201_CREATED
     assert Collaborator.objects.filter(user=owner_user).exists()
+
+
+@pytest.mark.django_db
+def test_collaborator_cannot_create_thread_without_follow(owner_user, agent_user):
+    """Collaborators must follow the athlete before opening a thread."""
+
+    sport = Sport.objects.create(name="Basketball")
+    athlete = Athlete.objects.create(
+        sport=sport,
+        agent=agent_user.agent_profile,
+        full_name="Jordan Example",
+        birth_date=date(1990, 1, 1),
+        nationality="FR",
+    )
+    payload = {
+        "agent_id": str(agent_user.agent_profile.id),
+        "athlete_id": str(athlete.id),
+    }
+    client = APIClient()
+    client.force_authenticate(user=owner_user)
+    url = reverse("messaging-thread-list")
+    response = client.post(url, payload, format="json")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "athlete_id" in response.json()
+
+
+@pytest.mark.django_db
+def test_collaborator_can_create_thread_when_following(owner_user, agent_user):
+    """Collaborators who follow the athlete can open a thread."""
+
+    sport = Sport.objects.create(name="Handball")
+    athlete = Athlete.objects.create(
+        sport=sport,
+        agent=agent_user.agent_profile,
+        full_name="Alex Followed",
+        birth_date=date(1995, 5, 5),
+        nationality="FR",
+    )
+    collaborator = Collaborator.objects.filter(user=owner_user).first()
+    assert collaborator is not None
+    Follow.objects.create(collaborator=collaborator, athlete=athlete)
+
+    payload = {
+        "agent_id": str(agent_user.agent_profile.id),
+        "athlete_id": str(athlete.id),
+    }
+    client = APIClient()
+    client.force_authenticate(user=owner_user)
+    url = reverse("messaging-thread-list")
+    response = client.post(url, payload, format="json")
+    assert response.status_code == status.HTTP_201_CREATED

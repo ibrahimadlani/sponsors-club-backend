@@ -1,12 +1,13 @@
 """API tests covering the messaging view layer."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
+from athletes.models import Athlete, Sport
 from messaging.models import Message, Thread
 from organisations.models import Organisation
 from users.models import AgentProfile
@@ -62,6 +63,24 @@ def test_thread_list_returns_threads_for_agent(
         agent=agent_user.agent_profile,
         last_message_at=timezone.now() - timedelta(hours=1),
     )
+    Message.objects.create(
+        thread=recent_thread,
+        sender=collaborator.user,
+        content="Hello agent",
+        is_read=False,
+    )
+    Message.objects.create(
+        thread=recent_thread,
+        sender=agent_user,
+        content="Agent sent but should not count",
+        is_read=False,
+    )
+    Message.objects.create(
+        thread=older_thread,
+        sender=other_collaborator.user,
+        content="Older hello",
+        is_read=False,
+    )
     outsider_user = user_model.objects.create_user(
         email="outsider-agent@test.com",
         password="pass1234",
@@ -85,6 +104,21 @@ def test_thread_list_returns_threads_for_agent(
     payload = response.json()
     ids = [item["id"] for item in payload["results"]]
     assert ids == [str(recent_thread.id), str(older_thread.id)]
+
+    first_thread = payload["results"][0]
+    collaborator_payload = first_thread["collaborator"]
+    assert collaborator_payload["first_name"] == collaborator.user.first_name
+    assert collaborator_payload["last_name"] == collaborator.user.last_name
+    assert collaborator_payload["organisation_name"] == collaborator.organisation.name
+    assert collaborator_payload["avatar"] is None
+
+    agent_payload = first_thread["agent"]
+    assert agent_payload["id"] == str(agent_user.agent_profile.id)
+    assert agent_payload["avatar"] is None
+    assert first_thread["subtitle"] is None
+    assert first_thread["avatar_badge_emoji"] is None
+    assert first_thread["unread_messages_count"] == 1
+    assert payload["unread_messages_total"] == 2
 
 
 @pytest.mark.django_db
@@ -116,6 +150,24 @@ def test_thread_list_returns_threads_for_collaborator(
         collaborator=collaborator,
         agent=other_agent_profile,
     )
+    Message.objects.create(
+        thread=primary_thread,
+        sender=agent_user,
+        content="Primary unread message",
+        is_read=False,
+    )
+    Message.objects.create(
+        thread=secondary_thread,
+        sender=other_agent_profile.user,
+        content="Secondary unread message",
+        is_read=False,
+    )
+    Message.objects.create(
+        thread=primary_thread,
+        sender=owner,
+        content="Collaborator sent but should not count",
+        is_read=False,
+    )
 
     api_client.force_authenticate(user=owner)
     url = reverse("messaging-thread-list")
@@ -126,6 +178,59 @@ def test_thread_list_returns_threads_for_collaborator(
     ids = [item["id"] for item in payload["results"]]
     assert ids[0] == str(primary_thread.id)
     assert set(ids) == {str(primary_thread.id), str(secondary_thread.id)}
+
+    first_thread = payload["results"][0]
+    assert first_thread["subtitle"] == f"Représenté par {agent_user.agent_profile.name}"
+    assert first_thread["avatar_badge_emoji"] is None
+    assert first_thread["unread_messages_count"] == 1
+    assert payload["unread_messages_total"] == 2
+
+
+@pytest.mark.django_db
+def test_thread_list_includes_athlete_and_sport_metadata(
+    api_client, organisations_setup, agent_user
+):
+    """Thread listings expose athlete avatar and sport metadata when linked."""
+
+    collaborator = organisations_setup["collaborator"]
+    sport = Sport.objects.create(name="Football", emoji="⚽")
+    athlete = Athlete.objects.create(
+        sport=sport,
+        agent=agent_user.agent_profile,
+        full_name="Elite Player",
+        birth_date=date(2000, 1, 1),
+        nationality="FR",
+    )
+    thread = Thread.objects.create(
+        collaborator=collaborator,
+        agent=agent_user.agent_profile,
+        athlete=athlete,
+        last_message_at=timezone.now(),
+    )
+    Message.objects.create(
+        thread=thread,
+        sender=collaborator.user,
+        content="Hello sport",
+        is_read=True,
+    )
+
+    api_client.force_authenticate(user=agent_user)
+    url = reverse("messaging-thread-list")
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    result = payload["results"][0]
+    athlete_payload = result["athlete"]
+    assert athlete_payload["id"] == str(athlete.id)
+    assert athlete_payload["sport_id"] == str(sport.id)
+    assert athlete_payload["sport_name"] == sport.name
+    assert athlete_payload["sport_emoji"] == sport.emoji
+    assert athlete_payload["avatar"] is None
+    assert result["avatar_badge_emoji"] == sport.emoji
+    assert result["subtitle"] is None
+    assert result["unread_messages_count"] == 0
+    assert payload["unread_messages_total"] == 0
 
 
 @pytest.mark.django_db

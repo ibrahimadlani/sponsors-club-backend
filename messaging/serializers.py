@@ -11,11 +11,27 @@ from django.db import transaction
 from rest_framework import serializers
 
 from athletes.models import Athlete
+from follows.models import Follow
 from organisations.models import Collaborator
 from users.models import AgentProfile
 
 from .constants import THREAD_PARTICIPANT_COLUMNS
 from .models import Message, Thread
+
+
+def _safe_media_url(value):
+    """Return a URL or file name for a media value when available."""
+
+    if not value:
+        return None
+    if hasattr(value, "url"):
+        try:
+            return value.url
+        except ValueError:
+            return value.name
+    if isinstance(value, str):
+        return value
+    return None
 
 
 class CollaboratorSummarySerializer(serializers.ModelSerializer):
@@ -25,12 +41,50 @@ class CollaboratorSummarySerializer(serializers.ModelSerializer):
     context to render collaborator information in a client UI.
     """
 
+    first_name = serializers.CharField(
+        source="user.first_name", read_only=True, allow_blank=True
+    )
+    last_name = serializers.CharField(
+        source="user.last_name", read_only=True, allow_blank=True
+    )
+    organisation_name = serializers.CharField(
+        source="organisation.name", read_only=True
+    )
+    avatar = serializers.SerializerMethodField()
+
     class Meta:
         """Serializer configuration."""
 
         model = Collaborator
-        fields = ("id", "organisation_id", "role")
+        fields = (
+            "id",
+            "organisation_id",
+            "role",
+            "first_name",
+            "last_name",
+            "organisation_name",
+            "avatar",
+        )
         ref_name = "MessagingCollaboratorSummary"
+
+    def get_avatar(self, obj):
+        """Return the collaborator avatar when a media file is linked."""
+
+        user = getattr(obj, "user", None)
+        if user is None:
+            return None
+
+        direct_avatar = getattr(user, "avatar", None)
+        if direct_avatar:
+            media_url = _safe_media_url(direct_avatar)
+            if media_url:
+                return media_url
+
+        avatar_method = getattr(user, "get_avatar_url", None)
+        if callable(avatar_method):
+            return avatar_method()
+
+        return None
 
 
 class AgentProfileSummarySerializer(serializers.ModelSerializer):
@@ -43,13 +97,37 @@ class AgentProfileSummarySerializer(serializers.ModelSerializer):
 
     name = serializers.CharField(read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
         """Serializer configuration."""
 
         model = AgentProfile
-        fields = ("id", "name", "user_email", "is_self_represented")
+        fields = ("id", "name", "user_email", "is_self_represented", "avatar")
         ref_name = "MessagingAgentSummary"
+
+    def get_avatar(self, obj):
+        """Return the agent profile avatar when available."""
+
+        direct_avatar = getattr(obj, "avatar", None)
+        media_url = _safe_media_url(direct_avatar)
+        if media_url:
+            return media_url
+
+        user = getattr(obj, "user", None)
+        if user is None:
+            return None
+
+        user_avatar = getattr(user, "avatar", None)
+        media_url = _safe_media_url(user_avatar)
+        if media_url:
+            return media_url
+
+        avatar_method = getattr(user, "get_avatar_url", None)
+        if callable(avatar_method):
+            return avatar_method()
+
+        return None
 
 
 class AthleteSummarySerializer(serializers.ModelSerializer):
@@ -59,11 +137,16 @@ class AthleteSummarySerializer(serializers.ModelSerializer):
     sticks to three columns to avoid needless database joins in consumers.
     """
 
+    sport_name = serializers.CharField(source="sport.name", read_only=True)
+    sport_emoji = serializers.CharField(
+        source="sport.emoji", read_only=True, allow_null=True, allow_blank=True
+    )
+
     class Meta:
         """Serializer configuration."""
 
         model = Athlete
-        fields = ("id", "full_name", "sport_id")
+        fields = ("id", "full_name", "sport_id", "sport_name", "sport_emoji", "avatar")
         ref_name = "MessagingAthleteSummary"
 
 
@@ -77,13 +160,63 @@ class ThreadSerializer(serializers.ModelSerializer):
     collaborator = CollaboratorSummarySerializer(read_only=True)
     agent = AgentProfileSummarySerializer(read_only=True)
     athlete = AthleteSummarySerializer(read_only=True)
+    subtitle = serializers.SerializerMethodField()
+    avatar_badge_emoji = serializers.SerializerMethodField()
+    unread_messages_count = serializers.SerializerMethodField()
 
     class Meta:
         """Serializer configuration."""
 
         model = Thread
-        fields = ("id", *THREAD_PARTICIPANT_COLUMNS, "updated_at")
+        fields = (
+            "id",
+            *THREAD_PARTICIPANT_COLUMNS,
+            "updated_at",
+            "unread_messages_count",
+            "subtitle",
+            "avatar_badge_emoji",
+        )
         read_only_fields = fields
+
+    def get_subtitle(self, obj):
+        """Return the subtitle depending on the requesting user's role."""
+
+        request = self.context.get("request")
+        if not request:
+            return None
+
+        user = getattr(request, "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            return None
+
+        collaborator = getattr(obj, "collaborator", None)
+        if collaborator and collaborator.user_id == getattr(user, "id", None):
+            agent = getattr(obj, "agent", None)
+            agent_name = getattr(agent, "name", None)
+            if agent_name:
+                return f"Représenté par {agent_name}"
+        return None
+
+    def get_avatar_badge_emoji(self, obj):
+        """Expose the sport emoji to render as an avatar badge when available."""
+
+        athlete = getattr(obj, "athlete", None)
+        if not athlete:
+            return None
+        sport = getattr(athlete, "sport", None)
+        emoji = getattr(sport, "emoji", None)
+        return emoji or None
+
+    def get_unread_messages_count(self, obj):
+        """Return the unread message count annotated on the thread."""
+
+        value = getattr(obj, "unread_messages_count", None)
+        if value is None:
+            return 0
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
 
 class ThreadCreateSerializer(serializers.Serializer):
@@ -162,6 +295,20 @@ class ThreadCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "User must represent either the collaborator or the agent."
             )
+
+        if (
+            athlete is not None
+            and collaborator is not None
+            and user.id == collaborator.user_id
+        ):
+            follows_athlete = Follow.objects.filter(
+                collaborator=collaborator,
+                athlete=athlete,
+            ).exists()
+            if not follows_athlete:
+                raise serializers.ValidationError(
+                    {"athlete_id": "Collaborateur doit suivre cet athlète pour démarrer une conversation."}
+                )
 
         attrs["collaborator"] = collaborator
         attrs["agent"] = agent

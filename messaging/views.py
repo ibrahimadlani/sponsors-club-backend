@@ -5,7 +5,7 @@ contains viewsets and API views that orchestrate authentication checks,
 pagination concerns, and serializer interactions for threads and messages.
 """
 
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from rest_framework import permissions, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -65,6 +65,7 @@ class ThreadViewSet(viewsets.GenericViewSet):
         """
 
         user = self.request.user
+        user = self.request.user
         return (
             Thread.objects.select_related(
                 "collaborator__organisation",
@@ -73,6 +74,12 @@ class ThreadViewSet(viewsets.GenericViewSet):
                 "athlete__sport",
             )
             .filter(Q(collaborator__user=user) | Q(agent__user=user))
+            .annotate(
+                unread_messages_count=Count(
+                    "messages",
+                    filter=Q(messages__is_read=False) & ~Q(messages__sender=user),
+                )
+            )
             .order_by("-last_message_at", "-created_at")
         )
 
@@ -92,9 +99,19 @@ class ThreadViewSet(viewsets.GenericViewSet):
         del args, kwargs
 
         queryset = self.get_queryset()
+        totals = queryset.aggregate(
+            unread_messages_total=Sum("unread_messages_count")
+        )
+        total_unread = totals.get("unread_messages_total") or 0
         page = self.paginate_queryset(queryset)
-        serializer = ThreadSerializer(page, many=True)
-        return self.get_paginated_response(serializer.data)
+        serializer = ThreadSerializer(
+            page,
+            many=True,
+            context={"request": request},
+        )
+        response = self.get_paginated_response(serializer.data)
+        response.data["unread_messages_total"] = total_unread
+        return response
 
     def create(self, request, *args, **kwargs):
         """Create a messaging thread after validating entitlement.
@@ -136,7 +153,10 @@ class ThreadViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         thread = serializer.save()
-        output = ThreadSerializer(thread)
+        output = ThreadSerializer(
+            thread,
+            context={"request": request},
+        )
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 

@@ -204,6 +204,15 @@ _env_cors_origins = [
 CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
 CORS_ALLOW_CREDENTIALS = True
 
+_env_csrf_origins = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+# Mirror allowed CORS origins so frontend hosts using cookies pass CSRF checks.
+CSRF_TRUSTED_ORIGINS = list({*CORS_ALLOWED_ORIGINS, *_env_csrf_origins})
+
 # Copy CORS hostnames into ALLOWED_HOSTS so websocket origin checks match.
 _cors_hosts = {
     parsed.hostname
