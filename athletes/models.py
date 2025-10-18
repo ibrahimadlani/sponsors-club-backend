@@ -130,8 +130,17 @@ class Athlete(BaseModel):
     full_name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     birth_date = models.DateField()
-    nationality = models.CharField(max_length=100)
-    country = models.CharField(max_length=100, blank=True, default="")
+    nationality = models.CharField(
+        max_length=2,
+        blank=True,
+        help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+    )
+    country = models.CharField(
+        max_length=2,
+        blank=True,
+        default="",
+        help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+    )
     city = models.CharField(max_length=255, blank=True, default="")
     bio = models.TextField(blank=True)
     social_links = models.JSONField(default=dict, blank=True)

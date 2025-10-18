@@ -19,9 +19,13 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "avatar",
             "phone_country_code",
             "phone_number",
             "date_of_birth",
+            "country",
+            "language",
+            "gender",
             "email_verified",
             "account_type",
             "is_active",
@@ -37,6 +41,30 @@ class UserSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Country code must contain only letters."
+            )
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -57,12 +85,40 @@ class RegisterSerializer(serializers.ModelSerializer):
             "account_type",
             "first_name",
             "last_name",
+            "avatar",
             "is_self_represented",
             "phone_country_code",
             "phone_number",
             "date_of_birth",
+            "country",
+            "language",
+            "gender",
         )
         read_only_fields = ("id",)
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Country code must contain only letters."
+            )
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
 
     @transaction.atomic
     def create(self, validated_data):
@@ -94,11 +150,39 @@ class MeUpdateSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "avatar",
             "phone_country_code",
             "phone_number",
             "date_of_birth",
+            "country",
+            "language",
+            "gender",
             "is_self_represented",
         )
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Country code must contain only letters."
+            )
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
 
     def update(self, instance, validated_data):
         """Update the user object and related agent profile when needed."""

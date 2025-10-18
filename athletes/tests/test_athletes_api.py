@@ -167,7 +167,7 @@ def test_athlete_serializer_create_success(agent_user, sport):
             "full_name": "Jane Doe",
             "birth_date": "1995-05-05",
             "nationality": "US",
-            "country": "United States",
+            "country": "US",
             "city": "New York",
             "bio": "Bio text",
             "social_links": {"twitter": "jane_doe"},
@@ -180,7 +180,7 @@ def test_athlete_serializer_create_success(agent_user, sport):
     assert athlete.agent == agent_user.agent_profile
     assert athlete.sport == sport
     assert athlete.full_name == "Jane Doe"
-    assert athlete.country == "United States"
+    assert athlete.country == "US"
     assert athlete.city == "New York"
     assert list(athlete.disciplines.order_by('name').values_list('name', flat=True)) == ["Professional 5v5", "Streetball"]
 
@@ -196,7 +196,7 @@ def test_athlete_serializer_adds_gallery_photos(agent_user, sport):
             "full_name": "Media Athlete",
             "birth_date": "1992-03-03",
             "nationality": "FR",
-            "country": "France",
+            "country": "FR",
             "city": "Paris",
             "new_photos": [
                 sample_image_file("gallery1.png"),
@@ -278,11 +278,15 @@ def test_athlete_public_serializer(athlete):
     assert data["disciplines"] == []
     assert data["card_photos"] == []
     assert data["gallery_photos"] == []
+    assert "agent" in data
+    assert data["agent"]["id"] == str(athlete.agent.id)
+    assert data["agent"]["name"] == str(athlete.agent.user)
+    assert data["agent"]["email"] == athlete.agent.user.email
 
 
 @pytest.mark.django_db
 def test_athlete_public_serializer_card_photos(athlete):
-    athlete.country = "France"
+    athlete.country = "FR"
     athlete.city = "Paris"
     athlete.save(update_fields=["country", "city", "updated_at"])
     for index in range(4):
@@ -292,7 +296,7 @@ def test_athlete_public_serializer_card_photos(athlete):
             position=index,
         )
     data = AthletePublicSerializer(athlete).data
-    assert data["country"] == "France"
+    assert data["country"] == "FR"
     assert data["city"] == "Paris"
     assert len(data["card_photos"]) == 3
     assert all(photo_path.endswith(".png") for photo_path in data["card_photos"])

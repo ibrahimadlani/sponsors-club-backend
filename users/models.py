@@ -64,9 +64,17 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         AGENT = "AGENT", _("Agent")
         COLLABORATOR = "COLLABORATOR", _("Collaborator")
 
+    class Gender(models.TextChoices):
+        MALE = "MALE", _("Homme")
+        FEMALE = "FEMALE", _("Femme")
+        NON_BINARY = "NON_BINARY", _("Non-binaire")
+
     email = models.EmailField(_("email address"), unique=True)
     first_name = models.CharField(_("first name"), max_length=150, blank=True)
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
+    avatar = models.ImageField(
+        _("avatar"), upload_to="user_avatars/", blank=True, null=True
+    )
     phone_country_code = models.CharField(
         _("phone country code"), max_length=8, blank=True, null=True
     )
@@ -74,6 +82,26 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         _("phone number"), max_length=32, blank=True, null=True
     )
     date_of_birth = models.DateField(_("date of birth"), blank=True, null=True)
+    country = models.CharField(
+        _("country"),
+        max_length=2,
+        blank=True,
+        help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+    )
+    language = models.CharField(
+        _("language"),
+        max_length=2,
+        blank=True,
+        default="fr",
+        help_text="ISO 639-1 language code (e.g., fr, en, es)",
+    )
+    gender = models.CharField(
+        _("gender"),
+        max_length=20,
+        choices=Gender.choices,
+        blank=True,
+        null=True,
+    )
     email_verified = models.BooleanField(_("email verified"), default=False)
     password_hash = models.CharField(_("password hash"), max_length=128, blank=True)
     is_active = models.BooleanField(_("active"), default=True)

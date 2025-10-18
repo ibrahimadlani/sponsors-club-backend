@@ -57,11 +57,21 @@ class AthletePhotoSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at")
 
 
+class AgentPublicSerializer(serializers.Serializer):
+    """Expose public agent information for athlete profiles."""
+
+    id = serializers.UUIDField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    avatar = serializers.ImageField(source="user.avatar", read_only=True)
+
+
 class AthletePublicSerializer(serializers.ModelSerializer):
     """Expose a limited athlete payload for public endpoints."""
 
     sport = SportSerializer(read_only=True)
     disciplines = SportDisciplineSerializer(many=True, read_only=True)
+    agent = AgentPublicSerializer(read_only=True)
     card_photos = serializers.SerializerMethodField()
     gallery_photos = AthletePhotoSerializer(source="photos", many=True, read_only=True)
 
@@ -76,6 +86,7 @@ class AthletePublicSerializer(serializers.ModelSerializer):
             "sport",
             "disciplines",
             "nationality",
+            "agent",
             "followers_count_cached",
             "engagement_rate_cached",
             "avatar",
@@ -245,6 +256,30 @@ class AthleteSerializer(serializers.ModelSerializer):
                     }
                 )
         return attrs
+
+    def validate_nationality(self, value):
+        """Validate that nationality is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Nationality must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Nationality code must contain only letters."
+            )
+        return value.upper() if value else value
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Country code must contain only letters."
+            )
+        return value.upper() if value else value
 
     def create(self, validated_data):
         """Create a new athlete while enforcing subscription limits.

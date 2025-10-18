@@ -205,6 +205,9 @@ _env_cors_origins = [
 CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF trusted origins must match CORS origins for secure cross-origin requests
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
 # Copy CORS hostnames into ALLOWED_HOSTS so websocket origin checks match.
 _cors_hosts = {
     parsed.hostname
