@@ -6,6 +6,9 @@ set -e
 # Run commands from the Django project root inside the container.
 cd /app/
 
+# Ensure the database is available before running migrations.
+/py/bin/python manage.py wait_for_db
+
 # Generate any new migration files and apply outstanding migrations.
 /py/bin/python manage.py makemigrations
 /py/bin/python manage.py migrate --noinput
