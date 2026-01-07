@@ -116,6 +116,10 @@ class OrganisationCreateSerializer(serializers.ModelSerializer):
                     ]
                 }
             )
+        if not user.is_staff and Collaborator.objects.filter(user=user).exists():
+            raise serializers.ValidationError(
+                {"non_field_errors": ["User already belongs to an organisation."]}
+            )
         organisation = Organisation.objects.create(
             **validated_data,
         )
@@ -226,6 +230,7 @@ class OrganisationInviteSerializer(serializers.ModelSerializer):
     """Expose invitation metadata for organisation owners."""
 
     created_by = serializers.CharField(source="created_by.user.email", read_only=True)
+    status = serializers.ReadOnlyField()
 
     class Meta:
         model = OrganisationInvite
@@ -237,6 +242,7 @@ class OrganisationInviteSerializer(serializers.ModelSerializer):
             "used_at",
             "created_at",
             "created_by",
+            "status",
         )
         read_only_fields = fields
 
@@ -275,19 +281,30 @@ class OrganisationJoinSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         code = attrs["code"].strip().upper()
+        attrs["code"] = code  # Store normalized code
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        code = validated_data["code"]
+        job_title = validated_data.get("job_title") or "Member"
+        user = self.context["request"].user
+
+        # Lock the invite row to prevent race conditions
         try:
-            invite = OrganisationInvite.objects.select_related("organisation").get(
-                code=code
-            )
+            invite = OrganisationInvite.objects.select_for_update().select_related(
+                "organisation"
+            ).get(code=code)
         except OrganisationInvite.DoesNotExist as exc:
             raise serializers.ValidationError({"code": "Invalid invitation code."}) from exc
 
+        # Validate within the transaction after locking
         if invite.is_used:
             raise serializers.ValidationError({"code": "Invitation has already been used."})
         if invite.expires_at < timezone.now():
             raise serializers.ValidationError({"code": "Invitation has expired."})
 
-        user = self.context["request"].user
+        # Validate user account type
         if (
             getattr(user, "account_type", None)
             != user.AccountType.COLLABORATOR
@@ -296,25 +313,17 @@ class OrganisationJoinSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"code": "Only collaborator accounts may join organisations."}
             )
+
+        # Check if user already belongs to an organisation
         if Collaborator.objects.filter(user=user).exists():
             raise serializers.ValidationError(
                 {"code": "User already belongs to an organisation."}
             )
 
-        attrs["invite"] = invite
-        attrs["organisation"] = invite.organisation
-        return attrs
-
-    @transaction.atomic
-    def create(self, validated_data):
-        invite: OrganisationInvite = validated_data["invite"]
-        organisation: Organisation = validated_data["organisation"]
-        job_title = validated_data.get("job_title") or "Member"
-        user = self.context["request"].user
-
+        # Create collaborator and mark invite as used
         collaborator = Collaborator.objects.create(
             user=user,
-            organisation=organisation,
+            organisation=invite.organisation,
             role=Collaborator.Role.MEMBER,
             job_title=job_title,
         )

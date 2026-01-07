@@ -15,7 +15,7 @@ from core.permissions import (
 from .models import Collaborator, Organisation
 from .permissions import (
     IsAuthenticatedCollaborator,
-    IsCollaboratorAccount,
+    IsOrganisationCreator,
     IsOrganisationOwner,
 )
 from .serializers import (
@@ -30,6 +30,7 @@ from .serializers import (
     OrganisationSerializer,
     OwnershipTransferSerializer,
 )
+from .throttling import InviteCreateThrottle, InviteJoinThrottle
 
 
 class OrganisationViewSet(
@@ -60,14 +61,16 @@ class OrganisationViewSet(
     def get_permissions(self):
         """Return action-specific permission instances."""
         action_permissions = {
-            "create": self._organisation_account_permissions,
-            "list": self._organisation_account_permissions,
+            "create": self._organisation_create_permissions,
+            "list": self._staff_permissions,
+            "retrieve": self._collaborator_permissions,
             "update": self._owner_permissions,
             "partial_update": self._owner_permissions,
             "collaborators": self._collaborator_permissions,
             "add_collaborator": self._collaborator_permissions,
             "remove_collaborator": lambda: [permissions.IsAuthenticated()],
             "invites": self._owner_permissions,
+            "revoke_invite": self._owner_permissions,
             "transfer_ownership": self._owner_permissions,
             "update_job_title": lambda: [permissions.IsAuthenticated()],
         }
@@ -195,6 +198,12 @@ class OrganisationViewSet(
     def invites(self, request, *_args, **_kwargs):
         """List or create invitation codes for the organisation."""
 
+        # Apply throttling for POST requests (creation)
+        if request.method.lower() == "post":
+            throttle = InviteCreateThrottle()
+            if not throttle.allow_request(request, self):
+                self.throttled(request, throttle.wait())
+
         organisation = self._get_organisation()
         owner_collaborator = Collaborator.objects.filter(
             organisation=organisation,
@@ -231,9 +240,64 @@ class OrganisationViewSet(
                 status=status.HTTP_201_CREATED,
             )
 
-        invites = organisation.invites.order_by("-created_at")
+        # Handle filtering by status
+        status_filter = request.query_params.get("status", None)
+        invites = organisation.invites.all()
+
+        if status_filter == "active":
+            invites = invites.active()
+        elif status_filter == "expired":
+            invites = invites.expired()
+        elif status_filter == "used":
+            invites = invites.used()
+
+        invites = invites.order_by("-created_at")
         serializer = OrganisationInviteSerializer(invites, many=True)
         return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="invites/(?P<invite_id>[^/.]+)",
+    )
+    def revoke_invite(self, request, pk=None, invite_id=None):
+        """Revoke/delete an invitation code."""
+        organisation = self._get_organisation()
+
+        # Check if user is owner
+        if not Collaborator.objects.filter(
+            organisation=organisation,
+            user=request.user,
+            role=Collaborator.Role.OWNER,
+        ).exists():
+            return Response(
+                {"detail": "Only organisation owners can revoke invitations."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Fetch the invite
+        try:
+            from .models import OrganisationInvite
+
+            invite = OrganisationInvite.objects.get(
+                id=invite_id,
+                organisation=organisation,
+            )
+        except OrganisationInvite.DoesNotExist:
+            return Response(
+                {"detail": "Invitation not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Optionally prevent deletion of already used invites
+        if invite.is_used:
+            return Response(
+                {"detail": "Cannot revoke an invitation that has already been used."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invite.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=True,
@@ -331,15 +395,20 @@ class OrganisationViewSet(
         self._get_organisation()
         return [permissions.IsAuthenticated(), IsAuthenticatedCollaborator()]
 
-    def _organisation_account_permissions(self):
-        """Return permissions for list operations restricted to collaborator accounts."""
-        return [permissions.IsAuthenticated(), IsCollaboratorAccount()]
+    def _organisation_create_permissions(self):
+        """Return permissions for create operations restricted to eligible users."""
+        return [permissions.IsAuthenticated(), IsOrganisationCreator()]
+
+    def _staff_permissions(self):
+        """Return permissions restricted to staff members."""
+        return [permissions.IsAdminUser()]
 
 
 class OrganisationJoinView(APIView):
     """Allow collaborators to join an organisation using an invitation code."""
 
     permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = (InviteJoinThrottle,)
 
     def post(self, request, *_args, **_kwargs):
         serializer = OrganisationJoinSerializer(
