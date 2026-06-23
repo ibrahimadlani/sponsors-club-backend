@@ -446,7 +446,48 @@ def test_legal_verification_and_signing_flow(
     agent_client,
     staff_client,
     created_contract,
+    organisations_setup,
 ):
+    from datetime import date, timedelta
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from contracts.models import RepresentationMandate
+    from athletes.models import Sport, Athlete
+
+    # Phase 2: Create required mandates for signature
+    # Create agent mandate
+    sport, _ = Sport.objects.get_or_create(name="Football", defaults={"emoji": "⚽"})
+    athlete = Athlete.objects.create(
+        sport=sport,
+        agent=created_contract.agent,
+        full_name="Test Athlete",
+        birth_date=date(1995, 1, 1),
+        nationality="FRA",
+    )
+
+    RepresentationMandate.objects.create(
+        agent=created_contract.agent,
+        athlete=athlete,
+        document=SimpleUploadedFile(
+            "agent_mandate.pdf", b"content", content_type="application/pdf"
+        ),
+        verified=True,
+        valid_from=date.today() - timedelta(days=30),
+        valid_until=date.today() + timedelta(days=365),
+    )
+
+    # Create collaborator mandate
+    collaborator = organisations_setup["collaborator"]
+    RepresentationMandate.objects.create(
+        collaborator=collaborator,
+        organisation=created_contract.organisation,
+        document=SimpleUploadedFile(
+            "collab_mandate.pdf", b"content", content_type="application/pdf"
+        ),
+        verified=True,
+        valid_from=date.today() - timedelta(days=30),
+        valid_until=date.today() + timedelta(days=365),
+    )
+
     status_url = reverse("contract-change-status", args=[created_contract.id])
     owner_client.patch(
         status_url, {"status": Contract.Status.NEGOTIATION}, format="json"
