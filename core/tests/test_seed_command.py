@@ -27,9 +27,7 @@ def test_seed_command_populates_requested_entities():
     baseline_athletes = Athlete.objects.count()
     baseline_accounts = AthleteSocialAccount.objects.count()
     baseline_stats = DailyStats.objects.count()
-    baseline_platforms = set(
-        SocialPlatform.objects.values_list("name", flat=True)
-    )
+    baseline_platforms = set(SocialPlatform.objects.values_list("name", flat=True))
 
     call_command(
         "seed",
@@ -42,10 +40,7 @@ def test_seed_command_populates_requested_entities():
     )
 
     message = output.getvalue().strip().splitlines()[-1]
-    assert (
-        message
-        == "Seed completed: 2 agents, 1 organisations, 2 sports, 3 athletes."
-    )
+    assert message == "Seed completed: 2 agents, 1 organisations, 2 sports, 3 athletes."
 
     assert AgentProfile.objects.count() == baseline_agents + 2
     assert Organisation.objects.count() == baseline_organisations + 1
@@ -59,9 +54,7 @@ def test_seed_command_populates_requested_entities():
     assert DailyStats.objects.count() == baseline_stats + (3 * 5)
 
     expected_platforms = {choice for choice, _ in SocialPlatform.Platform.choices}
-    current_platforms = set(
-        SocialPlatform.objects.values_list("name", flat=True)
-    )
+    current_platforms = set(SocialPlatform.objects.values_list("name", flat=True))
     assert expected_platforms.issubset(baseline_platforms | current_platforms)
 
     for athlete in Athlete.objects.all():

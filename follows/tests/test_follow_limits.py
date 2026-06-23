@@ -40,7 +40,9 @@ def fixture_follow_athlete(agent_user):
         Athlete: Persisted athlete ready to be followed in tests.
     """
 
-    sport = Sport.objects.create(name="Follow Sport", category=Sport.Category.INDIVIDUAL)
+    sport = Sport.objects.create(
+        name="Follow Sport", category=Sport.Category.INDIVIDUAL
+    )
     SportDiscipline.objects.create(
         sport=sport,
         name="Individual Competition",

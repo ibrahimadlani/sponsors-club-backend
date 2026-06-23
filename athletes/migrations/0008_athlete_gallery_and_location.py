@@ -7,7 +7,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("athletes", "0007_update_sportdiscipline_ordering"),
     ]

@@ -156,7 +156,9 @@ def test_notification_read_view_enforces_feature_requirement(api_client, agent_u
     denial = response.json()
     assert denial["required_feature"] == "notification_center"
     requirement = FEATURE_MATRIX["agent"]["notification_center"]
-    expected_detail = requirement.denied_message or "Upgrade required to access notifications."
+    expected_detail = (
+        requirement.denied_message or "Upgrade required to access notifications."
+    )
     assert denial["detail"] == expected_detail
     allowed_values = denial["allowed_values"]
     if allowed_values is not None:

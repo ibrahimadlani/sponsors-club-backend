@@ -129,8 +129,22 @@ def test_top_post_returns_none_when_missing():
 
 def test_top_post_returns_best():
     stats = [
-        _stub_stat(top_post={"post_id": "1", "engagement_rate": 2.1, "likes": 10, "comments": 1}),
-        _stub_stat(top_post={"post_id": "2", "engagement_rate": 3.6, "likes": 12, "comments": 2}),
+        _stub_stat(
+            top_post={
+                "post_id": "1",
+                "engagement_rate": 2.1,
+                "likes": 10,
+                "comments": 1,
+            }
+        ),
+        _stub_stat(
+            top_post={
+                "post_id": "2",
+                "engagement_rate": 3.6,
+                "likes": 12,
+                "comments": 2,
+            }
+        ),
     ]
     best = reports.top_post(stats)
     assert best["post_id"] == "2"
@@ -166,8 +180,20 @@ def test_collect_platform_metrics(account, stats):
 @pytest.mark.django_db
 def test_summarise_totals_calculates_averages():
     metrics = {
-        "Instagram": {"followers": 100.0, "engagement_rate": 2.2, "posts_count": 5.0, "likes": 50.0, "comments": 4.0},
-        "TikTok": {"followers": 150.0, "engagement_rate": 1.8, "posts_count": 3.0, "likes": 30.0, "comments": 2.0},
+        "Instagram": {
+            "followers": 100.0,
+            "engagement_rate": 2.2,
+            "posts_count": 5.0,
+            "likes": 50.0,
+            "comments": 4.0,
+        },
+        "TikTok": {
+            "followers": 150.0,
+            "engagement_rate": 1.8,
+            "posts_count": 3.0,
+            "likes": 30.0,
+            "comments": 2.0,
+        },
     }
     totals = reports.summarise_totals(metrics)
     assert totals["followers"] == 250.0

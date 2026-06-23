@@ -69,8 +69,7 @@ def send_email(message: EmailMessage) -> None:
 
     destination = {"ToAddresses": list(message.to_addresses)}
     tag_list = [
-        {"Name": tag_name, "Value": tag_value}
-        for tag_name, tag_value in message.tags
+        {"Name": tag_name, "Value": tag_value} for tag_name, tag_value in message.tags
     ]
 
     request: dict[str, object] = {

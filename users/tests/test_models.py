@@ -23,7 +23,9 @@ def test_user_save_normalises_blank_phone_fields(user_model):
 
 @pytest.mark.django_db
 def test_agent_profile_str_falls_back_to_user_email(user_model):
-    user = user_model.objects.create_user(email="fallback@example.com", password="pass1234")
+    user = user_model.objects.create_user(
+        email="fallback@example.com", password="pass1234"
+    )
     profile = AgentProfile.objects.create(user=user)
 
     assert str(profile) == str(user)
@@ -32,7 +34,9 @@ def test_agent_profile_str_falls_back_to_user_email(user_model):
 
 @pytest.mark.django_db
 def test_email_verification_token_verify_rejects_expired_token(user_model):
-    user = user_model.objects.create_user(email="expire@example.com", password="pass1234")
+    user = user_model.objects.create_user(
+        email="expire@example.com", password="pass1234"
+    )
     raw_token = EmailVerificationToken.issue_for_user(user)
 
     token = EmailVerificationToken.objects.get(user=user)

@@ -131,7 +131,9 @@ class TokenObtainPairWithProfileSerializer(TokenObtainPairSerializer):
         if role == getattr(user.__class__.AccountType, "AGENT", "AGENT"):
             for key, value in _build_agent_claims(user).items():
                 token[key] = value
-        elif role == getattr(user.__class__.AccountType, "COLLABORATOR", "COLLABORATOR"):
+        elif role == getattr(
+            user.__class__.AccountType, "COLLABORATOR", "COLLABORATOR"
+        ):
             for key, value in _build_collaborator_claims(user).items():
                 token[key] = value
         else:
@@ -214,7 +216,9 @@ def _build_agent_claims(user) -> dict:
         }
 
     subscription = get_active_agent_subscription(user)
-    plan_obj = subscription.plan if subscription else _get_subscription_plan("agent-free")
+    plan_obj = (
+        subscription.plan if subscription else _get_subscription_plan("agent-free")
+    )
     plan_features = _merge_feature_defaults(
         get_agent_plan_features(user),
         DEFAULT_AGENT_FEATURES,
@@ -226,7 +230,9 @@ def _build_agent_claims(user) -> dict:
         getattr(plan_obj, "max_collaborators", None)
     )
     if max_collaborators_value is None:
-        max_collaborators_value = _coerce_numeric(plan_features.get("max_collaborators", 0))
+        max_collaborators_value = _coerce_numeric(
+            plan_features.get("max_collaborators", 0)
+        )
 
     plan_payload = _build_plan_payload(
         plan_obj=plan_obj,
@@ -249,9 +255,13 @@ def _build_agent_claims(user) -> dict:
         has_collaboration = Collaborator.objects.filter(user=user).exists()
 
     profile_payload = {
-        "agent_profile_id": str(getattr(agent_profile, "id", "")) if agent_profile else None,
+        "agent_profile_id": str(getattr(agent_profile, "id", ""))
+        if agent_profile
+        else None,
         "display_name": str(user),
-        "is_self_represented": bool(getattr(agent_profile, "is_self_represented", False)),
+        "is_self_represented": bool(
+            getattr(agent_profile, "is_self_represented", False)
+        ),
         "bio": getattr(agent_profile, "bio", "") if agent_profile else "",
         "athletes_count": len(athletes),
         "athletes": athletes,
@@ -290,19 +300,23 @@ def _build_collaborator_claims(user) -> dict:
 
     collaborator_ids = [str(collab.id) for collab in collaborations]
     primary = collaborations[0] if collaborations else None
-    organisations = [collab.organisation for collab in collaborations if collab.organisation]
+    organisations = [
+        collab.organisation for collab in collaborations if collab.organisation
+    ]
 
     profile_payload: Dict[str, Any] = {
         "collaborator_ids": collaborator_ids,
         "primary_collaboration": None,
         "organisations_count": len({getattr(org, "id", None) for org in organisations}),
         "is_owner": any(
-            getattr(collab, "role", None) == Collaborator.Role.OWNER for collab in collaborations
+            getattr(collab, "role", None) == Collaborator.Role.OWNER
+            for collab in collaborations
         )
         if Collaborator is not None
         else False,
         "is_member": any(
-            getattr(collab, "role", None) == Collaborator.Role.MEMBER for collab in collaborations
+            getattr(collab, "role", None) == Collaborator.Role.MEMBER
+            for collab in collaborations
         )
         if Collaborator is not None
         else False,
@@ -327,7 +341,9 @@ def _build_collaborator_claims(user) -> dict:
     }
     selected_subscription = None
     if primary is not None:
-        selected_subscription = subscription_lookup.get(getattr(primary, "organisation_id", None))
+        selected_subscription = subscription_lookup.get(
+            getattr(primary, "organisation_id", None)
+        )
     if selected_subscription is None and subscriptions:
         selected_subscription = subscriptions[0]
 
@@ -345,12 +361,16 @@ def _build_collaborator_claims(user) -> dict:
         getattr(plan_obj, "max_collaborators", None)
     )
     if max_collaborators_value is None:
-        max_collaborators_value = _coerce_numeric(plan_features.get("max_collaborators"))
+        max_collaborators_value = _coerce_numeric(
+            plan_features.get("max_collaborators")
+        )
 
     plan_payload = _build_plan_payload(
         plan_obj=plan_obj,
         plan_features=plan_features,
-        is_active=(selected_subscription is not None) if selected_subscription is not None else True,
+        is_active=(selected_subscription is not None)
+        if selected_subscription is not None
+        else True,
         current_period_end=getattr(selected_subscription, "current_period_end", None),
         fallback_code="org-starter",
         fallback_name="Organisation Starter",
@@ -430,7 +450,9 @@ def _build_entitlements_map(user, plan_features: Dict[str, Any]) -> dict:
     statuses = feature_status_for_user(user)
     for feature_status in statuses:
         suggestion = None
-        if not feature_status.get("granted") and feature_status.get("recommended_plans"):
+        if not feature_status.get("granted") and feature_status.get(
+            "recommended_plans"
+        ):
             suggestion = feature_status["recommended_plans"][0]
         entry: Dict[str, Any] = {
             "granted": bool(feature_status.get("granted")),
@@ -449,7 +471,9 @@ def _build_entitlements_map(user, plan_features: Dict[str, Any]) -> dict:
     return entitlements
 
 
-def _build_collaborator_activity(collaborations: Iterable[Any], organisations: Iterable[Any], user) -> dict:
+def _build_collaborator_activity(
+    collaborations: Iterable[Any], organisations: Iterable[Any], user
+) -> dict:
     """Calculate collaborator activity metrics exposed in the JWT."""
 
     Follow = _get_model("follows", "Follow")
@@ -460,7 +484,9 @@ def _build_collaborator_activity(collaborations: Iterable[Any], organisations: I
 
     follows_count = 0
     if Follow is not None and collaborator_ids:
-        follows_count = Follow.objects.filter(collaborator_id__in=collaborator_ids).count()
+        follows_count = Follow.objects.filter(
+            collaborator_id__in=collaborator_ids
+        ).count()
 
     active_contracts_count = 0
     pending_contracts_count = 0
@@ -514,7 +540,9 @@ def _sanitize_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
             sanitized[key] = _sanitize_mapping(value)
         elif isinstance(value, list):
             sanitized[key] = [
-                _sanitize_mapping(item) if isinstance(item, dict) else _sanitize_value(item)
+                _sanitize_mapping(item)
+                if isinstance(item, dict)
+                else _sanitize_value(item)
                 for item in value
             ]
         else:

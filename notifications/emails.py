@@ -48,7 +48,9 @@ def send_notification_email(notification: Notification) -> None:
         send_email(message)
     except EmailDeliveryError:
         logger.exception(
-            "Failed to send notification email for %s to %s", notification.id, user.email
+            "Failed to send notification email for %s to %s",
+            notification.id,
+            user.email,
         )
 
 

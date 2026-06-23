@@ -8,15 +8,15 @@ from django.utils.text import slugify
 
 
 def populate_sport_slugs_and_disciplines(apps, schema_editor):
-    Sport = apps.get_model('athletes', 'Sport')
-    SportDiscipline = apps.get_model('athletes', 'SportDiscipline')
+    Sport = apps.get_model("athletes", "Sport")
+    SportDiscipline = apps.get_model("athletes", "SportDiscipline")
 
     used_names = set()
     for sport in Sport.objects.all():
         base_name = sport.name
         candidate = base_name
         if candidate in used_names:
-            discipline_hint = getattr(sport, 'discipline', None) or "Variant"
+            discipline_hint = getattr(sport, "discipline", None) or "Variant"
             count = 1
             while True:
                 candidate = f"{base_name} ({discipline_hint}{'' if count == 1 else f' {count}'})"
@@ -33,9 +33,9 @@ def populate_sport_slugs_and_disciplines(apps, schema_editor):
             counter += 1
             slug = f"{base_slug}-{counter}"
         sport.slug = slug
-        sport.save(update_fields=['name', 'slug'])
+        sport.save(update_fields=["name", "slug"])
 
-        discipline_name = getattr(sport, 'discipline', None)
+        discipline_name = getattr(sport, "discipline", None)
         if discipline_name:
             disc_base = slugify(discipline_name) or uuid.uuid4().hex[:8]
             disc_slug = disc_base
@@ -52,73 +52,127 @@ def populate_sport_slugs_and_disciplines(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('athletes', '0004_remove_athlete_is_self_represented'),
+        ("athletes", "0004_remove_athlete_is_self_represented"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sport',
-            name='category',
-            field=models.CharField(choices=[('TEAM', 'Team'), ('INDIVIDUAL', 'Individual'), ('MIXED', 'Mixed')], default='INDIVIDUAL', max_length=20),
+            model_name="sport",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("TEAM", "Team"),
+                    ("INDIVIDUAL", "Individual"),
+                    ("MIXED", "Mixed"),
+                ],
+                default="INDIVIDUAL",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='sport',
-            name='slug',
+            model_name="sport",
+            name="slug",
             field=models.SlugField(blank=True, max_length=255, null=True),
         ),
         migrations.AlterModelOptions(
-            name='sport',
-            options={'ordering': ('name',)},
+            name="sport",
+            options={"ordering": ("name",)},
         ),
         migrations.AlterUniqueTogether(
-            name='sport',
+            name="sport",
             unique_together=set(),
         ),
         migrations.CreateModel(
-            name='SportDiscipline',
+            name="SportDiscipline",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('name', models.CharField(max_length=255)),
-                ('slug', models.SlugField(max_length=255)),
-                ('description', models.CharField(blank=True, max_length=255)),
-                ('is_olympic', models.BooleanField(default=False)),
-                ('sport', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='disciplines', to='athletes.sport')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("name", models.CharField(max_length=255)),
+                ("slug", models.SlugField(max_length=255)),
+                ("description", models.CharField(blank=True, max_length=255)),
+                ("is_olympic", models.BooleanField(default=False)),
+                (
+                    "sport",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="disciplines",
+                        to="athletes.sport",
+                    ),
+                ),
             ],
-            options={'ordering': ('sport__name', 'name'), 'unique_together': {('sport', 'slug')}},
+            options={
+                "ordering": ("sport__name", "name"),
+                "unique_together": {("sport", "slug")},
+            },
         ),
         migrations.CreateModel(
-            name='AthleteDiscipline',
+            name="AthleteDiscipline",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('athlete', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='discipline_links', to='athletes.athlete')),
-                ('discipline', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='athlete_links', to='athletes.sportdiscipline')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "athlete",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="discipline_links",
+                        to="athletes.athlete",
+                    ),
+                ),
+                (
+                    "discipline",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="athlete_links",
+                        to="athletes.sportdiscipline",
+                    ),
+                ),
             ],
-            options={'unique_together': {('athlete', 'discipline')}},
+            options={"unique_together": {("athlete", "discipline")}},
         ),
         migrations.AddField(
-            model_name='athlete',
-            name='disciplines',
-            field=models.ManyToManyField(blank=True, related_name='athletes', through='athletes.AthleteDiscipline', to='athletes.sportdiscipline'),
+            model_name="athlete",
+            name="disciplines",
+            field=models.ManyToManyField(
+                blank=True,
+                related_name="athletes",
+                through="athletes.AthleteDiscipline",
+                to="athletes.sportdiscipline",
+            ),
         ),
-        migrations.RunPython(populate_sport_slugs_and_disciplines, migrations.RunPython.noop),
+        migrations.RunPython(
+            populate_sport_slugs_and_disciplines, migrations.RunPython.noop
+        ),
         migrations.RemoveField(
-            model_name='sport',
-            name='discipline',
+            model_name="sport",
+            name="discipline",
         ),
         migrations.AlterField(
-            model_name='sport',
-            name='name',
+            model_name="sport",
+            name="name",
             field=models.CharField(max_length=255, unique=True),
         ),
         migrations.AlterField(
-            model_name='sport',
-            name='slug',
+            model_name="sport",
+            name="slug",
             field=models.SlugField(blank=True, max_length=255, unique=True),
         ),
     ]

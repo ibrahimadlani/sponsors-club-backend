@@ -26,12 +26,16 @@ def test_register_sends_verification_email(monkeypatch, api_client):
     assert "message" in captured
     message = captured["message"]
     assert message.to_addresses == ["verify@example.com"]
-    assert EmailVerificationToken.objects.filter(user__email="verify@example.com").exists()
+    assert EmailVerificationToken.objects.filter(
+        user__email="verify@example.com"
+    ).exists()
 
 
 @pytest.mark.django_db
 def test_verify_email_endpoint_success(api_client, user_model):
-    user = user_model.objects.create_user(email="pending@example.com", password="pass1234")
+    user = user_model.objects.create_user(
+        email="pending@example.com", password="pass1234"
+    )
     token = EmailVerificationToken.issue_for_user(user)
 
     response = api_client.post(
@@ -47,7 +51,9 @@ def test_verify_email_endpoint_success(api_client, user_model):
 
 @pytest.mark.django_db
 def test_verify_email_endpoint_rejects_invalid_token(api_client, user_model):
-    user = user_model.objects.create_user(email="invalid@example.com", password="pass1234")
+    user = user_model.objects.create_user(
+        email="invalid@example.com", password="pass1234"
+    )
     EmailVerificationToken.issue_for_user(user)
 
     response = api_client.post(

@@ -22,41 +22,116 @@ class PhoneNumberGenerator:
             {
                 "code": "+34",
                 "patterns": [
-                    {"prefix": "612", "total_length": 9, "base": 485230, "grouping": (3, 3, 3)},
-                    {"prefix": "934", "total_length": 9, "base": 218745, "grouping": (3, 3, 3)},
-                    {"prefix": "722", "total_length": 9, "base": 604913, "grouping": (3, 3, 3)},
+                    {
+                        "prefix": "612",
+                        "total_length": 9,
+                        "base": 485230,
+                        "grouping": (3, 3, 3),
+                    },
+                    {
+                        "prefix": "934",
+                        "total_length": 9,
+                        "base": 218745,
+                        "grouping": (3, 3, 3),
+                    },
+                    {
+                        "prefix": "722",
+                        "total_length": 9,
+                        "base": 604913,
+                        "grouping": (3, 3, 3),
+                    },
                 ],
             },
             {
                 "code": "+32",
                 "patterns": [
-                    {"prefix": "0470", "total_length": 10, "base": 182334, "grouping": (4, 2, 2, 2)},
-                    {"prefix": "0498", "total_length": 10, "base": 267415, "grouping": (4, 2, 2, 2)},
-                    {"prefix": "0466", "total_length": 10, "base": 905221, "grouping": (4, 2, 2, 2)},
+                    {
+                        "prefix": "0470",
+                        "total_length": 10,
+                        "base": 182334,
+                        "grouping": (4, 2, 2, 2),
+                    },
+                    {
+                        "prefix": "0498",
+                        "total_length": 10,
+                        "base": 267415,
+                        "grouping": (4, 2, 2, 2),
+                    },
+                    {
+                        "prefix": "0466",
+                        "total_length": 10,
+                        "base": 905221,
+                        "grouping": (4, 2, 2, 2),
+                    },
                 ],
             },
             {
                 "code": "+41",
                 "patterns": [
-                    {"prefix": "079", "total_length": 10, "base": 6124800, "grouping": (3, 3, 2, 2)},
-                    {"prefix": "078", "total_length": 10, "base": 4231750, "grouping": (3, 3, 2, 2)},
-                    {"prefix": "044", "total_length": 10, "base": 2853690, "grouping": (3, 3, 2, 2)},
+                    {
+                        "prefix": "079",
+                        "total_length": 10,
+                        "base": 6124800,
+                        "grouping": (3, 3, 2, 2),
+                    },
+                    {
+                        "prefix": "078",
+                        "total_length": 10,
+                        "base": 4231750,
+                        "grouping": (3, 3, 2, 2),
+                    },
+                    {
+                        "prefix": "044",
+                        "total_length": 10,
+                        "base": 2853690,
+                        "grouping": (3, 3, 2, 2),
+                    },
                 ],
             },
             {
                 "code": "+352",
                 "patterns": [
-                    {"prefix": "621", "total_length": 9, "base": 834275, "grouping": (3, 2, 2, 2)},
-                    {"prefix": "691", "total_length": 9, "base": 452138, "grouping": (3, 2, 2, 2)},
-                    {"prefix": "278", "total_length": 9, "base": 906541, "grouping": (3, 2, 2, 2)},
+                    {
+                        "prefix": "621",
+                        "total_length": 9,
+                        "base": 834275,
+                        "grouping": (3, 2, 2, 2),
+                    },
+                    {
+                        "prefix": "691",
+                        "total_length": 9,
+                        "base": 452138,
+                        "grouping": (3, 2, 2, 2),
+                    },
+                    {
+                        "prefix": "278",
+                        "total_length": 9,
+                        "base": 906541,
+                        "grouping": (3, 2, 2, 2),
+                    },
                 ],
             },
             {
                 "code": "+39",
                 "patterns": [
-                    {"prefix": "331", "total_length": 10, "base": 7426810, "grouping": (3, 3, 2, 2)},
-                    {"prefix": "347", "total_length": 10, "base": 5184620, "grouping": (3, 3, 2, 2)},
-                    {"prefix": "320", "total_length": 10, "base": 9061245, "grouping": (3, 3, 2, 2)},
+                    {
+                        "prefix": "331",
+                        "total_length": 10,
+                        "base": 7426810,
+                        "grouping": (3, 3, 2, 2),
+                    },
+                    {
+                        "prefix": "347",
+                        "total_length": 10,
+                        "base": 5184620,
+                        "grouping": (3, 3, 2, 2),
+                    },
+                    {
+                        "prefix": "320",
+                        "total_length": 10,
+                        "base": 9061245,
+                        "grouping": (3, 3, 2, 2),
+                    },
                 ],
             },
         ]
@@ -235,65 +310,115 @@ def build_fixture() -> list[dict]:
         {
             "name": "Athletics",
             "slug": "athletics",
-            "emoji": "\U0001F3C3",
+            "emoji": "\U0001f3c3",
             "category": "INDIVIDUAL",
             "disciplines": [
-                ("100m Sprint", "100m-sprint", "High intensity sprint over 100 meters.", True),
+                (
+                    "100m Sprint",
+                    "100m-sprint",
+                    "High intensity sprint over 100 meters.",
+                    True,
+                ),
                 ("Marathon", "marathon", "Long distance road running event.", True),
-                ("Long Jump", "long-jump", "Field event measuring horizontal distance.", True),
+                (
+                    "Long Jump",
+                    "long-jump",
+                    "Field event measuring horizontal distance.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Football",
             "slug": "football",
-            "emoji": "\u26BD",
+            "emoji": "\u26bd",
             "category": "TEAM",
             "disciplines": [
                 ("Ligue 1", "ligue-1", "Top French professional league.", False),
-                ("UEFA Champions League", "uefa-champions-league", "Elite European club competition.", False),
-                ("FIFA World Cup", "fifa-world-cup", "Global national team tournament.", True),
+                (
+                    "UEFA Champions League",
+                    "uefa-champions-league",
+                    "Elite European club competition.",
+                    False,
+                ),
+                (
+                    "FIFA World Cup",
+                    "fifa-world-cup",
+                    "Global national team tournament.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Basketball",
             "slug": "basketball",
-            "emoji": "\U0001F3C0",
+            "emoji": "\U0001f3c0",
             "category": "TEAM",
             "disciplines": [
-                ("EuroLeague", "euroleague", "Premier European club competition.", False),
+                (
+                    "EuroLeague",
+                    "euroleague",
+                    "Premier European club competition.",
+                    False,
+                ),
                 ("NBA", "nba", "North American professional league.", False),
-                ("FIBA World Cup", "fiba-world-cup", "International national team competition.", True),
+                (
+                    "FIBA World Cup",
+                    "fiba-world-cup",
+                    "International national team competition.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Swimming",
             "slug": "swimming",
-            "emoji": "\U0001F3CA",
+            "emoji": "\U0001f3ca",
             "category": "INDIVIDUAL",
             "disciplines": [
                 ("100m Freestyle", "100m-freestyle", "Sprint freestyle event.", True),
-                ("200m Butterfly", "200m-butterfly", "Challenging butterfly distance.", True),
-                ("Open Water 10km", "open-water-10km", "Endurance race in open water.", True),
+                (
+                    "200m Butterfly",
+                    "200m-butterfly",
+                    "Challenging butterfly distance.",
+                    True,
+                ),
+                (
+                    "Open Water 10km",
+                    "open-water-10km",
+                    "Endurance race in open water.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Cycling",
             "slug": "cycling",
-            "emoji": "\U0001F6B4",
+            "emoji": "\U0001f6b4",
             "category": "MIXED",
             "disciplines": [
                 ("Tour de France", "tour-de-france", "Grand Tour stage race.", True),
                 ("Track Sprint", "track-sprint", "Velodrome sprint event.", True),
-                ("Mountain Biking XCO", "mountain-biking-xco", "Cross-country Olympic format.", True),
+                (
+                    "Mountain Biking XCO",
+                    "mountain-biking-xco",
+                    "Cross-country Olympic format.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Tennis",
             "slug": "tennis",
-            "emoji": "\U0001F3BE",
+            "emoji": "\U0001f3be",
             "category": "INDIVIDUAL",
             "disciplines": [
-                ("Roland-Garros", "roland-garros", "Clay Grand Slam tournament.", False),
+                (
+                    "Roland-Garros",
+                    "roland-garros",
+                    "Clay Grand Slam tournament.",
+                    False,
+                ),
                 ("Wimbledon", "wimbledon", "Grass Grand Slam tournament.", False),
                 ("ATP Finals", "atp-finals", "Season-ending championship.", False),
             ],
@@ -301,45 +426,90 @@ def build_fixture() -> list[dict]:
         {
             "name": "Gymnastics",
             "slug": "gymnastics",
-            "emoji": "\U0001F938",
+            "emoji": "\U0001f938",
             "category": "INDIVIDUAL",
             "disciplines": [
-                ("Artistic All-Around", "artistic-all-around", "Combined apparatus competition.", True),
-                ("Rhythmic Ribbon", "rhythmic-ribbon", "Graceful ribbon routine.", True),
+                (
+                    "Artistic All-Around",
+                    "artistic-all-around",
+                    "Combined apparatus competition.",
+                    True,
+                ),
+                (
+                    "Rhythmic Ribbon",
+                    "rhythmic-ribbon",
+                    "Graceful ribbon routine.",
+                    True,
+                ),
                 ("Trampoline", "trampoline", "Acrobatic trampoline event.", True),
             ],
         },
         {
             "name": "Rugby",
             "slug": "rugby",
-            "emoji": "\U0001F3C9",
+            "emoji": "\U0001f3c9",
             "category": "TEAM",
             "disciplines": [
                 ("Top 14", "top-14", "French professional rugby league.", False),
                 ("Six Nations", "six-nations", "Annual European championship.", False),
-                ("Rugby World Cup", "rugby-world-cup", "Global rugby union tournament.", True),
+                (
+                    "Rugby World Cup",
+                    "rugby-world-cup",
+                    "Global rugby union tournament.",
+                    True,
+                ),
             ],
         },
         {
             "name": "Esports",
             "slug": "esports",
-            "emoji": "\U0001F3AE",
+            "emoji": "\U0001f3ae",
             "category": "MIXED",
             "disciplines": [
-                ("League of Legends", "league-of-legends", "International MOBA circuit.", False),
-                ("Valorant Champions", "valorant-champions", "Global FPS circuit.", False),
-                ("Rocket League Major", "rocket-league-major", "Hybrid motorsports esports event.", False),
+                (
+                    "League of Legends",
+                    "league-of-legends",
+                    "International MOBA circuit.",
+                    False,
+                ),
+                (
+                    "Valorant Champions",
+                    "valorant-champions",
+                    "Global FPS circuit.",
+                    False,
+                ),
+                (
+                    "Rocket League Major",
+                    "rocket-league-major",
+                    "Hybrid motorsports esports event.",
+                    False,
+                ),
             ],
         },
         {
             "name": "Surfing",
             "slug": "surfing",
-            "emoji": "\U0001F3C4",
+            "emoji": "\U0001f3c4",
             "category": "INDIVIDUAL",
             "disciplines": [
-                ("WSL Championship Tour", "wsl-championship-tour", "Elite professional tour.", False),
-                ("Big Wave Invitational", "big-wave-invitational", "Invite-only big wave event.", False),
-                ("Olympic Shortboard", "olympic-shortboard", "Olympic surfing competition.", True),
+                (
+                    "WSL Championship Tour",
+                    "wsl-championship-tour",
+                    "Elite professional tour.",
+                    False,
+                ),
+                (
+                    "Big Wave Invitational",
+                    "big-wave-invitational",
+                    "Invite-only big wave event.",
+                    False,
+                ),
+                (
+                    "Olympic Shortboard",
+                    "olympic-shortboard",
+                    "Olympic surfing competition.",
+                    True,
+                ),
             ],
         },
     ]
@@ -361,7 +531,9 @@ def build_fixture() -> list[dict]:
             },
         )
         sport_ids[sport["name"]] = sport_id
-        for d_idx, (name, slug, description, is_olympic) in enumerate(sport["disciplines"]):
+        for d_idx, (name, slug, description, is_olympic) in enumerate(
+            sport["disciplines"]
+        ):
             disc_id = add(
                 objects,
                 "athletes.sportdiscipline",
@@ -371,8 +543,12 @@ def build_fixture() -> list[dict]:
                     "slug": slug,
                     "description": description,
                     "is_olympic": is_olympic,
-                    "created_at": iso(BASE_DT + timedelta(minutes=10 + idx, seconds=30 * d_idx)),
-                    "updated_at": iso(BASE_DT + timedelta(minutes=10 + idx, seconds=30 * d_idx)),
+                    "created_at": iso(
+                        BASE_DT + timedelta(minutes=10 + idx, seconds=30 * d_idx)
+                    ),
+                    "updated_at": iso(
+                        BASE_DT + timedelta(minutes=10 + idx, seconds=30 * d_idx)
+                    ),
                 },
             )
             discipline_ids[(sport["name"], name)] = disc_id
@@ -402,12 +578,26 @@ def build_fixture() -> list[dict]:
     ]
 
     agent_plan_map = [
-        "agent-free", "agent-free", "agent-free", "agent-free", "agent-free", "agent-free", "agent-free",
-        "agent-free", "agent-free", "agent-free", "agent-free", "agent-free",
-        "agent-pro", "agent-pro", "agent-pro",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-free",
+        "agent-pro",
+        "agent-pro",
+        "agent-pro",
         "agent-agency",
-        "agent-pro", "agent-pro",
-        "agent-free", "agent-free",
+        "agent-pro",
+        "agent-pro",
+        "agent-free",
+        "agent-free",
     ]
 
     self_represented = {i for i in range(7)}
@@ -552,7 +742,9 @@ def build_fixture() -> list[dict]:
             "address_city": enterprise_org["address_city"],
             "address_country": enterprise_org["address_country"],
             "address_postal_code": enterprise_org["address_postal_code"],
-            "social_links": {"linkedin": "https://www.linkedin.com/company/global-sports"},
+            "social_links": {
+                "linkedin": "https://www.linkedin.com/company/global-sports"
+            },
             "founded_year": 2010,
             "employees_count": 120,
             "budget_range": "500k-1M€",
@@ -644,13 +836,19 @@ def build_fixture() -> list[dict]:
                 "address_city": "Lyon",
                 "address_country": "France",
                 "address_postal_code": "69002",
-                "social_links": {"linkedin": f"https://www.linkedin.com/company/{slug}"},
+                "social_links": {
+                    "linkedin": f"https://www.linkedin.com/company/{slug}"
+                },
                 "founded_year": 2018,
                 "employees_count": 25,
                 "budget_range": "150k-300k€",
                 "sponsoring_focus": ["Brand awareness", "Lancement produit"],
-                "created_at": iso(BASE_DT + timedelta(days=2, minutes=len(organisation_ids) * 3)),
-                "updated_at": iso(BASE_DT + timedelta(days=2, minutes=len(organisation_ids) * 3)),
+                "created_at": iso(
+                    BASE_DT + timedelta(days=2, minutes=len(organisation_ids) * 3)
+                ),
+                "updated_at": iso(
+                    BASE_DT + timedelta(days=2, minutes=len(organisation_ids) * 3)
+                ),
             },
         )
         organisation_ids.append(org_id)
@@ -662,8 +860,12 @@ def build_fixture() -> list[dict]:
                 "organisation": org_id,
                 "role": "OWNER",
                 "job_title": "Responsable sponsoring",
-                "created_at": iso(BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5)),
-                "updated_at": iso(BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5)),
+                "created_at": iso(
+                    BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5)
+                ),
+                "updated_at": iso(
+                    BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5)
+                ),
             },
         )
         member_ids = [owner_collab_id]
@@ -679,8 +881,18 @@ def build_fixture() -> list[dict]:
                     "organisation": org_id,
                     "role": "MEMBER",
                     "job_title": ["Chef de projet", "Analyste insights"][m],
-                    "created_at": iso(BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5 + m + 1)),
-                    "updated_at": iso(BASE_DT + timedelta(days=2, minutes=len(pro_org_collaborators) * 5 + m + 1)),
+                    "created_at": iso(
+                        BASE_DT
+                        + timedelta(
+                            days=2, minutes=len(pro_org_collaborators) * 5 + m + 1
+                        )
+                    ),
+                    "updated_at": iso(
+                        BASE_DT
+                        + timedelta(
+                            days=2, minutes=len(pro_org_collaborators) * 5 + m + 1
+                        )
+                    ),
                 },
             )
             member_ids.append(collab_id)
@@ -724,8 +936,12 @@ def build_fixture() -> list[dict]:
                 "employees_count": 6,
                 "budget_range": "20k-50k€",
                 "sponsoring_focus": ["Visibilité locale"],
-                "created_at": iso(BASE_DT + timedelta(days=3, minutes=len(organisation_ids) * 4)),
-                "updated_at": iso(BASE_DT + timedelta(days=3, minutes=len(organisation_ids) * 4)),
+                "created_at": iso(
+                    BASE_DT + timedelta(days=3, minutes=len(organisation_ids) * 4)
+                ),
+                "updated_at": iso(
+                    BASE_DT + timedelta(days=3, minutes=len(organisation_ids) * 4)
+                ),
             },
         )
         organisation_ids.append(org_id)
@@ -737,8 +953,12 @@ def build_fixture() -> list[dict]:
                 "organisation": org_id,
                 "role": "OWNER",
                 "job_title": "Gérant",
-                "created_at": iso(BASE_DT + timedelta(days=3, minutes=len(free_org_collaborators) * 6)),
-                "updated_at": iso(BASE_DT + timedelta(days=3, minutes=len(free_org_collaborators) * 6)),
+                "created_at": iso(
+                    BASE_DT + timedelta(days=3, minutes=len(free_org_collaborators) * 6)
+                ),
+                "updated_at": iso(
+                    BASE_DT + timedelta(days=3, minutes=len(free_org_collaborators) * 6)
+                ),
             },
         )
         free_org_collaborators.append([owner_collab_id])
@@ -790,12 +1010,43 @@ def build_fixture() -> list[dict]:
 
     # Athletes assignments
     athlete_names = [
-        "Alice Dupont", "Bruno Martin", "Chloé Laurent", "David Bernard", "Emma Girard", "Fabien Moreau", "Gaëlle Robert",
-        "Milan Ortega", "Yara Benali", "Theo Ricard", "Selena Kone", "Jonas Kramer",
-        "Ingrid Meyer", "Lucas Vidal", "Maya Sato", "Noah Fischer", "Clara Jensen",
-        "Rafael Costa", "Lucie Moretti", "Amira Idrissi", "Victor Da Silva", "Elena Popov", "Jules Lambert", "Sofia Romano",
-        "Tobias Keller", "Hanna Schultz", "Ivy McKenna", "Leo Andersson", "Aisha Diallo", "Jonah Clarke", "Mira Novak",
-        "Pavel Horvat", "Sara Nordin", "Elodie Marchal", "Kenji Watanabe", "Camila Torres", "Nikolai Petrov",
+        "Alice Dupont",
+        "Bruno Martin",
+        "Chloé Laurent",
+        "David Bernard",
+        "Emma Girard",
+        "Fabien Moreau",
+        "Gaëlle Robert",
+        "Milan Ortega",
+        "Yara Benali",
+        "Theo Ricard",
+        "Selena Kone",
+        "Jonas Kramer",
+        "Ingrid Meyer",
+        "Lucas Vidal",
+        "Maya Sato",
+        "Noah Fischer",
+        "Clara Jensen",
+        "Rafael Costa",
+        "Lucie Moretti",
+        "Amira Idrissi",
+        "Victor Da Silva",
+        "Elena Popov",
+        "Jules Lambert",
+        "Sofia Romano",
+        "Tobias Keller",
+        "Hanna Schultz",
+        "Ivy McKenna",
+        "Leo Andersson",
+        "Aisha Diallo",
+        "Jonah Clarke",
+        "Mira Novak",
+        "Pavel Horvat",
+        "Sara Nordin",
+        "Elodie Marchal",
+        "Kenji Watanabe",
+        "Camila Torres",
+        "Nikolai Petrov",
     ]
 
     athlete_assignments: list[tuple[str, str]] = []
@@ -808,7 +1059,9 @@ def build_fixture() -> list[dict]:
     athlete_idx = 12
     for agent_idx in pro_agent_indices:
         for _ in range(5):
-            athlete_assignments.append((athlete_names[athlete_idx], agent_profile_ids[agent_idx]))
+            athlete_assignments.append(
+                (athlete_names[athlete_idx], agent_profile_ids[agent_idx])
+            )
             athlete_idx += 1
 
     for _ in range(10):
@@ -836,9 +1089,25 @@ def build_fixture() -> list[dict]:
             "full_name": full_name,
             "slug": full_name.lower().replace(" ", "-") + f"-{idx}",
             "birth_date": f"{birth_year}-0{(idx % 9) + 1}-15",
-            "nationality": ["France", "Belgique", "Suisse", "Espagne", "Italie", "Allemagne"][idx % 6],
-            "country": ["France", "Belgique", "Suisse", "Espagne", "Italie", "Allemagne"][idx % 6],
-            "city": ["Paris", "Lyon", "Nice", "Toulouse", "Bordeaux", "Marseille"][idx % 6],
+            "nationality": [
+                "France",
+                "Belgique",
+                "Suisse",
+                "Espagne",
+                "Italie",
+                "Allemagne",
+            ][idx % 6],
+            "country": [
+                "France",
+                "Belgique",
+                "Suisse",
+                "Espagne",
+                "Italie",
+                "Allemagne",
+            ][idx % 6],
+            "city": ["Paris", "Lyon", "Nice", "Toulouse", "Bordeaux", "Marseille"][
+                idx % 6
+            ],
             "bio": "Athlète professionnel(le) avec un palmarès reconnu sur la scène internationale.",
             "social_links": {
                 "instagram": f"https://instagram.com/{full_name.lower().replace(' ', '')}",
@@ -942,7 +1211,9 @@ def build_fixture() -> list[dict]:
     ]
 
     clause_template_ids: list[str] = []
-    for idx, (_, title, category, content, placeholders, mandatory) in enumerate(clause_templates):
+    for idx, (_, title, category, content, placeholders, mandatory) in enumerate(
+        clause_templates
+    ):
         template_id = add(
             objects,
             "contracts.clausetemplate",
@@ -981,7 +1252,9 @@ def build_fixture() -> list[dict]:
         free_org_collaborators[0][0],
         enterprise_collaborator_ids[1],
     ]
-    initiator_users = [collaborator_user_lookup[collab_id] for collab_id in initiator_collaborators]
+    initiator_users = [
+        collaborator_user_lookup[collab_id] for collab_id in initiator_collaborators
+    ]
     contract_agents = [
         agent_profile_ids[12],
         agent_profile_ids[13],
@@ -1004,10 +1277,18 @@ def build_fixture() -> list[dict]:
                 "initiated_by": initiator_collaborators[idx],
                 "status": status,
                 "title": title,
-                "effective_date": "2025-03-01" if status in {"signing", "active"} else None,
-                "expiration_date": "2026-02-28" if status in {"signing", "active"} else None,
-                "owner_agreed_at": iso(BASE_DT + timedelta(days=idx)) if status in {"legal_review", "signing", "active"} else None,
-                "agent_agreed_at": iso(BASE_DT + timedelta(days=idx, hours=2)) if status in {"signing", "active"} else None,
+                "effective_date": "2025-03-01"
+                if status in {"signing", "active"}
+                else None,
+                "expiration_date": "2026-02-28"
+                if status in {"signing", "active"}
+                else None,
+                "owner_agreed_at": iso(BASE_DT + timedelta(days=idx))
+                if status in {"legal_review", "signing", "active"}
+                else None,
+                "agent_agreed_at": iso(BASE_DT + timedelta(days=idx, hours=2))
+                if status in {"signing", "active"}
+                else None,
                 "current_version_number": 1,
                 "created_at": iso(BASE_DT + timedelta(days=idx * 2)),
                 "updated_at": iso(BASE_DT + timedelta(days=idx * 2, hours=1)),
@@ -1036,11 +1317,17 @@ def build_fixture() -> list[dict]:
                     "contract": contract_id,
                     "template": template_id,
                     "title": clause_templates[tpl_idx][1],
-                    "content": clause_templates[tpl_idx][3].replace("{{", "").replace("}}", ""),
+                    "content": clause_templates[tpl_idx][3]
+                    .replace("{{", "")
+                    .replace("}}", ""),
                     "is_mandatory": clause_templates[tpl_idx][5],
                     "is_modified": tpl_idx == 2,
-                    "created_at": iso(BASE_DT + timedelta(days=idx * 2, minutes=45 + tpl_idx)),
-                    "updated_at": iso(BASE_DT + timedelta(days=idx * 2, minutes=45 + tpl_idx)),
+                    "created_at": iso(
+                        BASE_DT + timedelta(days=idx * 2, minutes=45 + tpl_idx)
+                    ),
+                    "updated_at": iso(
+                        BASE_DT + timedelta(days=idx * 2, minutes=45 + tpl_idx)
+                    ),
                 },
             )
             contract_clause_ids.append(clause_id)
@@ -1050,7 +1337,9 @@ def build_fixture() -> list[dict]:
                 "contracts.contractrevision",
                 {
                     "contract": contract_id,
-                    "proposed_by": agent_ids[agent_profile_ids.index(contract_agents[idx])],
+                    "proposed_by": agent_ids[
+                        agent_profile_ids.index(contract_agents[idx])
+                    ],
                     "comment": "Proposition d'ajuster le périmètre des contenus.",
                     "accepted": None,
                     "created_at": iso(BASE_DT + timedelta(days=idx * 2, hours=3)),

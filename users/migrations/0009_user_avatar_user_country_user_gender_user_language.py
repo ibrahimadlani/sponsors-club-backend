@@ -4,30 +4,43 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0008_agentprofile_is_self_represented'),
+        ("users", "0008_agentprofile_is_self_represented"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='avatar',
-            field=models.ImageField(blank=True, null=True, upload_to='user_avatars/', verbose_name='avatar'),
+            model_name="user",
+            name="avatar",
+            field=models.ImageField(
+                blank=True, null=True, upload_to="user_avatars/", verbose_name="avatar"
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='country',
-            field=models.CharField(blank=True, max_length=100, verbose_name='country'),
+            model_name="user",
+            name="country",
+            field=models.CharField(blank=True, max_length=100, verbose_name="country"),
         ),
         migrations.AddField(
-            model_name='user',
-            name='gender',
-            field=models.CharField(blank=True, choices=[('MALE', 'Homme'), ('FEMALE', 'Femme'), ('NON_BINARY', 'Non-binaire')], max_length=20, null=True, verbose_name='gender'),
+            model_name="user",
+            name="gender",
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ("MALE", "Homme"),
+                    ("FEMALE", "Femme"),
+                    ("NON_BINARY", "Non-binaire"),
+                ],
+                max_length=20,
+                null=True,
+                verbose_name="gender",
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='language',
-            field=models.CharField(blank=True, default='fr', max_length=10, verbose_name='language'),
+            model_name="user",
+            name="language",
+            field=models.CharField(
+                blank=True, default="fr", max_length=10, verbose_name="language"
+            ),
         ),
     ]

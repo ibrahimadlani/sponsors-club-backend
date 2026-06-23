@@ -25,7 +25,9 @@ def login_get_access(client, email, password):
 
 
 def decode(token):
-    return jwt.decode(token, django_settings.SECRET_KEY, algorithms=["HS256"])  # SimpleJWT default
+    return jwt.decode(
+        token, django_settings.SECRET_KEY, algorithms=["HS256"]
+    )  # SimpleJWT default
 
 
 pytestmark = pytest.mark.django_db

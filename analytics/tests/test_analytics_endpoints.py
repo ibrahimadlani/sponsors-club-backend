@@ -19,7 +19,9 @@ def instagram_platform():
 
 @pytest.fixture
 def stats_sport():
-    sport = Sport.objects.create(name="Volley", emoji="🏐", category=Sport.Category.TEAM)
+    sport = Sport.objects.create(
+        name="Volley", emoji="🏐", category=Sport.Category.TEAM
+    )
     SportDiscipline.objects.create(
         sport=sport,
         name="Indoor Volleyball",

@@ -4,20 +4,30 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0009_user_avatar_user_country_user_gender_user_language'),
+        ("users", "0009_user_avatar_user_country_user_gender_user_language"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='user',
-            name='country',
-            field=models.CharField(blank=True, help_text='ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)', max_length=2, verbose_name='country'),
+            model_name="user",
+            name="country",
+            field=models.CharField(
+                blank=True,
+                help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+                max_length=2,
+                verbose_name="country",
+            ),
         ),
         migrations.AlterField(
-            model_name='user',
-            name='language',
-            field=models.CharField(blank=True, default='fr', help_text='ISO 639-1 language code (e.g., fr, en, es)', max_length=2, verbose_name='language'),
+            model_name="user",
+            name="language",
+            field=models.CharField(
+                blank=True,
+                default="fr",
+                help_text="ISO 639-1 language code (e.g., fr, en, es)",
+                max_length=2,
+                verbose_name="language",
+            ),
         ),
     ]

@@ -118,7 +118,10 @@ def test_disconnect_removes_group_and_calls_super():
     }
     thread = SimpleNamespace(id=thread_id)
 
-    with patch("messaging.consumers.AsyncJsonWebsocketConsumer.disconnect", new_callable=AsyncMock) as super_disconnect:
+    with patch(
+        "messaging.consumers.AsyncJsonWebsocketConsumer.disconnect",
+        new_callable=AsyncMock,
+    ) as super_disconnect:
         with patch.object(
             ThreadConsumer,
             "_get_thread_for_user",
@@ -135,7 +138,10 @@ def test_disconnect_without_group_name_skips_cleanup():
     consumer = ThreadConsumer()
     layer = _instrument_consumer(consumer)
 
-    with patch("messaging.consumers.AsyncJsonWebsocketConsumer.disconnect", new_callable=AsyncMock) as super_disconnect:
+    with patch(
+        "messaging.consumers.AsyncJsonWebsocketConsumer.disconnect",
+        new_callable=AsyncMock,
+    ) as super_disconnect:
         _run(consumer.disconnect, 1001)
 
     assert not layer.discard_calls

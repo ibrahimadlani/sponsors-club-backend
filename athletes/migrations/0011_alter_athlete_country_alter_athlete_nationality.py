@@ -4,20 +4,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('athletes', '0010_ensure_athlete_slug_column'),
+        ("athletes", "0010_ensure_athlete_slug_column"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='athlete',
-            name='country',
-            field=models.CharField(blank=True, default='', help_text='ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)', max_length=2),
+            model_name="athlete",
+            name="country",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+                max_length=2,
+            ),
         ),
         migrations.AlterField(
-            model_name='athlete',
-            name='nationality',
-            field=models.CharField(blank=True, help_text='ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)', max_length=2),
+            model_name="athlete",
+            name="nationality",
+            field=models.CharField(
+                blank=True,
+                help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+                max_length=2,
+            ),
         ),
     ]

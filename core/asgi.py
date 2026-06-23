@@ -21,9 +21,8 @@ def _load_websocket_urlpatterns():
 
     messaging_routing = import_module("messaging.routing")
     notifications_routing = import_module("notifications.routing")
-    return (
-        getattr(messaging_routing, "websocket_urlpatterns", [])
-        + getattr(notifications_routing, "websocket_urlpatterns", [])
+    return getattr(messaging_routing, "websocket_urlpatterns", []) + getattr(
+        notifications_routing, "websocket_urlpatterns", []
     )
 
 
@@ -34,9 +33,7 @@ application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
-            JWTAuthMiddlewareStack(
-                URLRouter(_load_websocket_urlpatterns())
-            )
+            JWTAuthMiddlewareStack(URLRouter(_load_websocket_urlpatterns()))
         ),
     }
 )

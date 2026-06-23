@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("athletes", "0002_alter_sport_name_alter_sport_unique_together"),
     ]
