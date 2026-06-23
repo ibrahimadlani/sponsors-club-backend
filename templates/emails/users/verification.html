@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body style="font-family: Arial, sans-serif; color: #111827;">
+    <p>Hello {{ user.first_name|default:user.email }},</p>
+    <p>
+      Thank you for creating your Sponsors Club account. Please confirm your
+      email address to unlock messaging, notifications, and contract workflows.
+    </p>
+    {% if verification_url %}
+      <p>
+        <a href="{{ verification_url }}" style="color: #2563eb;">
+          Click here to verify your email address
+        </a>
+      </p>
+    {% endif %}
+    <p>If you prefer, you can confirm via the API with:</p>
+    <pre style="background: #f3f4f6; padding: 12px; border-radius: 6px;">
+{
+  "uid": "{{ user.id }}",
+  "token": "{{ token }}"
+}
+    </pre>
+    <p>If you did not create this account you can safely ignore this email.</p>
+    <p>The Sponsors Club team</p>
+  </body>
+</html>

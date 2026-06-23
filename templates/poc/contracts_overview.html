@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Contrats • Vue d'ensemble • SponsorsClub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0f172a;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+        main {
+            width: min(1180px, 100%);
+            display: grid;
+            gap: 32px;
+            padding: 36px;
+            border-radius: 28px;
+            background: #f8fafc;
+            box-shadow: 0 36px 88px rgba(15, 23, 42, 0.28);
+        }
+        header {
+            display: grid;
+            gap: 18px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: clamp(1.7rem, 2.6vw, 2.4rem);
+            color: #111827;
+        }
+        header p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.6;
+        }
+        .header-top {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .login-button {
+            padding: 12px 20px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.35);
+            background: white;
+            color: #1d4ed8;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+        }
+        .login-button:hover {
+            background: #eff6ff;
+            color: #1e3a8a;
+            box-shadow: none;
+            transform: none;
+        }
+        section {
+            background: white;
+            border-radius: 22px;
+            padding: 28px;
+            display: grid;
+            gap: 20px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+        }
+        header .context {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            display: grid;
+            gap: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        header .context strong {
+            font-size: 1rem;
+            color: #0f172a;
+        }
+        header .context span {
+            color: #1e3a8a;
+            font-weight: 500;
+        }
+        header .context.error {
+            background: rgba(239, 68, 68, 0.14);
+            color: #b91c1c;
+        }
+        header .context.error span {
+            color: inherit;
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.3rem;
+            color: #0f172a;
+        }
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+        .grid.two {
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+        label {
+            display: grid;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font: inherit;
+            color: inherit;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 14px 24px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+            justify-self: start;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 32px rgba(37, 99, 235, 0.28);
+        }
+        .status-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+        }
+        .status-card {
+            border-radius: 18px;
+            padding: 18px;
+            background: #eef2ff;
+            display: grid;
+            gap: 8px;
+            border: 1px solid rgba(79, 70, 229, 0.18);
+        }
+        .status-card span {
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #6366f1;
+            font-weight: 700;
+        }
+        .status-card strong {
+            font-size: 1.8rem;
+            color: #1e1b4b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 18px;
+        }
+        thead {
+            background: #e2e8f0;
+            color: #1f2937;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+        th, td {
+            padding: 16px 18px;
+        }
+        tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        tbody tr:nth-child(odd) {
+            background: #fff;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            background: rgba(37, 99, 235, 0.1);
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        .empty {
+            padding: 24px;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.95rem;
+            border-radius: 16px;
+            background: #f1f5f9;
+            border: 1px dashed rgba(148, 163, 184, 0.6);
+        }
+        @media (max-width: 720px) {
+            body {
+                padding: 20px;
+            }
+            main {
+                padding: 28px;
+            }
+            section {
+                padding: 22px;
+            }
+            th, td {
+                padding: 12px 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <div class="header-top">
+            <h1>Pilotage des contrats</h1>
+            <button type="button" class="login-button" id="loginButton">Changer de compte</button>
+        </div>
+        <p>Simulez l'onboarding d'une nouvelle collaboration entre une organisation sportive et un agent SponsorsClub. Cette page permet de démarrer un nouveau contrat et de visualiser rapidement les étapes clés du pipeline.</p>
+        <div class="context" id="identitySummary">Authentifiez-vous via la sandbox pour charger vos organisations.</div>
+    </header>
+
+    <section>
+        <h2>Créer un brouillon</h2>
+        <p>Renseignez les éléments indispensables avant de passer à l'éditeur de clauses.</p>
+        <form class="grid two" id="createContractForm">
+            <label>
+                Organisation
+                <select id="organisationSelect" required></select>
+            </label>
+            <label>
+                Agent SponsorsClub
+                <select id="agentSelect" required></select>
+            </label>
+            <label>
+                Titre du contrat
+                <input type="text" id="titleInput" placeholder="Contrat partenariat saison 2025" required>
+            </label>
+            <label>
+                Date d'effet souhaitée
+                <input type="date" id="effectiveDateInput">
+            </label>
+            <label style="grid-column: 1 / -1;">
+                Description interne
+                <textarea id="descriptionInput" placeholder="Notes internes (non envoyées à l'API)"></textarea>
+            </label>
+            <div style="grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="submit">Créer le brouillon</button>
+                <span class="pill">Étape 1 sur 4 : Brouillon</span>
+            </div>
+            <div id="createStatus" style="grid-column: 1 / -1; font-size: 0.9rem; color: #475569;"></div>
+        </form>
+    </section>
+
+    <section>
+        <h2>Suivi des statuts</h2>
+        <div class="status-board" id="statusBoard"></div>
+        <div class="empty" id="statusEmpty" style="display:none;">Connectez-vous puis rechargez la page pour visualiser les données de vos contrats.</div>
+    </section>
+
+    <section>
+        <h2>Contrats récents</h2>
+        <div class="grid">
+            <table>
+                <thead>
+                <tr>
+                    <th>Contrat</th>
+                    <th>Organisation</th>
+                    <th>Agent</th>
+                    <th>Dernière mise à jour</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="contractsTableBody"></tbody>
+            </table>
+            <div class="empty" id="contractsEmpty">Aucun contrat pour le moment. Créez un brouillon ou vérifiez vos permissions.</div>
+        </div>
+    </section>
+</main>
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
+    const state = {
+        statuses: [],
+        organisations: [],
+        agents: [],
+        contracts: [],
+        me: null,
+        roles: null,
+        activeOrganisationId: null,
+    };
+
+    const createForm = document.getElementById('createContractForm');
+    const organisationSelect = document.getElementById('organisationSelect');
+    const agentSelect = document.getElementById('agentSelect');
+    const titleInput = document.getElementById('titleInput');
+    const effectiveDateInput = document.getElementById('effectiveDateInput');
+    const statusBoard = document.getElementById('statusBoard');
+    const statusEmpty = document.getElementById('statusEmpty');
+    const contractsTableBody = document.getElementById('contractsTableBody');
+    const contractsEmpty = document.getElementById('contractsEmpty');
+    const createStatus = document.getElementById('createStatus');
+    const identitySummary = document.getElementById('identitySummary');
+    const loginButton = document.getElementById('loginButton');
+    const defaultContractsEmptyMessage = contractsEmpty ? contractsEmpty.textContent : '';
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = {
+            method,
+            headers,
+            credentials: 'same-origin',
+        };
+
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        const accessToken = window.localStorage.getItem(ACCESS_KEY);
+        if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (error) {
+                payload = text;
+            }
+        }
+
+        return { ok: response.ok, status: response.status, data: payload };
+    }
+
+    function setStatus(element, message, variant) {
+        if (!element) {
+            return;
+        }
+        element.textContent = message || '';
+        element.style.color = variant === 'error' ? '#b91c1c' : variant === 'success' ? '#15803d' : '#475569';
+    }
+
+    function populateSelect(select, items, placeholder) {
+        if (!select) {
+            return;
+        }
+        select.innerHTML = '';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = placeholder;
+        defaultOption.disabled = true;
+        defaultOption.selected = !state.activeOrganisationId;
+        select.appendChild(defaultOption);
+        for (const item of items) {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.name || item.email;
+            select.appendChild(option);
+        }
+        if (select === organisationSelect) {
+            if (state.activeOrganisationId) {
+                select.value = state.activeOrganisationId;
+                defaultOption.selected = false;
+            } else if (items.length === 1) {
+                const [singleOrganisation] = items;
+                select.value = singleOrganisation.id;
+                defaultOption.selected = false;
+                setActiveOrganisation(singleOrganisation.id, { skipSelectUpdate: true });
+            }
+            select.disabled = items.length <= 1;
+        }
+    }
+
+    function getActiveOrganisation() {
+        if (!state.activeOrganisationId) {
+            return null;
+        }
+        return (
+            state.organisations.find((organisation) => organisation.id === state.activeOrganisationId) || null
+        );
+    }
+
+    function updateIdentitySummary() {
+        if (!identitySummary) {
+            return;
+        }
+
+        identitySummary.className = 'context';
+        identitySummary.innerHTML = '';
+
+        if (!state.me) {
+            identitySummary.classList.add('error');
+            identitySummary.textContent = "Authentifiez-vous via la sandbox pour charger vos organisations.";
+            return;
+        }
+
+        const nameParts = [];
+        if (state.me.first_name) {
+            nameParts.push(state.me.first_name);
+        }
+        if (state.me.last_name) {
+            nameParts.push(state.me.last_name);
+        }
+        const displayName = nameParts.length ? nameParts.join(' ') : state.me.email;
+
+        const heading = document.createElement('strong');
+        heading.textContent = displayName;
+        identitySummary.appendChild(heading);
+
+        if (state.me.email) {
+            const emailLine = document.createElement('span');
+            emailLine.textContent = state.me.email;
+            identitySummary.appendChild(emailLine);
+        }
+
+        const organisation = getActiveOrganisation();
+        const organisationLine = document.createElement('span');
+        organisationLine.textContent = organisation
+            ? `Organisation active : ${organisation.name}`
+            : 'Aucune organisation active.';
+        identitySummary.appendChild(organisationLine);
+
+        const totalCollaborations =
+            state.roles && Array.isArray(state.roles.collaborations)
+                ? state.roles.collaborations.length
+                : 0;
+        const collaborationsLine = document.createElement('span');
+        collaborationsLine.textContent = totalCollaborations
+            ? `${totalCollaborations} organisation(s) liée(s) à ce compte.`
+            : 'Aucune collaboration synchronisée.';
+        identitySummary.appendChild(collaborationsLine);
+    }
+
+    function getVisibleContracts() {
+        if (!state.activeOrganisationId) {
+            return state.contracts;
+        }
+        return state.contracts.filter(
+            (contract) => contract.organisation && contract.organisation.id === state.activeOrganisationId,
+        );
+    }
+
+    function setActiveOrganisation(organisationId, options = {}) {
+        const normalized = organisationId || null;
+        const { skipSelectUpdate = false } = options;
+        const changed = state.activeOrganisationId !== normalized;
+        state.activeOrganisationId = normalized;
+
+        if (!skipSelectUpdate && organisationSelect) {
+            if (normalized) {
+                const candidate = organisationSelect.querySelector(`option[value="${normalized}"]`);
+                if (candidate) {
+                    organisationSelect.value = normalized;
+                }
+            } else {
+                if (organisationSelect.options.length) {
+                    organisationSelect.selectedIndex = 0;
+                }
+            }
+        }
+
+        if (changed) {
+            renderStatusBoard();
+            renderContractsTable();
+        }
+        updateIdentitySummary();
+    }
+
+    function formatDate(value) {
+        if (!value) {
+            return '—';
+        }
+        const date = new Date(value);
+        return date.toLocaleDateString('fr-FR', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    }
+
+    function renderStatusBoard() {
+        if (!statusBoard) {
+            return;
+        }
+        statusBoard.innerHTML = '';
+        if (!state.statuses.length) {
+            statusEmpty.style.display = 'block';
+            return;
+        }
+        statusEmpty.style.display = 'none';
+
+        const counts = new Map();
+        for (const contract of getVisibleContracts()) {
+            counts.set(contract.status, (counts.get(contract.status) || 0) + 1);
+        }
+
+        for (const item of state.statuses) {
+            const card = document.createElement('div');
+            card.className = 'status-card';
+            const count = counts.get(item.value) || 0;
+
+            const label = document.createElement('span');
+            label.textContent = item.label;
+
+            const strong = document.createElement('strong');
+            strong.textContent = count;
+
+            const helper = document.createElement('p');
+            helper.textContent =
+                item.value === 'draft'
+                    ? 'Contrats en cours de préparation.'
+                    : item.value === 'negotiation'
+                        ? 'Négociations actives avec les agents.'
+                        : item.value === 'agreement'
+                            ? 'Prêts pour la signature finale.'
+                            : item.value === 'active'
+                                ? 'Contrats en cours d’exécution.'
+                                : 'Contrats terminés ou résiliés.';
+
+            card.appendChild(label);
+            card.appendChild(strong);
+            card.appendChild(helper);
+            statusBoard.appendChild(card);
+        }
+    }
+
+    function renderContractsTable() {
+        if (!contractsTableBody) {
+            return;
+        }
+        contractsTableBody.innerHTML = '';
+        const visibleContracts = getVisibleContracts();
+        if (!visibleContracts.length) {
+            contractsEmpty.style.display = 'block';
+            if (state.activeOrganisationId) {
+                const organisation = getActiveOrganisation();
+                contractsEmpty.textContent = organisation
+                    ? `Aucun contrat pour ${organisation.name}. Créez un brouillon pour démarrer.`
+                    : 'Aucun contrat pour cette organisation.';
+            } else {
+                contractsEmpty.textContent = defaultContractsEmptyMessage;
+            }
+            return;
+        }
+        contractsEmpty.style.display = 'none';
+        contractsEmpty.textContent = defaultContractsEmptyMessage;
+
+        for (const contract of visibleContracts) {
+            const row = document.createElement('tr');
+
+            const titleCell = document.createElement('td');
+            titleCell.textContent = contract.title;
+
+            const organisationCell = document.createElement('td');
+            organisationCell.textContent = contract.organisation ? contract.organisation.name : '—';
+
+            const agentCell = document.createElement('td');
+            agentCell.textContent = contract.agent ? contract.agent.name : '—';
+
+            const updatedCell = document.createElement('td');
+            updatedCell.textContent = formatDate(contract.updated_at);
+
+            const statusCell = document.createElement('td');
+            const pill = document.createElement('span');
+            pill.className = 'pill';
+            pill.textContent = contract.status_label;
+            statusCell.appendChild(pill);
+
+            const actionsCell = document.createElement('td');
+            actionsCell.style.textAlign = 'right';
+            const editorLink = document.createElement('a');
+            editorLink.href = `/poc/contracts/editor/?contractId=${contract.id}`;
+            editorLink.className = 'pill';
+            editorLink.textContent = 'Éditer';
+            editorLink.style.background = 'rgba(37,99,235,0.12)';
+            const reviewLink = document.createElement('a');
+            reviewLink.href = `/poc/contracts/review/?contractId=${contract.id}`;
+            reviewLink.className = 'pill';
+            reviewLink.style.marginLeft = '8px';
+            reviewLink.textContent = 'Revue';
+            reviewLink.style.background = 'rgba(16,185,129,0.15)';
+            reviewLink.style.color = '#047857';
+            actionsCell.appendChild(editorLink);
+            actionsCell.appendChild(reviewLink);
+
+            row.appendChild(titleCell);
+            row.appendChild(organisationCell);
+            row.appendChild(agentCell);
+            row.appendChild(updatedCell);
+            row.appendChild(statusCell);
+            row.appendChild(actionsCell);
+
+            contractsTableBody.appendChild(row);
+        }
+    }
+
+    async function loadData() {
+        setStatus(createStatus, 'Chargement des données…');
+        try {
+            const [optionsResponse, contractsResponse] = await Promise.all([
+                apiRequest({ url: '/api/contracts/options/' }),
+                apiRequest({ url: '/api/contracts/' }),
+            ]);
+
+            if (optionsResponse.ok) {
+                state.statuses = optionsResponse.data.statuses || [];
+                state.organisations = optionsResponse.data.organisations || [];
+                state.agents = optionsResponse.data.agents || [];
+                populateSelect(organisationSelect, state.organisations, 'Sélectionnez une organisation');
+                populateSelect(agentSelect, state.agents, 'Sélectionnez un agent');
+                updateIdentitySummary();
+                if (state.activeOrganisationId) {
+                    renderStatusBoard();
+                    renderContractsTable();
+                }
+            } else if (optionsResponse.status === 401) {
+                setStatus(createStatus, 'Authentifiez-vous via la page de login POC.', 'error');
+            }
+
+            if (contractsResponse.ok && Array.isArray(contractsResponse.data)) {
+                state.contracts = contractsResponse.data;
+            } else {
+                state.contracts = [];
+            }
+
+            renderStatusBoard();
+            renderContractsTable();
+            if (state.contracts.length) {
+                setStatus(createStatus, 'Données mises à jour.', 'success');
+            } else if (createStatus.textContent === 'Chargement des données…') {
+                setStatus(createStatus, 'Aucun contrat trouvé. Créez un brouillon pour démarrer.');
+            }
+        } catch (error) {
+            console.error(error);
+            setStatus(createStatus, "Impossible de charger l'API.", 'error');
+        }
+    }
+
+    async function loadIdentity() {
+        try {
+            const [meResponse, rolesResponse] = await Promise.all([
+                apiRequest({ url: '/api/users/me/' }),
+                apiRequest({ url: '/api/users/me/roles/' }),
+            ]);
+
+            if (meResponse.ok) {
+                state.me = meResponse.data;
+            } else {
+                state.me = null;
+            }
+
+            if (rolesResponse.ok) {
+                state.roles = rolesResponse.data;
+                if (
+                    Array.isArray(state.roles.collaborations) &&
+                    state.roles.collaborations.length
+                ) {
+                    const preferred =
+                        state.roles.collaborations.find((item) => item.role === 'owner') ||
+                        state.roles.collaborations[0];
+                    setActiveOrganisation(preferred.organisation_id, { skipSelectUpdate: true });
+                } else {
+                    setActiveOrganisation(null, { skipSelectUpdate: true });
+                }
+            } else {
+                state.roles = null;
+                setActiveOrganisation(null, { skipSelectUpdate: true });
+            }
+        } catch (error) {
+            console.error(error);
+            state.me = null;
+            state.roles = null;
+            setActiveOrganisation(null, { skipSelectUpdate: true });
+        } finally {
+            updateIdentitySummary();
+        }
+    }
+
+    if (organisationSelect) {
+        organisationSelect.addEventListener('change', (event) => {
+            if (event.target.value) {
+                setActiveOrganisation(event.target.value, { skipSelectUpdate: true });
+            } else {
+                setActiveOrganisation(null, { skipSelectUpdate: true });
+            }
+        });
+    }
+
+    if (createForm) {
+        createForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!organisationSelect.value || !agentSelect.value) {
+                setStatus(createStatus, 'Sélectionnez une organisation et un agent.', 'error');
+                return;
+            }
+            const payload = {
+                organisation_id: organisationSelect.value,
+                agent_id: agentSelect.value,
+                title: titleInput.value,
+            };
+            if (effectiveDateInput.value) {
+                payload.effective_date = effectiveDateInput.value;
+            }
+
+            setStatus(createStatus, 'Création du contrat…');
+            try {
+                const response = await apiRequest({
+                    url: '/api/contracts/',
+                    method: 'POST',
+                    data: payload,
+                });
+                if (response.ok) {
+                    setStatus(createStatus, 'Contrat créé avec succès !', 'success');
+                    titleInput.value = '';
+                    effectiveDateInput.value = '';
+                    if (organisationSelect.options.length === 1) {
+                        organisationSelect.selectedIndex = 0;
+                    }
+                    if (agentSelect.options.length === 1) {
+                        agentSelect.selectedIndex = 0;
+                    }
+                    await loadData();
+                } else {
+                    const detail = typeof response.data === 'object' && response.data !== null ? JSON.stringify(response.data) : 'Erreur inconnue.';
+                    setStatus(createStatus, `Erreur (${response.status}) • ${detail}`, 'error');
+                }
+            } catch (error) {
+                setStatus(createStatus, 'Erreur réseau lors de la création.', 'error');
+            }
+        });
+    }
+
+    (async function bootstrap() {
+        await loadIdentity();
+        await loadData();
+    })();
+})();
+</script>
+</body>
+</html>

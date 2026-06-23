@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Testeur de messages • Sponsors Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0f172a;
+            color: #0f172a;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            padding: clamp(16px, 4vw, 40px);
+        }
+        main {
+            width: min(1280px, 100%);
+            background: #f8fafc;
+            border-radius: 28px;
+            box-shadow: 0 40px 90px rgba(15, 23, 42, 0.35);
+            padding: clamp(24px, 4vw, 40px);
+            display: grid;
+            gap: clamp(20px, 2.5vw, 32px);
+        }
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: clamp(1.8rem, 3vw, 2.4rem);
+            color: #0f172a;
+        }
+        header p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.6;
+            max-width: 72ch;
+        }
+        .layout {
+            display: grid;
+            gap: clamp(18px, 2vw, 24px);
+        }
+        @media (min-width: 960px) {
+            .layout.two-columns {
+                grid-template-columns: 360px 1fr;
+            }
+        }
+        section {
+            background: white;
+            border-radius: 22px;
+            padding: clamp(20px, 2.2vw, 28px);
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+            display: grid;
+            gap: clamp(16px, 1.8vw, 22px);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #111827;
+        }
+        h3 {
+            margin: 0 0 4px;
+            font-size: 1rem;
+            color: #1f2937;
+        }
+        p.hint {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font: inherit;
+            color: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+            background: #fff;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 999px;
+            padding: 11px 22px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(37, 99, 235, 0.25);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #4b5563;
+        }
+        button.ghost {
+            background: transparent;
+            color: #2563eb;
+            padding: 0 12px;
+            border-radius: 12px;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .status {
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #475569;
+        }
+        .status.success {
+            color: #047857;
+        }
+        .status.error {
+            color: #b91c1c;
+        }
+        .stack {
+            display: grid;
+            gap: 12px;
+        }
+        ul.thread-list,
+        ul.message-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 12px;
+        }
+        .thread-card,
+        .message-card {
+            border-radius: 16px;
+            padding: 16px 18px;
+            background: #f8fafc;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            display: grid;
+            gap: 10px;
+        }
+        .thread-card.active {
+            border-color: #2563eb;
+            box-shadow: 0 10px 28px rgba(37, 99, 235, 0.15);
+        }
+        .thread-card header,
+        .message-card header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: baseline;
+        }
+        .thread-card header strong {
+            color: #111827;
+        }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+        }
+        .tag.neutral {
+            background: rgba(15, 23, 42, 0.08);
+            color: #0f172a;
+        }
+        .message-card .content {
+            white-space: pre-wrap;
+            line-height: 1.55;
+            color: #1f2937;
+        }
+        .message-card.unread {
+            border-color: rgba(37, 99, 235, 0.28);
+            background: #eff6ff;
+        }
+        .message-card footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .empty-state {
+            border-radius: 16px;
+            padding: 18px;
+            background: #e2e8f0;
+            color: #475569;
+            text-align: center;
+            font-weight: 500;
+        }
+        pre.log {
+            margin: 0;
+            border-radius: 16px;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 18px;
+            max-height: 260px;
+            overflow: auto;
+            font-size: 0.85rem;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Testeur de l'API Messaging</h1>
+        <p>
+            Cette page React permet de vérifier rapidement les endpoints de la messagerie :
+            lister les conversations disponibles, inspecter leurs messages, envoyer une réponse
+            et marquer des messages comme lus. Les appels nécessitent un token JWT valide.
+        </p>
+    </header>
+    <div id="root"></div>
+</main>
+{% verbatim %}
+<script type="text/babel" data-presets="env,react">
+const { useCallback, useEffect, useMemo, useState } = React;
+
+const DEFAULT_SETTINGS = {
+    baseUrl: "http://localhost:8000/api/messaging",
+    token: "",
+};
+
+function readStoredSettings() {
+    try {
+        const raw = window.localStorage.getItem("messagingTesterSettings");
+        if (!raw) {
+            return DEFAULT_SETTINGS;
+        }
+        const parsed = JSON.parse(raw);
+        return {
+            baseUrl: parsed.baseUrl || DEFAULT_SETTINGS.baseUrl,
+            token: parsed.token || DEFAULT_SETTINGS.token,
+        };
+    } catch (error) {
+        console.warn("Impossible de lire les préférences stockées", error);
+        return DEFAULT_SETTINGS;
+    }
+}
+
+function MessageTesterApp() {
+    const storedSettings = useMemo(() => readStoredSettings(), []);
+    const [baseUrl, setBaseUrl] = useState(storedSettings.baseUrl);
+    const [token, setToken] = useState(storedSettings.token);
+    const [status, setStatus] = useState({ level: "info", message: "Prêt à interroger l'API." });
+    const [threads, setThreads] = useState({ results: [], count: 0, next: null, previous: null });
+    const [threadsLoading, setThreadsLoading] = useState(false);
+    const [messages, setMessages] = useState({ results: [], count: 0, next: null, previous: null });
+    const [messagesLoading, setMessagesLoading] = useState(false);
+    const [selectedThread, setSelectedThread] = useState(null);
+    const [messageInput, setMessageInput] = useState("");
+    const [threadForm, setThreadForm] = useState({ collaboratorId: "", agentId: "", athleteId: "" });
+    const [creatingThread, setCreatingThread] = useState(false);
+    const [log, setLog] = useState([]);
+    const [threadsPageSize, setThreadsPageSize] = useState(20);
+    const [messagesPageSize, setMessagesPageSize] = useState(50);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                "messagingTesterSettings",
+                JSON.stringify({ baseUrl, token })
+            );
+        } catch (error) {
+            console.warn("Impossible d'enregistrer les préférences", error);
+        }
+    }, [baseUrl, token]);
+
+    const normalizedBaseUrl = useMemo(() => {
+        if (!baseUrl) {
+            return DEFAULT_SETTINGS.baseUrl;
+        }
+        return baseUrl.replace(/\/$/, "");
+    }, [baseUrl]);
+
+    const pushLog = useCallback((entry) => {
+        setLog((current) => [entry, ...current].slice(0, 25));
+    }, []);
+
+    const csrfToken = useMemo(() => {
+        if (typeof document === "undefined") {
+            return null;
+        }
+        const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }, []);
+
+    const buildHeaders = useCallback(
+        (method = "GET", hasBody = false) => {
+            const headers = { Accept: "application/json" };
+            if (hasBody) {
+                headers["Content-Type"] = "application/json";
+            }
+            if (csrfToken && !/^(GET|HEAD|OPTIONS|TRACE)$/i.test(method)) {
+                headers["X-CSRFToken"] = csrfToken;
+            }
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            return headers;
+        },
+        [csrfToken, token]
+    );
+
+    const callApi = useCallback(
+        async (path, { method = "GET", body = undefined, query = null } = {}) => {
+            const endpoint = path.startsWith("/")
+                ? `${normalizedBaseUrl}${path}`
+                : `${normalizedBaseUrl}/${path}`;
+            const url = new URL(endpoint);
+            if (query) {
+                const params = new URLSearchParams(query);
+                params.forEach((value, key) => {
+                    if (value !== undefined && value !== null && value !== "") {
+                        url.searchParams.set(key, value);
+                    }
+                });
+            }
+            const requestInit = {
+                method,
+                headers: buildHeaders(
+                    method,
+                    body !== undefined && !(body instanceof FormData)
+                ),
+                credentials: token ? "omit" : "include",
+            };
+            if (body !== undefined) {
+                requestInit.body = body instanceof FormData ? body : JSON.stringify(body);
+            }
+            let response;
+            try {
+                response = await fetch(url.toString(), requestInit);
+            } catch (networkError) {
+                pushLog({
+                    timestamp: new Date().toISOString(),
+                    method,
+                    url: url.toString(),
+                    status: "network_error",
+                    payload: networkError instanceof Error ? networkError.message : networkError,
+                });
+                throw new Error("Impossible de joindre le serveur. Vérifiez l'URL de base.");
+            }
+            const text = await response.text();
+            let payload = null;
+            try {
+                payload = text ? JSON.parse(text) : null;
+            } catch (error) {
+                payload = text;
+            }
+            pushLog({
+                timestamp: new Date().toISOString(),
+                method,
+                url: url.toString(),
+                status: response.status,
+                payload,
+            });
+            if (!response.ok) {
+                const message = payload && payload.detail
+                    ? payload.detail
+                    : `Erreur ${response.status}`;
+                throw new Error(message);
+            }
+            return payload;
+        },
+        [buildHeaders, normalizedBaseUrl, pushLog, token]
+    );
+
+    const loadThreads = useCallback(
+        async (page) => {
+            setThreadsLoading(true);
+            setStatus({ level: "info", message: "Chargement des conversations…" });
+            try {
+                const data = await callApi("/threads/", {
+                    query: { page, page_size: threadsPageSize },
+                });
+                setThreads({
+                    results: data.results || [],
+                    count: data.count || 0,
+                    next: data.next,
+                    previous: data.previous,
+                });
+                setStatus({
+                    level: "success",
+                    message: `Conversations chargées (${(data.results || []).length} éléments).`,
+                });
+            } catch (error) {
+                setStatus({ level: "error", message: error.message || "Échec du chargement." });
+            } finally {
+                setThreadsLoading(false);
+            }
+        },
+        [callApi, threadsPageSize]
+    );
+
+    const loadMessages = useCallback(
+        async (thread, page) => {
+            if (!thread) {
+                return;
+            }
+            setMessagesLoading(true);
+            setStatus({ level: "info", message: "Récupération des messages…" });
+            try {
+                const data = await callApi(`/threads/${thread.id}/messages/`, {
+                    query: { page, page_size: messagesPageSize },
+                });
+                setMessages({
+                    results: data.results || [],
+                    count: data.count || 0,
+                    next: data.next,
+                    previous: data.previous,
+                });
+                setStatus({ level: "success", message: "Messages chargés." });
+            } catch (error) {
+                setStatus({ level: "error", message: error.message || "Impossible de charger les messages." });
+            } finally {
+                setMessagesLoading(false);
+            }
+        },
+        [callApi, messagesPageSize]
+    );
+
+    const handleSelectThread = useCallback((thread) => {
+        setSelectedThread(thread);
+        setMessageInput("");
+        setMessages({ results: [], count: 0, next: null, previous: null });
+    }, []);
+
+    const handleSendMessage = useCallback(
+        async (event) => {
+            event.preventDefault();
+            if (!selectedThread || !messageInput.trim()) {
+                return;
+            }
+            setStatus({ level: "info", message: "Envoi du message…" });
+            try {
+                await callApi(`/threads/${selectedThread.id}/messages/`, {
+                    method: "POST",
+                    body: { content: messageInput.trim() },
+                });
+                setMessageInput("");
+                await loadMessages(selectedThread, 1);
+                await loadThreads(1);
+                setStatus({ level: "success", message: "Message envoyé." });
+            } catch (error) {
+                setStatus({ level: "error", message: error.message || "Échec de l'envoi." });
+            }
+        },
+        [callApi, loadMessages, loadThreads, messageInput, selectedThread]
+    );
+
+    const handleToggleRead = useCallback(
+        async (message, nextState) => {
+            try {
+                const updated = await callApi(`/messages/${message.id}/read/`, {
+                    method: "PATCH",
+                    body: { is_read: nextState },
+                });
+                setMessages((current) => ({
+                    ...current,
+                    results: current.results.map((item) =>
+                        item.id === message.id ? updated : item
+                    ),
+                }));
+                setStatus({ level: "success", message: "Statut de lecture mis à jour." });
+            } catch (error) {
+                setStatus({ level: "error", message: error.message || "Impossible de modifier le statut." });
+            }
+        },
+        [callApi]
+    );
+
+    const handleCreateThread = useCallback(
+        async (event) => {
+            event.preventDefault();
+            setCreatingThread(true);
+            setStatus({ level: "info", message: "Création de la conversation…" });
+            try {
+                await callApi("/threads/", {
+                    method: "POST",
+                    body: {
+                        collaborator_id: threadForm.collaboratorId || undefined,
+                        agent_id: threadForm.agentId || undefined,
+                        athlete_id: threadForm.athleteId || undefined,
+                    },
+                });
+                setThreadForm({ collaboratorId: "", agentId: "", athleteId: "" });
+                await loadThreads(1);
+                setStatus({ level: "success", message: "Conversation créée." });
+            } catch (error) {
+                setStatus({ level: "error", message: error.message || "Échec de la création." });
+            } finally {
+                setCreatingThread(false);
+            }
+        },
+        [callApi, loadThreads, threadForm]
+    );
+
+    const resetSettings = useCallback(() => {
+        setBaseUrl(DEFAULT_SETTINGS.baseUrl);
+        setToken("");
+        setThreads({ results: [], count: 0, next: null, previous: null });
+        setMessages({ results: [], count: 0, next: null, previous: null });
+        setSelectedThread(null);
+        setLog([]);
+        setStatus({ level: "info", message: "Préférences réinitialisées." });
+        try {
+            window.localStorage.removeItem("messagingTesterSettings");
+        } catch (error) {
+            console.warn("Impossible de supprimer les préférences", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedThread) {
+            setMessages({ results: [], count: 0, next: null, previous: null });
+            return;
+        }
+        setMessages((current) => ({
+            ...current,
+            results: [],
+        }));
+        loadMessages(selectedThread, 1);
+    }, [selectedThread, messagesPageSize, loadMessages]);
+
+    useEffect(() => {
+        loadThreads(1);
+    }, [threadsPageSize, loadThreads]);
+
+    return (
+        <div className="layout">
+            <section>
+                <div className={`status ${status.level}`}>{status.message}</div>
+                <h2>Paramètres d'API</h2>
+                <p className="hint">
+                    Renseignez l'URL de base des endpoints messaging et collez un token JWT valide.
+                    Les valeurs sont mémorisées dans le navigateur pour vos prochaines sessions.
+                </p>
+                <div className="stack">
+                    <label>
+                        URL de base
+                        <input
+                            type="url"
+                            value={baseUrl}
+                            onChange={(event) => setBaseUrl(event.target.value)}
+                            placeholder="https://sandbox.sponsorsclub.test/api/messaging"
+                            required
+                        />
+                    </label>
+                    <label>
+                        Access token JWT
+                        <textarea
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            placeholder="eyJhbGciOiJI..."
+                            rows={4}
+                        />
+                    </label>
+                    <div className="controls">
+                        <button type="button" onClick={() => loadThreads(1)} disabled={threadsLoading}>
+                            Rafraîchir les conversations
+                        </button>
+                        <button type="button" className="secondary" onClick={resetSettings}>
+                            Réinitialiser
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <div className="layout two-columns">
+                <section>
+                    <h2>Conversations</h2>
+                    <p className="hint">
+                        Les conversations sont paginées ({threadsPageSize} éléments par page). Sélectionnez-en une pour
+                        afficher le détail. Les identifiants sont utiles pour tester les endpoints spécifiques.
+                    </p>
+                    <div className="controls">
+                        <label style={{ maxWidth: "200px" }}>
+                            Taille de page
+                            <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={threadsPageSize}
+                                onChange={(event) => setThreadsPageSize(Number(event.target.value) || 1)}
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => loadThreads(1)}
+                            disabled={threadsLoading}
+                        >
+                            {threadsLoading ? "Chargement…" : "Recharger"}
+                        </button>
+                        <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => threads.previous && loadThreads(new URL(threads.previous).searchParams.get("page"))}
+                            disabled={!threads.previous}
+                        >
+                            Page précédente
+                        </button>
+                        <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => threads.next && loadThreads(new URL(threads.next).searchParams.get("page"))}
+                            disabled={!threads.next}
+                        >
+                            Page suivante
+                        </button>
+                    </div>
+                    {threads.results.length === 0 ? (
+                        <div className="empty-state">
+                            Aucune conversation trouvée. Vérifiez le token ou créez-en une nouvelle.
+                        </div>
+                    ) : (
+                        <ul className="thread-list">
+                            {threads.results.map((thread) => (
+                                <li key={thread.id}>
+                                    <article
+                                        className={`thread-card ${selectedThread && selectedThread.id === thread.id ? "active" : ""}`}
+                                    >
+                                        <header>
+                                            <strong>Thread #{thread.id}</strong>
+                                            {thread.athlete ? (
+                                                <span className="tag">Athlète {thread.athlete.full_name}</span>
+                                            ) : (
+                                                <span className="tag neutral">Sans athlète</span>
+                                            )}
+                                        </header>
+                                        <div>
+                                            <div>
+                                                <strong>Collaborateur :</strong> {thread.collaborator?.role || "—"} · {thread.collaborator?.id || "—"}
+                                            </div>
+                                            <div>
+                                                <strong>Agent :</strong> {thread.agent?.name || "—"} · {thread.agent?.id || "—"}
+                                            </div>
+                                        </div>
+                                        <div className="controls">
+                                            <button type="button" onClick={() => handleSelectThread(thread)}>
+                                                Voir les messages
+                                            </button>
+                                        </div>
+                                    </article>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+
+                <section>
+                    <h2>Messages du thread sélectionné</h2>
+                    {selectedThread ? (
+                        <>
+                            <p className="hint">
+                                Thread actuel : <strong>{selectedThread.id}</strong>. Les messages sont triés du plus ancien au plus récent.
+                            </p>
+                            <div className="controls">
+                                <label style={{ maxWidth: "200px" }}>
+                                    Taille de page
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="200"
+                                        value={messagesPageSize}
+                                        onChange={(event) => setMessagesPageSize(Number(event.target.value) || 1)}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => loadMessages(selectedThread, 1)}
+                                    disabled={messagesLoading}
+                                >
+                                    {messagesLoading ? "Chargement…" : "Rafraîchir"}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() =>
+                                        messages.previous && loadMessages(
+                                            selectedThread,
+                                            new URL(messages.previous).searchParams.get("page")
+                                        )
+                                    }
+                                    disabled={!messages.previous}
+                                >
+                                    Page précédente
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() =>
+                                        messages.next && loadMessages(
+                                            selectedThread,
+                                            new URL(messages.next).searchParams.get("page")
+                                        )
+                                    }
+                                    disabled={!messages.next}
+                                >
+                                    Page suivante
+                                </button>
+                            </div>
+                            {messages.results.length === 0 ? (
+                                <div className="empty-state">
+                                    Aucun message disponible pour l'instant.
+                                </div>
+                            ) : (
+                                <ul className="message-list">
+                                    {messages.results.map((message) => (
+                                        <li key={message.id}>
+                                            <article className={`message-card ${message.is_read ? "" : "unread"}`}>
+                                                <header>
+                                                    <strong>Message #{message.id}</strong>
+                                                    <span className="tag neutral">{new Date(message.created_at).toLocaleString()}</span>
+                                                    <span className="tag">{message.sender_email}</span>
+                                                </header>
+                                                <div className="content">
+                                                    {message.content ? message.content : <em>(Sans contenu)</em>}
+                                                </div>
+                                                {message.attachment ? (
+                                                    <a href={message.attachment} target="_blank" rel="noreferrer">
+                                                        Télécharger la pièce jointe
+                                                    </a>
+                                                ) : null}
+                                                <footer>
+                                                    <span>{message.is_read ? "Lu" : "Non lu"}</span>
+                                                    <div className="controls">
+                                                        <button
+                                                            type="button"
+                                                            className="ghost"
+                                                            onClick={() => handleToggleRead(message, !message.is_read)}
+                                                        >
+                                                            {message.is_read ? "Marquer comme non lu" : "Marquer comme lu"}
+                                                        </button>
+                                                    </div>
+                                                </footer>
+                                            </article>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <form className="stack" onSubmit={handleSendMessage}>
+                                <h3>Envoyer un message</h3>
+                                <textarea
+                                    value={messageInput}
+                                    onChange={(event) => setMessageInput(event.target.value)}
+                                    placeholder="Tapez votre message ici…"
+                                    required
+                                />
+                                <button type="submit" disabled={!messageInput.trim()}>
+                                    Envoyer
+                                </button>
+                            </form>
+                        </>
+                    ) : (
+                        <div className="empty-state">
+                            Sélectionnez une conversation pour voir ses messages.
+                        </div>
+                    )}
+                </section>
+            </div>
+
+            <section>
+                <h2>Créer une conversation manuellement</h2>
+                <p className="hint">
+                    Utilisez ce formulaire pour ouvrir un thread entre un collaborateur et un agent. Si vous laissez un identifiant vide,
+                    l'API tentera de déduire la valeur à partir de l'utilisateur authentifié.
+                </p>
+                <form className="stack" onSubmit={handleCreateThread}>
+                    <label>
+                        Collaborateur (UUID)
+                        <input
+                            value={threadForm.collaboratorId}
+                            onChange={(event) => setThreadForm((current) => ({ ...current, collaboratorId: event.target.value }))}
+                            placeholder="00000000-0000-0000-0000-000000000000"
+                        />
+                    </label>
+                    <label>
+                        Agent (UUID)
+                        <input
+                            value={threadForm.agentId}
+                            onChange={(event) => setThreadForm((current) => ({ ...current, agentId: event.target.value }))}
+                            placeholder="00000000-0000-0000-0000-000000000000"
+                        />
+                    </label>
+                    <label>
+                        Athlète (UUID optionnel)
+                        <input
+                            value={threadForm.athleteId}
+                            onChange={(event) => setThreadForm((current) => ({ ...current, athleteId: event.target.value }))}
+                            placeholder="00000000-0000-0000-0000-000000000000"
+                        />
+                    </label>
+                    <button type="submit" disabled={creatingThread}>
+                        {creatingThread ? "Création…" : "Créer la conversation"}
+                    </button>
+                </form>
+            </section>
+
+            <section>
+                <h2>Historique des appels</h2>
+                <p className="hint">
+                    Les 25 derniers appels effectués depuis cette page sont listés ci-dessous pour faciliter le débogage.
+                </p>
+                {log.length === 0 ? (
+                    <div className="empty-state">Aucune requête effectuée pour le moment.</div>
+                ) : (
+                    <pre className="log">
+{log.map((entry) => `${entry.timestamp} — ${entry.method} ${entry.url} → ${entry.status}\n${JSON.stringify(entry.payload, null, 2)}\n`).join("\n")}
+                    </pre>
+                )}
+            </section>
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<MessageTesterApp />);
+</script>
+{% endverbatim %}
+</body>
+</html>
