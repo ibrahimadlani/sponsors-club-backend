@@ -1,0 +1,10 @@
+Bonjour,
+
+Un nouveau membre a rejoint {{ organisation_name }} via votre invitation.
+
+Nouveau membre  : {{ new_member_email }}
+Code utilisé    : {{ invite_code }}
+
+Rendez-vous dans le tableau de bord pour gérer les membres de votre organisation.
+
+L'équipe Sponsors Club

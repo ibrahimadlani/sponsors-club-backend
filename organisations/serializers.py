@@ -244,6 +244,7 @@ class OrganisationInviteSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "code",
+            "target_email",
             "expires_at",
             "is_used",
             "used_at",
@@ -260,6 +261,12 @@ class OrganisationInviteCreateSerializer(serializers.Serializer):
     expires_in_hours = serializers.IntegerField(
         min_value=1, max_value=168, required=False
     )
+    target_email = serializers.EmailField(
+        required=False,
+        allow_null=True,
+        help_text="Optional email of the intended recipient; "
+        "triggers an automatic invitation email when provided.",
+    )
 
     def create(self, validated_data):
         organisation: Organisation = self.context["organisation"]
@@ -268,6 +275,7 @@ class OrganisationInviteCreateSerializer(serializers.Serializer):
             "expires_in_hours", OrganisationInvite.DEFAULT_EXPIRY_HOURS
         )
         expires_at = timezone.now() + timedelta(hours=hours)
+        target_email: str | None = validated_data.get("target_email")
 
         code = OrganisationInvite.generate_code()
         while OrganisationInvite.objects.filter(code=code).exists():
@@ -277,6 +285,7 @@ class OrganisationInviteCreateSerializer(serializers.Serializer):
             organisation=organisation,
             created_by=created_by,
             code=code,
+            target_email=target_email,
             expires_at=expires_at,
         )
         return invite
@@ -342,6 +351,19 @@ class OrganisationJoinSerializer(serializers.Serializer):
             job_title=job_title,
         )
         invite.mark_used(user)
+
+        # Audit log + owner notification (soft failures — never block the join)
+        from .services import log_invitation_action, send_invitation_accepted_email
+        from .models import InvitationAuditLog
+
+        request = self.context.get("request")
+        log_invitation_action(
+            invite,
+            InvitationAuditLog.Action.ACCEPTED,
+            request=request,
+        )
+        send_invitation_accepted_email(invite, user.email)
+
         return collaborator
 
 

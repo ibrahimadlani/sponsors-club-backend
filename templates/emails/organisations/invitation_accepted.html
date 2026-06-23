@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family: Arial, sans-serif; color: #111827; max-width: 600px; margin: 0 auto;">
+    <p>Bonjour,</p>
+    <p>
+      Un nouveau membre a rejoint <strong>{{ organisation_name }}</strong> via votre invitation.
+    </p>
+    <table style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; width: 100%;">
+      <tr>
+        <td style="color: #6b7280; padding: 4px 0;">Nouveau membre</td>
+        <td style="font-weight: bold; padding: 4px 0;">{{ new_member_email }}</td>
+      </tr>
+      <tr>
+        <td style="color: #6b7280; padding: 4px 0;">Code d'invitation utilisé</td>
+        <td style="font-family: monospace; padding: 4px 0;">{{ invite_code }}</td>
+      </tr>
+    </table>
+    <p>Rendez-vous dans le tableau de bord pour gérer les membres de votre organisation.</p>
+    <p>L'équipe Sponsors Club</p>
+  </body>
+</html>

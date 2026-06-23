@@ -269,6 +269,12 @@ class OrganisationInvite(BaseModel):
         related_name="created_invites",
     )
     code = models.CharField(max_length=16, unique=True)
+    target_email = models.EmailField(
+        blank=True,
+        null=True,
+        help_text="Optional email address of the intended recipient; "
+        "when provided, an invitation email is sent automatically.",
+    )
     expires_at = models.DateTimeField()
     is_used = models.BooleanField(default=False)
     used_at = models.DateTimeField(blank=True, null=True)
@@ -312,3 +318,57 @@ class OrganisationInvite(BaseModel):
         """Return a random uppercase invitation code."""
         alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return "".join(secrets.choice(alphabet) for _ in range(cls.CODE_LENGTH))
+
+
+class InvitationAuditLog(BaseModel):
+    """Immutable audit trail for invitation lifecycle events.
+
+    A new record is written for every significant state change on an
+    ``OrganisationInvite``: creation, acceptance, revocation, or expiry.
+    The actor and HTTP metadata are captured for forensic purposes.
+
+    Attributes:
+        invite: The invitation that triggered this log entry.
+        action: One of CREATED / ACCEPTED / REVOKED / EXPIRED.
+        actor: The platform user who performed the action, or ``None``
+            for system-generated entries (e.g. scheduled expiry cleanup).
+        ip_address: The client's IP address, extracted with reverse-proxy
+            awareness (``X-Forwarded-For`` header takes precedence).
+        user_agent: Raw ``User-Agent`` header, truncated to 512 chars.
+    """
+
+    class Action(models.TextChoices):
+        """Enumeration of trackable invitation lifecycle events."""
+
+        CREATED = "CREATED", _("Created")
+        ACCEPTED = "ACCEPTED", _("Accepted")
+        REVOKED = "REVOKED", _("Revoked")
+        EXPIRED = "EXPIRED", _("Expired")
+
+    invite = models.ForeignKey(
+        OrganisationInvite,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+    action = models.CharField(max_length=16, choices=Action.choices)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitation_audit_logs",
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(
+                fields=("invite", "-created_at"),
+                name="inviteaudit_invite_created_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.action} — {self.invite.code} at {self.created_at}"
