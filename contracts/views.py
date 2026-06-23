@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from athletes.models import RepresentationMandate
 from organisations.models import Collaborator
 from payments.models import PlatformFee
 from users.models import AgentProfile
@@ -24,7 +25,6 @@ from .models import (
     ContractRevision,
     ContractSigning,
     ContractVersion,
-    RepresentationMandate,
 )
 from .serializers import (
     ClauseTemplateSerializer,
@@ -1337,76 +1337,54 @@ class ContractViewSet(
             raise Http404 from exc
 
     def _has_valid_mandate(self, contract):
-        """Check if both parties have valid representation mandates.
+        """Check if the agent holds a valid representation mandate.
 
-        Phase 2: Validates that the agent has a verified mandate for the athlete
-        and a collaborator has a verified mandate for the organisation.
+        Queries ``athletes.RepresentationMandate`` for a LICENSED_AGENT entry
+        belonging to the contract's agent user that is active, staff-verified,
+        and within its validity window.
 
         Args:
             contract: Contract instance to validate.
 
         Returns:
-            bool: ``True`` if both mandates are valid, ``False`` otherwise.
+            bool: ``True`` when a qualifying mandate exists.
         """
 
         today = timezone.now().date()
 
-        # Check agent mandate - agent should have at least one verified mandate
-        agent_mandate_exists = (
+        return (
             RepresentationMandate.objects.filter(
-                agent=contract.agent,
+                representative__user=contract.agent.user,
+                role=RepresentationMandate.Role.LICENSED_AGENT,
+                is_active=True,
                 verified=True,
-                valid_from__lte=today,
             )
+            .filter(Q(valid_from__isnull=True) | Q(valid_from__lte=today))
             .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
             .exists()
         )
 
-        # Check collaborator mandate for organisation
-        # Find the owner collaborator for this organisation
-        owner_collaborator = Collaborator.objects.filter(
-            organisation=contract.organisation,
-            role=Collaborator.Role.OWNER,
-        ).first()
-
-        collaborator_mandate_exists = False
-        if owner_collaborator:
-            collaborator_mandate_exists = (
-                RepresentationMandate.objects.filter(
-                    collaborator=owner_collaborator,
-                    organisation=contract.organisation,
-                    verified=True,
-                    valid_from__lte=today,
-                )
-                .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
-                .exists()
-            )
-
-        return agent_mandate_exists and collaborator_mandate_exists
-
     def _get_missing_mandates(self, contract):
-        """Return a list of missing or invalid mandates.
-
-        Phase 2: Provides detailed feedback about which mandates are missing
-        to help users complete the requirements for signature.
+        """Return a list of missing or invalid agent mandates.
 
         Args:
             contract: Contract instance to check.
 
         Returns:
-            list: List of missing mandate descriptions.
+            list: Descriptions of each missing mandate (empty when all present).
         """
 
         today = timezone.now().date()
         missing = []
 
-        # Check agent mandate
         agent_mandate_exists = (
             RepresentationMandate.objects.filter(
-                agent=contract.agent,
+                representative__user=contract.agent.user,
+                role=RepresentationMandate.Role.LICENSED_AGENT,
+                is_active=True,
                 verified=True,
-                valid_from__lte=today,
             )
+            .filter(Q(valid_from__isnull=True) | Q(valid_from__lte=today))
             .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
             .exists()
         )
@@ -1417,41 +1395,6 @@ class ContractViewSet(
                     "party": "agent",
                     "agent_id": str(contract.agent.id),
                     "reason": "No valid verified mandate found for agent",
-                }
-            )
-
-        # Check collaborator mandate
-        owner_collaborator = Collaborator.objects.filter(
-            organisation=contract.organisation,
-            role=Collaborator.Role.OWNER,
-        ).first()
-
-        if owner_collaborator:
-            collaborator_mandate_exists = (
-                RepresentationMandate.objects.filter(
-                    collaborator=owner_collaborator,
-                    organisation=contract.organisation,
-                    verified=True,
-                    valid_from__lte=today,
-                )
-                .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
-                .exists()
-            )
-
-            if not collaborator_mandate_exists:
-                missing.append(
-                    {
-                        "party": "organisation",
-                        "organisation_id": str(contract.organisation_id),
-                        "reason": "No valid verified mandate found for organisation owner",
-                    }
-                )
-        else:
-            missing.append(
-                {
-                    "party": "organisation",
-                    "organisation_id": str(contract.organisation_id),
-                    "reason": "No owner collaborator found for organisation",
                 }
             )
 

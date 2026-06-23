@@ -450,11 +450,9 @@ def test_legal_verification_and_signing_flow(
 ):
     from datetime import date, timedelta
     from django.core.files.uploadedfile import SimpleUploadedFile
-    from contracts.models import RepresentationMandate
-    from athletes.models import Sport, Athlete
+    from athletes.models import RepresentationMandate, Sport, Athlete
 
-    # Phase 2: Create required mandates for signature
-    # Create agent mandate
+    # Phase 2: create an agent mandate in athletes.RepresentationMandate
     sport, _ = Sport.objects.get_or_create(name="Football", defaults={"emoji": "⚽"})
     athlete = Athlete.objects.create(
         sport=sport,
@@ -465,27 +463,16 @@ def test_legal_verification_and_signing_flow(
     )
 
     RepresentationMandate.objects.create(
-        agent=created_contract.agent,
+        representative=created_contract.agent.user.representative_profile,
         athlete=athlete,
-        document=SimpleUploadedFile(
+        role=RepresentationMandate.Role.LICENSED_AGENT,
+        proof_document=SimpleUploadedFile(
             "agent_mandate.pdf", b"content", content_type="application/pdf"
         ),
         verified=True,
         valid_from=date.today() - timedelta(days=30),
         valid_until=date.today() + timedelta(days=365),
-    )
-
-    # Create collaborator mandate
-    collaborator = organisations_setup["collaborator"]
-    RepresentationMandate.objects.create(
-        collaborator=collaborator,
-        organisation=created_contract.organisation,
-        document=SimpleUploadedFile(
-            "collab_mandate.pdf", b"content", content_type="application/pdf"
-        ),
-        verified=True,
-        valid_from=date.today() - timedelta(days=30),
-        valid_until=date.today() + timedelta(days=365),
+        can_sign_legally=True,
     )
 
     status_url = reverse("contract-change-status", args=[created_contract.id])
