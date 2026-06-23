@@ -26,6 +26,8 @@ PyYAML==6.0.2  # YAML parsing for configuration-driven utilities
 psycopg2==2.9.10  # PostgreSQL driver enabling Django to connect when DATABASE_URL is set
 dj-database-url==3.0.1  # Parses DATABASE_URL into Django DATABASES dict (12-Factor DB config)
 stripe==10.9.0  # Stripe Python SDK for subscription billing workflows
+sentry-sdk[django]==2.63.0  # Error tracking and performance monitoring (no-op when SENTRY_DSN is unset)
+django-prometheus==2.5.0  # Expose /metrics endpoint for Prometheus scraping
 python-dotenv==1.0.1  # Loads environment variables from .env files in local setups
 boto3==1.35.96  # AWS SDK used for Amazon SES email delivery
 whitenoise==6.7.0  # Static file serving for Gunicorn-based deployments

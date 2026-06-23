@@ -7,6 +7,11 @@ from django.views.generic import TemplateView
 from django.conf.urls.static import static
 
 urlpatterns = [
+    # Prometheus metrics endpoint — scraped by prometheus every 15 s.
+    # In production restrict this path to internal traffic at the proxy layer
+    # (Nginx allow/deny or AWS ALB listener rules) rather than adding auth here,
+    # so that Prometheus can reach it without token management.
+    path("", include("django_prometheus.urls")),
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("api/users/", include("users.urls")),

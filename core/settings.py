@@ -33,6 +33,36 @@ load_dotenv(BASE_DIR / ".env")
 
 
 # ---------------------------------------------------------------------------
+# Sentry — error tracking and performance APM
+# ---------------------------------------------------------------------------
+# No-op when SENTRY_DSN is absent (local dev, CI).  The import is deferred so
+# the package is never required in environments where the DSN is unset.
+_sentry_dsn = os.environ.get("SENTRY_DSN")
+if _sentry_dsn:  # pragma: no cover
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[
+            DjangoIntegration(
+                transaction_style="url",   # Group transactions by URL pattern
+                middleware_spans=True,     # Trace time spent in each middleware
+                signals_spans=True,        # Trace Django signal handlers
+                cache_spans=True,          # Trace cache hits/misses
+            ),
+            RedisIntegration(),
+        ],
+        # Adjust in production: 0.1 = sample 10 % of transactions for APM
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,  # Never forward PII — GDPR compliance
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "development"),
+        release=os.environ.get("GIT_COMMIT_SHA", ""),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Environment detection
 # ---------------------------------------------------------------------------
 
@@ -86,6 +116,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "corsheaders",
+    "django_prometheus",  # Exposes /metrics for Prometheus scraping
     "core.apps.CoreConfig",
     "analytics",
     "athletes",
@@ -104,6 +135,8 @@ if DRF_YASG_ENABLED:
     INSTALLED_APPS.append("drf_yasg")
 
 MIDDLEWARE = [
+    # django-prometheus: MUST be first to time the full request/response cycle
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -113,6 +146,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # django-prometheus: MUST be last to record after all other middlewares
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
