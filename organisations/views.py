@@ -235,6 +235,16 @@ class OrganisationViewSet(
             )
             serializer.is_valid(raise_exception=True)
             invite = serializer.save()
+
+            from .models import InvitationAuditLog
+            from .services import log_invitation_action, send_invitation_created_email
+
+            log_invitation_action(
+                invite, InvitationAuditLog.Action.CREATED, request=request
+            )
+            if invite.target_email:
+                send_invitation_created_email(invite, invite.target_email)
+
             return Response(
                 OrganisationInviteSerializer(invite).data,
                 status=status.HTTP_201_CREATED,
@@ -296,6 +306,12 @@ class OrganisationViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from .models import InvitationAuditLog
+        from .services import log_invitation_action
+
+        log_invitation_action(
+            invite, InvitationAuditLog.Action.REVOKED, request=request
+        )
         invite.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

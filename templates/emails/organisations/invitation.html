@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family: Arial, sans-serif; color: #111827; max-width: 600px; margin: 0 auto;">
+    <p>Bonjour,</p>
+    <p>
+      <strong>{{ inviter_name }}</strong> vous invite à rejoindre
+      <strong>{{ organisation_name }}</strong> sur la plateforme Sponsors Club.
+    </p>
+    <p>Utilisez le code ci-dessous pour accepter l'invitation :</p>
+    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 24px 0;">
+      <span style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1d4ed8;">
+        {{ invite_code }}
+      </span>
+    </div>
+    <p>
+      Saisissez ce code dans l'application pour rejoindre l'organisation.
+      Ce code est valide jusqu'au <strong>{{ expires_at|date:"d/m/Y à H:i" }}</strong>.
+    </p>
+    <p style="color: #6b7280; font-size: 14px;">
+      Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail.
+    </p>
+    <p>L'équipe Sponsors Club</p>
+  </body>
+</html>

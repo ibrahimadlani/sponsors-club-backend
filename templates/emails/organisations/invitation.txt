@@ -1,0 +1,12 @@
+Bonjour,
+
+{{ inviter_name }} vous invite à rejoindre {{ organisation_name }} sur Sponsors Club.
+
+Votre code d'invitation : {{ invite_code }}
+
+Saisissez ce code dans l'application pour rejoindre l'organisation.
+Ce code est valide jusqu'au {{ expires_at|date:"d/m/Y à H:i" }}.
+
+Si vous n'attendiez pas cette invitation, ignorez cet e-mail.
+
+L'équipe Sponsors Club
