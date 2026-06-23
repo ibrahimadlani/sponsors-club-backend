@@ -5,6 +5,11 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+try:  # pragma: no cover - gracefully absent before first pip install
+    import dj_database_url as _dj_db_url
+except ImportError:  # pragma: no cover
+    _dj_db_url = None  # type: ignore[assignment]
+
 try:  # pragma: no cover - fallback path exercised only when dependency missing
     from dotenv import load_dotenv
 except (
@@ -27,15 +32,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# ---------------------------------------------------------------------------
+# Environment detection
+# ---------------------------------------------------------------------------
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-d=twofy9rdp(@w6qc8aqwao2n9fm=3*@to!+yhw=rct1+bf1+0"
+# Any value other than "false", "0", or "no" (case-insensitive) keeps DEBUG on.
+# Production deployments must set:  DJANGO_DEBUG=false
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() not in ("false", "0", "no")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
+# ---------------------------------------------------------------------------
+# Secret key — must come from the environment in production
+# ---------------------------------------------------------------------------
+
+_secret_key = os.environ.get("DJANGO_SECRET_KEY")
+
+if not _secret_key and not DEBUG:
+    # Refuse to start in production without a real secret key — an insecure
+    # key would compromise HMAC signatures, session tokens, and CSRF protection.
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY is not set. In production (DJANGO_DEBUG=false) a "
+        "cryptographically strong key is required.\n"
+        "Generate one with:\n"
+        "  python -c \"from django.core.management.utils import "
+        "get_random_secret_key; print(get_random_secret_key())\""
+    )
+
+# Falls back to the insecure dev key only in local/test environments (DEBUG=True).
+SECRET_KEY = (
+    _secret_key
+    or "django-insecure-d=twofy9rdp(@w6qc8aqwao2n9fm=3*@to!+yhw=rct1+bf1+0"
+)
+
+
+# ---------------------------------------------------------------------------
+# Allowed hosts
+# ---------------------------------------------------------------------------
+
+# Base set always present (covers local dev and DRF's test client hostname).
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
 
@@ -103,25 +137,30 @@ ASGI_APPLICATION = "core.asgi.application"
 WSGI_APPLICATION = "core.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+# ---------------------------------------------------------------------------
+# Database — 12-Factor style: DATABASE_URL drives everything in production
+# ---------------------------------------------------------------------------
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_database_url = os.environ.get("DATABASE_URL")
+
+if _database_url and _dj_db_url is not None and not os.environ.get("PYTEST_CURRENT_TEST"):
+    # Production / staging: parse e.g. postgres://user:pw@host:5432/dbname
+    # conn_max_age=600  — keep connections alive 10 min; reduces per-request overhead.
+    # conn_health_checks — validate stale connections before reuse (safe in containers).
+    DATABASES = {
+        "default": _dj_db_url.config(
+            default=_database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
-
-
-if os.environ.get("POSTGRES_DB") and not os.environ.get("PYTEST_CURRENT_TEST"):
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ["POSTGRES_DB"],
-        "USER": os.environ.get("POSTGRES_USER", ""),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+else:
+    # Local development and CI fall back to SQLite (zero-config, no server needed).
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
 
 
@@ -219,7 +258,15 @@ _cors_hosts = {
     for origin in CORS_ALLOWED_ORIGINS
     if origin and (parsed := urlparse(origin)).hostname
 }
-ALLOWED_HOSTS = list({*ALLOWED_HOSTS, *(_cors_hosts or set())})
+
+# Production domains/IPs — comma-separated, e.g. "api.example.com,10.0.0.5"
+_env_allowed_hosts = [
+    h.strip()
+    for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if h.strip()
+]
+
+ALLOWED_HOSTS = list({*ALLOWED_HOSTS, *(_cors_hosts or set()), *_env_allowed_hosts})
 
 
 AUTH_USER_MODEL = "users.User"
@@ -262,3 +309,44 @@ else:
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         }
     }
+
+
+# ---------------------------------------------------------------------------
+# Production security settings — active only when DEBUG is False
+# ---------------------------------------------------------------------------
+
+if not DEBUG:
+    # Redirect every plain-HTTP request to HTTPS at the Django layer.
+    # If a reverse proxy (Nginx, AWS ALB) already enforces HTTPS and forwards
+    # only HTTP internally, set SECURE_SSL_REDIRECT=false to avoid redirect
+    # loops and rely on SECURE_PROXY_SSL_HEADER alone.
+    SECURE_SSL_REDIRECT = (
+        os.environ.get("SECURE_SSL_REDIRECT", "true").lower()
+        not in ("false", "0", "no")
+    )
+
+    # Tell Django to trust the X-Forwarded-Proto header injected by the proxy
+    # so that request.is_secure() returns True for HTTPS connections terminated
+    # upstream (required whenever TLS is offloaded before reaching Gunicorn).
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # Session and CSRF cookies are only sent over encrypted connections.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # HSTS: instruct browsers to enforce HTTPS for this origin for 2 years.
+    # SECURE_HSTS_PRELOAD submits the domain to browser preload lists — only
+    # enable after confirming every subdomain is also HTTPS-only.
+    SECURE_HSTS_SECONDS = 63072000  # 2 years
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Prevent browsers from MIME-sniffing a response away from its declared
+    # Content-Type (mitigates content-injection attacks).
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
+    # Limit referrer information sent cross-origin (privacy + information leak).
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+    # Deny embedding this app in <frame>/<iframe> from other origins (clickjacking).
+    X_FRAME_OPTIONS = "DENY"
