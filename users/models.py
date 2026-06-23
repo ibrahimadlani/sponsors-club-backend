@@ -58,13 +58,28 @@ class UserManager(BaseUserManager):
 
 
 class User(BaseModel, AbstractBaseUser, PermissionsMixin):
-    """Primary user model backing authentication and account metadata."""
+    """Primary user model backing authentication and account metadata.
+
+    Attributes:
+        email: Unique login identifier; used as USERNAME_FIELD.
+        account_type: AGENT for sports agents; COLLABORATOR for brand/org users.
+        email_verified: True once the user has confirmed their email address.
+        phone_country_code: ITU-T E.164 country code (e.g., "+33").
+        phone_number: Local phone number; combined with country code must be unique.
+        country: ISO 3166-1 alpha-2 country code (e.g., "FR").
+        language: ISO 639-1 preferred language code, defaults to "fr".
+        password_hash: Legacy copy of Django's hashed password, kept in sync.
+    """
 
     class AccountType(models.TextChoices):
+        """Two account types that determine the user's role on the platform."""
+
         AGENT = "AGENT", _("Agent")
         COLLABORATOR = "COLLABORATOR", _("Collaborator")
 
     class Gender(models.TextChoices):
+        """Gender options available on the user's profile."""
+
         MALE = "MALE", _("Homme")
         FEMALE = "FEMALE", _("Femme")
         NON_BINARY = "NON_BINARY", _("Non-binaire")
@@ -119,6 +134,8 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
 
     class Meta:
+        """Enforce unique phone number pairs when both fields are provided."""
+
         constraints = [
             models.UniqueConstraint(
                 fields=("phone_country_code", "phone_number"),
@@ -152,7 +169,13 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
 
 
 class AgentProfile(BaseModel):
-    """Profile details that extend the base user for agent accounts."""
+    """Profile details that extend the base user for agent accounts.
+
+    Attributes:
+        user: The platform account this profile extends (1:1).
+        bio: Optional freeform biography displayed on the agent's public page.
+        is_self_represented: True when the agent manages their own athlete career.
+    """
 
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="agent_profile"
@@ -242,7 +265,17 @@ class RepresentativeProfile(BaseModel):
 
 
 class EmailVerificationToken(BaseModel):
-    """Token issued to confirm a user's email address."""
+    """Token issued to confirm a user's email address.
+
+    Attributes:
+        user: The user who must verify their email.
+        token_hash: SHA-256 digest of the raw token sent by email; never stored
+            in plain text.
+        expires_at: Hard expiry; tokens are invalid after this timestamp.
+        used_at: Set when the token is consumed via ``verify()``; null means unused.
+        TOKEN_BYTES: Entropy size used to generate raw tokens (32 bytes → 43 chars).
+        EXPIRY_HOURS: Token validity window in hours (default 48).
+    """
 
     TOKEN_BYTES = 32
     EXPIRY_HOURS = 48
@@ -257,12 +290,22 @@ class EmailVerificationToken(BaseModel):
     used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        """Optimise lookups by user + expiry window."""
+
         indexes = [
             models.Index(fields=("user", "expires_at")),
         ]
 
     @classmethod
     def _hash(cls, raw_token: str) -> str:
+        """Return the SHA-256 hex digest of a raw token string.
+
+        Args:
+            raw_token: The plain-text token to hash.
+
+        Returns:
+            A 64-character hexadecimal SHA-256 digest.
+        """
         return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
     @classmethod

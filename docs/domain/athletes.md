@@ -1,68 +1,125 @@
 # Athletes domain
 
 ## Overview
-The athletes app stores athlete profiles, sports catalogues, and the agent-side
-APIs used to manage rosters. It enforces per-plan limits when creating athletes
-and restricts operations to the owning agent or invited collaborators.
+
+The `athletes` app stores athlete profiles under a **"Sport-Business"** valuation
+model: an athlete's commercial value is computed from verified sporting achievements
+and real physical audience exposure — not follower counts alone. It also manages
+sport taxonomy, sponsorship inventory, and entourage mandates with legal compliance
+rules for French sports agency law.
 
 ## Data model
-- **`Sport`** now stores the high-level taxonomy for a discipline set. Fields
-  include a unique `slug`, optional `emoji`, and `category` (team/individual/
-  mixed). Slugs are auto-generated from the sport name for stable URLs
-  and filtering.
-- **`SportDiscipline`** captures individual events within a sport (e.g.
-  "Professional 5v5", "Marathon"), providing its own slug, optional
-  `description`, and an `is_olympic` flag. Disciplines cascade when their
-  parent sport is removed.
-- **`Athlete`** links to a `Sport` and an owning `AgentProfile`. It stores core
-  biography fields, cached social metrics (`followers_count_cached` and
-  `engagement_rate_cached`), social links, and optional avatar uploads. Whether
-  the agent is self-represented now lives on the owning `AgentProfile` record.
 
-## Serializers
-- `SportSerializer` includes slug, category, and nested `SportDiscipline`
-  representations so clients can render available events without additional
-  round-trips.
-- `AthletePublicSerializer` exposes the readonly fields returned in nested
-  contexts such as follows, messaging, and analytics.
-- `AthleteSerializer` is the write-capable serializer used by the management
-  endpoints. It validates the requesting user has an `AgentProfile`, blocks agent
-  reassignment on updates, allows clients to supply optional `discipline_ids`
-  (validated against the selected sport), and enforces feature limits:
-  - `get_agent_plan_features()` retrieves the current subscription allowances.
-  - `user_feature_requirement("athlete_slots")` pairs with the
-    `AGENT_FEATURES` matrix to build entitlement denial payloads via
-    `requirement_denied_payload()`.
-  - If the plan provides a numeric `max_athletes`, the serializer counts current
-    athletes for the agent and raises `PermissionDenied` once the threshold is
-    reached.
+### Sport taxonomy
 
-## Permissions
-Action-specific guards in `AthleteViewSet` ensure that:
+| Model | Purpose | Key fields / methods |
+|-------|---------|---------------------|
+| `Sport` | High-level sport category | `name`, `slug`, `emoji`, `category` (TEAM / INDIVIDUAL / MIXED) |
+| `SportDiscipline` | Specific event within a sport (e.g. "100m haies") | `sport`, `name`, `slug`, `is_olympic` |
+| `AthleteDiscipline` | Through table: athlete ↔ discipline | `athlete`, `discipline`; `clean()` validates discipline belongs to athlete's sport |
 
-- Listing (`GET /api/athletes/`) requires an authenticated collaborator account
-  via `IsCollaboratorUser`.
-- Retrieving (`GET /api/athletes/<id>/`) is allowed for the owning agent,
-  collaborators, or staff through `CanViewAthlete`.
-- Creating requires the requester to be an authenticated agent with a profile
-  (`IsAgentUser`) and enough feature slots as described above.
-- Updating and deleting are limited to the owning agent via `IsAthleteOwner`.
+### Athlete profile
 
-The `MyAthletesView` endpoint additionally filters by the authenticated agent's
-profile, while `SportListView` is public.
+| Model | Purpose | Key fields / methods |
+|-------|---------|---------------------|
+| `Athlete` | Core profile managed by an agent | `sport`, `agent`, `full_name`, `birth_date`, `nationality`, `club_name`, `federation_name`, `license_number`; `total_physical_reach` (property), `sponsorship_tier` (property) |
+| `AthletePhoto` | Gallery images for the public profile | `athlete`, `image`, `caption`, `position` |
 
-## API surface
-Routes are mounted under `/api/` by the DRF router:
+### Commercial valuation
 
-| Method | Route | Description | Auth |
-| --- | --- | --- | --- |
-| `GET` | `/athletes/` | List athletes visible to collaborator accounts. | Authenticated collaborator |
-| `POST` | `/athletes/` | Create a new athlete subject to plan limits. | Authenticated agent |
-| `GET` | `/athletes/<id>/` | Retrieve a single athlete. | Authenticated agent/collaborator/staff |
-| `PUT/PATCH` | `/athletes/<id>/` | Update athlete details (owner only). | Owning agent |
-| `DELETE` | `/athletes/<id>/` | Remove an athlete (owner only). | Owning agent |
-| `GET` | `/me/athletes/` | List athletes owned by the current agent. | Authenticated agent |
-| `GET` | `/sports/` | Enumerate configured sports. | Public |
+| Model | Purpose | Key fields / methods |
+|-------|---------|---------------------|
+| `SportingAchievement` | Verified competition result | `title`, `date`, `level` (LOCAL / REGIONAL / NATIONAL / INTERNATIONAL), `ranking`, `proof_url`, `verification_status` (PENDING / VERIFIED / REJECTED); only VERIFIED achievements count for `sponsorship_tier` |
+| `UpcomingEvent` | Future event with physical audience | `event_name`, `start_date`, `end_date`, `location`, `estimated_physical_audience`, `target_demographic`, `is_broadcasted`; summed by `total_physical_reach` |
+| `SponsorshipAsset` | Advertisement space the athlete sells | `asset_type` (PHYSICAL_GEAR / DIGITAL_SHOUTOUT / EVENT_PRESENCE / IMAGE_RIGHTS), `name`, `description`, `estimated_value_min`, `estimated_value_max`, `is_available` |
 
-All list responses use DRF's default pagination settings inherited from the
-project.
+### Entourage mandates
+
+`RepresentationMandate` is the through model for the `Athlete.entourage` M2M
+relation (via `RepresentativeProfile`). It encodes *what* a person is allowed to
+do on behalf of an athlete.
+
+**Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `role` | PARENT_GUARDIAN / COACH / CLUB_OFFICIAL / LICENSED_AGENT / MANAGER |
+| `can_manage_messaging` | May communicate with sponsors |
+| `can_negotiate_contracts` | May open/edit contract clauses |
+| `can_sign_legally` | May sign contracts with legal effect |
+| `commission_percentage` | 0–20 %; must be 0 for non-licensed roles |
+| `is_active` | Soft-delete flag; inactive mandates are ignored by permission checks |
+| `proof_document` | Uploaded mandate document (required for LICENSED_AGENT) |
+| `verified` | Staff-verified flag; required before the mandate gates DocuSign signing |
+| `valid_from` / `valid_until` | Optional validity window |
+
+**Legal constraints enforced in `clean()`:**
+
+- **Rule 1 — Art. L222-5 Code du sport**: Representatives who are not
+  `LICENSED_AGENT` cannot receive a commission (`commission_percentage > 0`).
+- **Rule 2 — Minor athlete signing rights**: A `COACH` or `CLUB_OFFICIAL` cannot
+  hold `can_sign_legally=True` for an athlete under 18. Only a `PARENT_GUARDIAN`
+  may sign on behalf of a minor.
+
+**`is_valid(check_date=None)` method:**
+
+Returns `True` when the mandate can gate a DocuSign signing. Checks:
+1. `is_active` must be True.
+2. For `LICENSED_AGENT`: `proof_document` must be non-null and `verified` must be True.
+3. Date window: if `valid_from` is set, today must be ≥ `valid_from`; if `valid_until`
+   is set, today must be ≤ `valid_until`.
+
+## Computed properties on `Athlete`
+
+| Property | Logic |
+|----------|-------|
+| `sponsorship_tier` | Returns `"Élite Nationale"` (NATIONAL or INTERNATIONAL verified achievement), `"Espoir Régional"` (REGIONAL), or `"Héros Local"` (LOCAL or none). Only VERIFIED achievements count. |
+| `total_physical_reach` | Sum of `estimated_physical_audience` for all future `UpcomingEvent` records (today or later). |
+
+Both properties exploit the prefetch cache (`_prefetched_objects_cache`) when
+available, avoiding N+1 queries in list views.
+
+## API endpoints
+
+| Method | URL | Auth | Permission | Description |
+|--------|-----|------|------------|-------------|
+| `GET` | `/api/athletes/` | Required | `IsCollaboratorUser` | List athletes visible to collaborators |
+| `POST` | `/api/athletes/` | Required | `IsAgentUser` | Create athlete (plan quota enforced) |
+| `GET` | `/api/athletes/<id>/` | Required | `CanViewAthlete` | Retrieve single athlete |
+| `PUT/PATCH` | `/api/athletes/<id>/` | Required | `IsAthleteOwner` | Update athlete (owning agent only) |
+| `DELETE` | `/api/athletes/<id>/` | Required | `IsAthleteOwner` | Delete athlete |
+| `GET` | `/api/athletes/slug/<slug>/` | Required | `CanViewAthlete` | Retrieve athlete by slug |
+| `GET` | `/api/athletes/<id>/photos/` | Required | `CanViewAthlete` | List athlete gallery photos |
+| `GET` | `/api/me/athletes/` | Required | `IsAgentUser` | List authenticated agent's athletes |
+| `GET` | `/api/sports/` | Public | — | List all sports |
+| `GET` | `/api/sports/<uuid>/disciplines/` | Public | — | List disciplines for a sport |
+
+## Permissions & roles
+
+- **`IsAgentUser`** — user must have `account_type=AGENT` and a linked `AgentProfile`.
+- **`IsCollaboratorUser`** — user must have `account_type=COLLABORATOR`.
+- **`CanViewAthlete`** — the owning agent, any collaborator, or staff.
+- **`IsAthleteOwner`** — only the agent who created the athlete.
+- **`athlete_slots` feature gate** — checked via `AGENT_FEATURES` matrix; creation
+  is blocked when `max_athletes` quota is reached.
+
+## Key workflows
+
+1. **Athlete creation** — Agent POSTs to `/api/athletes/`; serializer checks `max_athletes`
+   quota, creates the profile, and auto-generates a URL slug.
+2. **Mandate granting** — `RepresentationMandate` is created (via admin or dedicated
+   API) linking a `RepresentativeProfile` to the athlete with the desired role and
+   permissions.
+3. **Sponsorship tier computation** — The agent uploads `SportingAchievement` records
+   with `proof_url`; staff sets `verification_status=VERIFIED`. The `sponsorship_tier`
+   property then reflects the highest verified level.
+4. **Signing gate** — Before DocuSign envelope creation, `contracts.views` calls
+   `RepresentationMandate.is_valid()` for the agent's mandate. A mandate without
+   `proof_document` or `verified=True` will block signing with a 403.
+
+## Dependencies
+
+**Requires:** `users` (AgentProfile, RepresentativeProfile), `payments` (max_athletes
+entitlement via subscription plan)
+
+**Used by:** `follows`, `messaging`, `contracts`, `analytics`, `payments`
