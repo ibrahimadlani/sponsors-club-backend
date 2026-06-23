@@ -7,11 +7,16 @@ from urllib.parse import urlparse
 
 try:  # pragma: no cover - fallback path exercised only when dependency missing
     from dotenv import load_dotenv
-except (ModuleNotFoundError, ImportError):  # pragma: no cover - lightweight shim for constrained envs
+except (
+    ModuleNotFoundError,
+    ImportError,
+):  # pragma: no cover - lightweight shim for constrained envs
+
     def load_dotenv(*_args, **_kwargs):
         """Gracefully skip dotenv loading when the optional dependency is absent."""
 
         return False
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,6 +65,7 @@ INSTALLED_APPS = [
 ]
 
 DRF_YASG_ENABLED = importlib.util.find_spec("drf_yasg") is not None
+SWAGGER_USE_COMPAT_RENDERERS = False
 if DRF_YASG_ENABLED:
     INSTALLED_APPS.append("drf_yasg")
 
@@ -203,6 +209,9 @@ _env_cors_origins = [
 
 CORS_ALLOWED_ORIGINS = _env_cors_origins or list(_default_cors_origins)
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF trusted origins must match CORS origins for secure cross-origin requests
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 
 # Copy CORS hostnames into ALLOWED_HOSTS so websocket origin checks match.
 _cors_hosts = {

@@ -18,7 +18,9 @@ def drop_unused_columns(apps, schema_editor):
 
 def rename_short_description(apps, schema_editor):
     cursor = schema_editor.connection.cursor()
-    columns = [row[1] for row in cursor.execute("PRAGMA table_info(athletes_sportdiscipline)")]
+    columns = [
+        row[1] for row in cursor.execute("PRAGMA table_info(athletes_sportdiscipline)")
+    ]
     if "short_description" in columns and "description" not in columns:
         schema_editor.execute(
             "ALTER TABLE athletes_sportdiscipline RENAME COLUMN short_description TO description;"
@@ -26,7 +28,6 @@ def rename_short_description(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("athletes", "0005_sport_slug_and_disciplines"),
     ]

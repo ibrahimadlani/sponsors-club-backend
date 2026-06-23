@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as datetime_timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,8 +10,7 @@ from athletes.models import Athlete, Sport, SportDiscipline
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def platform():
+def platform(db):
     return SocialPlatform.objects.create(
         name=SocialPlatform.Platform.INSTAGRAM,
         base_url="https://instagram.com",
@@ -19,8 +18,7 @@ def platform():
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def athlete(agent_user):
+def athlete(agent_user, db):
     sport = Sport.objects.create(
         name="Freestyle", emoji="🛹", category=Sport.Category.INDIVIDUAL
     )
@@ -40,8 +38,7 @@ def athlete(agent_user):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def account(athlete, platform):
+def account(athlete, platform, db):
     return AthleteSocialAccount.objects.create(
         athlete=athlete,
         platform=platform,
@@ -52,8 +49,7 @@ def account(athlete, platform):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def stats(account):
+def stats(account, db):
     base = date.today() - timedelta(days=2)
     stats = []
     for offset in range(3):
@@ -87,7 +83,7 @@ def _stub_stat(**kwargs):
 def test_parse_range_defaults(monkeypatch):
     fixed_today = date(2023, 6, 30)
     monkeypatch.setattr(
-        timezone, "now", lambda: datetime(2023, 6, 30, tzinfo=timezone.utc)
+        timezone, "now", lambda: datetime(2023, 6, 30, tzinfo=datetime_timezone.utc)
     )
     result = reports.parse_range(None)
     assert result.label == "last_30_days"
@@ -97,7 +93,7 @@ def test_parse_range_defaults(monkeypatch):
 
 def test_parse_range_numeric(monkeypatch):
     monkeypatch.setattr(
-        timezone, "now", lambda: datetime(2023, 6, 30, tzinfo=timezone.utc)
+        timezone, "now", lambda: datetime(2023, 6, 30, tzinfo=datetime_timezone.utc)
     )
     result = reports.parse_range("7d")
     assert result.label == "last_7_days"
@@ -133,8 +129,22 @@ def test_top_post_returns_none_when_missing():
 
 def test_top_post_returns_best():
     stats = [
-        _stub_stat(top_post={"post_id": "1", "engagement_rate": 2.1, "likes": 10, "comments": 1}),
-        _stub_stat(top_post={"post_id": "2", "engagement_rate": 3.6, "likes": 12, "comments": 2}),
+        _stub_stat(
+            top_post={
+                "post_id": "1",
+                "engagement_rate": 2.1,
+                "likes": 10,
+                "comments": 1,
+            }
+        ),
+        _stub_stat(
+            top_post={
+                "post_id": "2",
+                "engagement_rate": 3.6,
+                "likes": 12,
+                "comments": 2,
+            }
+        ),
     ]
     best = reports.top_post(stats)
     assert best["post_id"] == "2"
@@ -170,8 +180,20 @@ def test_collect_platform_metrics(account, stats):
 @pytest.mark.django_db
 def test_summarise_totals_calculates_averages():
     metrics = {
-        "Instagram": {"followers": 100.0, "engagement_rate": 2.2, "posts_count": 5.0, "likes": 50.0, "comments": 4.0},
-        "TikTok": {"followers": 150.0, "engagement_rate": 1.8, "posts_count": 3.0, "likes": 30.0, "comments": 2.0},
+        "Instagram": {
+            "followers": 100.0,
+            "engagement_rate": 2.2,
+            "posts_count": 5.0,
+            "likes": 50.0,
+            "comments": 4.0,
+        },
+        "TikTok": {
+            "followers": 150.0,
+            "engagement_rate": 1.8,
+            "posts_count": 3.0,
+            "likes": 30.0,
+            "comments": 2.0,
+        },
     }
     totals = reports.summarise_totals(metrics)
     assert totals["followers"] == 250.0

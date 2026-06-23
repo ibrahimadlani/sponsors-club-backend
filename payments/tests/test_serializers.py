@@ -21,8 +21,7 @@ from users.models import AgentProfile
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def organisation_owner(user_model):
+def organisation_owner(user_model, db):
     user = user_model.objects.create_user(
         email="owner@example.com",
         password="pass1234",
@@ -41,8 +40,7 @@ def organisation_owner(user_model):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def subscription_plan():
+def subscription_plan(db):
     return SubscriptionPlan.objects.create(
         code="custom-plan",
         name="Custom Plan",
@@ -198,7 +196,9 @@ def test_subscription_create_serializer_validates_agent_scope(
 
     assert subscription.agent == agent_profile
     assert subscription.organisation is None
-    assert subscription.start_at == datetime(2024, 5, 1, 8, 0, tzinfo=datetime_timezone.utc)
+    assert subscription.start_at == datetime(
+        2024, 5, 1, 8, 0, tzinfo=datetime_timezone.utc
+    )
     assert subscription.current_period_end.tzinfo is not None
 
 
@@ -310,13 +310,13 @@ def test_subscription_create_serializer_rejects_multiple_scopes(
     with pytest.raises(serializers.ValidationError) as exc:
         serializer.is_valid(raise_exception=True)
 
-    assert "Provide either organisation_id or agent_id, not both." in str(exc.value.detail)
+    assert "Provide either organisation_id or agent_id, not both." in str(
+        exc.value.detail
+    )
 
 
 @pytest.mark.django_db
-def test_subscription_create_serializer_rejects_inactive_plan(
-    organisation_owner
-):
+def test_subscription_create_serializer_rejects_inactive_plan(organisation_owner):
     inactive_plan = SubscriptionPlan.objects.create(
         code="inactive-plan",
         name="Inactive",
@@ -342,7 +342,9 @@ def test_subscription_create_serializer_rejects_inactive_plan(
 
 
 @pytest.mark.django_db
-def test_subscription_create_serializer_rejects_missing_agent(subscription_plan, user_model):
+def test_subscription_create_serializer_rejects_missing_agent(
+    subscription_plan, user_model
+):
     agent_user = user_model.objects.create_user(
         email="agent3@example.com",
         password="pass1234",
@@ -367,7 +369,9 @@ def test_subscription_create_serializer_rejects_missing_agent(subscription_plan,
 
 
 @pytest.mark.django_db
-def test_subscription_create_serializer_update_not_supported(subscription_plan, user_model):
+def test_subscription_create_serializer_update_not_supported(
+    subscription_plan, user_model
+):
     agent_user = user_model.objects.create_user(
         email="agent4@example.com",
         password="pass1234",
@@ -416,4 +420,3 @@ def test_stripe_checkout_session_serializer_reuses_subscription_validation(
     assert serializer.validated_data["plan"] == subscription_plan
     assert serializer.validated_data["agent_profile"] == agent_profile
     assert serializer.validated_data["organisation"] is None
-

@@ -26,7 +26,9 @@ def test_is_agent_or_staff_allows_safe_authenticated_user(request_factory, agent
 
 
 @pytest.mark.django_db
-def test_is_agent_or_staff_requires_agent_profile_for_write(request_factory, agent_user, user_model):
+def test_is_agent_or_staff_requires_agent_profile_for_write(
+    request_factory, agent_user, user_model
+):
     request = request_factory.post("/analytics")
     request.user = agent_user
     permission = IsAgentOrStaff()

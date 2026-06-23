@@ -57,7 +57,9 @@ def populate_missing_slugs(apps, schema_editor):
 
     connection = schema_editor.connection
     with connection.cursor() as cursor:
-        constraints = connection.introspection.get_constraints(cursor, "athletes_athlete")
+        constraints = connection.introspection.get_constraints(
+            cursor, "athletes_athlete"
+        )
 
     has_unique_constraint = any(
         details.get("unique") and details.get("columns") == ["slug"]
@@ -84,7 +86,6 @@ def populate_missing_slugs(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("athletes", "0009_athlete_slug"),
     ]

@@ -133,6 +133,34 @@ class Contract(BaseModel):
     agent_agreed_at = models.DateTimeField(null=True, blank=True)
     current_version_number = models.PositiveIntegerField(default=0)
 
+    # --- Capacité juridique (Art. L221-1 Code civil) ---
+    athlete = models.ForeignKey(
+        "athletes.Athlete",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contracts",
+        help_text="Athlète concerné par ce contrat (permet le calcul automatique de la minorité).",
+    )
+    is_athlete_minor = models.BooleanField(
+        default=False,
+        help_text="True si l'athlète est mineur au moment de la signature.",
+    )
+    legal_guardian_name = models.CharField(max_length=255, blank=True)
+    legal_guardian_email = models.EmailField(blank=True)
+    legal_guardian_agreed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Horodatage de la co-signature du représentant légal (obligatoire si mineur).",
+    )
+    requires_escrow_deposit = models.BooleanField(
+        default=False,
+        help_text=(
+            "Dépôt à la Caisse des Dépôts obligatoire pour certains revenus de mineurs "
+            "(loi du 19 mai 2015 relative au compte bancaire des mineurs)."
+        ),
+    )
+
     class Meta:
         ordering = ("-created_at",)
         # Sorting by recency keeps the admin changelist aligned with how staff
@@ -215,6 +243,52 @@ class Contract(BaseModel):
 
         return changed
 
+    def compute_minor_status(self) -> bool:
+        """Return True if the linked athlete is currently under 18.
+
+        Uses the athlete's birth_date when the FK is populated; otherwise
+        falls back to the stored ``is_athlete_minor`` flag.
+        The age boundary follows French civil law: majority is reached on the
+        anniversary of the 18th birthday (Art. 488 Code civil).
+        """
+        if self.athlete_id and self.athlete.birth_date:
+            from datetime import date
+
+            birth = self.athlete.birth_date
+            try:
+                majority_date = date(birth.year + 18, birth.month, birth.day)
+            except ValueError:
+                # 29 février → majorité le 1er mars de l'année non bissextile
+                majority_date = date(birth.year + 18, 3, 1)
+            return timezone.now().date() < majority_date
+        return self.is_athlete_minor
+
+    def validate_signing_eligibility(self) -> None:
+        """Raise ValidationError if the contract cannot proceed to signing.
+
+        For minor athletes both guardian name and guardian e-mail must be
+        present (Art. L221-1 Code civil; annulation de plein droit de tout
+        contrat signé par un mineur seul).
+
+        Raises:
+            django.core.exceptions.ValidationError: When guardian information
+                is missing for a minor athlete.
+        """
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        if self.compute_minor_status():
+            errors = {}
+            if not self.legal_guardian_name:
+                errors["legal_guardian_name"] = (
+                    "Obligatoire pour un athlète mineur (Art. L221-1 Code civil)."
+                )
+            if not self.legal_guardian_email:
+                errors["legal_guardian_email"] = (
+                    "Obligatoire pour un athlète mineur (Art. L221-1 Code civil)."
+                )
+            if errors:
+                raise DjangoValidationError(errors)
+
     def bump_version(
         self,
         *,
@@ -242,6 +316,10 @@ class Contract(BaseModel):
             source_revision=source_revision,
             notes=notes,
         )
+
+        # NEW: Automatically capture full snapshot of contract state
+        version.capture_snapshot(self)
+
         self.current_version_number = next_number
         # Persist the increment before returning so subsequent calls stay in sync.
         self.save(update_fields=["current_version_number", "updated_at"])
@@ -258,6 +336,8 @@ class ContractClause(BaseModel):
         content: Body of the clause, potentially customised from the template.
         is_mandatory: Whether the clause originated from a mandatory template.
         is_modified: Tracks edits made after the template was applied.
+        placeholder_values: Dictionary mapping placeholder keys to their values.
+        locked_placeholders: List of placeholder keys that cannot be modified.
     """
 
     contract = models.ForeignKey(
@@ -277,11 +357,46 @@ class ContractClause(BaseModel):
     is_mandatory = models.BooleanField(default=False)
     is_modified = models.BooleanField(default=False)
 
+    # Phase 2: Placeholder management
+    placeholder_values = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Valeurs des placeholders {key: value}",
+    )
+    locked_placeholders = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Liste des clés de placeholders non modifiables (protégés)",
+    )
+
     class Meta:
         ordering = ("created_at",)
 
     def __str__(self) -> str:  # pragma: no cover - human readable
         return f"{self.title} ({self.contract.title})"
+
+    def render_content(self) -> str:
+        """Render clause content with placeholders replaced by their values.
+
+        Returns:
+            Rendered content with {{placeholder}} replaced by actual values.
+        """
+        rendered = self.content
+        for key, value in self.placeholder_values.items():
+            placeholder = f"{{{{{key}}}}}"
+            rendered = rendered.replace(placeholder, str(value))
+        return rendered
+
+    def can_modify_placeholder(self, placeholder_key: str) -> bool:
+        """Check if a specific placeholder can be modified.
+
+        Args:
+            placeholder_key: The placeholder key to check.
+
+        Returns:
+            True if the placeholder is not locked, False otherwise.
+        """
+        return placeholder_key not in self.locked_placeholders
 
 
 class ContractRevision(BaseModel):
@@ -329,6 +444,8 @@ class ContractVersion(BaseModel):
         created_by: User who generated the snapshot.
         source_revision: Revision that triggered the snapshot.
         notes: Optional narrative attached to the version.
+        clauses_snapshot: Complete snapshot of all clauses at this version.
+        agreement_status: Snapshot of agreement status (owner_agreed, agent_agreed).
     """
 
     contract = models.ForeignKey(
@@ -351,12 +468,88 @@ class ContractVersion(BaseModel):
     )
     notes = models.TextField(blank=True)
 
+    # NEW: Complete snapshot of contract state
+    clauses_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Complete snapshot of all clauses at this version",
+    )
+    agreement_status = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Snapshot of agreement status (owner_agreed, agent_agreed)",
+    )
+
     class Meta:
         ordering = ("-number",)
         unique_together = (("contract", "number"),)
 
     def __str__(self) -> str:  # pragma: no cover - human readable
         return f"Version {self.number} of {self.contract.title}"
+
+    def capture_snapshot(self, contract):
+        """Capture the complete state of the contract at this moment.
+
+        Args:
+            contract: Contract instance to snapshot.
+
+        Returns:
+            None: Updates self in place.
+        """
+        clauses_data = []
+        for clause in contract.clauses.all().select_related("template"):
+            clause_dict = {
+                "id": str(clause.id),
+                "title": clause.title,
+                "content": clause.content,
+                "is_mandatory": clause.is_mandatory,
+                "is_modified": clause.is_modified,
+                "created_at": clause.created_at.isoformat(),
+            }
+
+            if clause.template:
+                clause_dict["template"] = {
+                    "id": str(clause.template.id),
+                    "title": clause.template.title,
+                    "category": clause.template.category,
+                    "version": clause.template.version,
+                }
+            else:
+                clause_dict["template"] = None
+
+            clauses_data.append(clause_dict)
+
+        self.clauses_snapshot = {
+            "contract_title": contract.title,
+            "effective_date": (
+                contract.effective_date.isoformat() if contract.effective_date else None
+            ),
+            "expiration_date": (
+                contract.expiration_date.isoformat()
+                if contract.expiration_date
+                else None
+            ),
+            "status": contract.status,
+            "clauses": clauses_data,
+            "clause_count": len(clauses_data),
+        }
+
+        self.agreement_status = {
+            "owner_agreed": bool(contract.owner_agreed_at),
+            "owner_agreed_at": (
+                contract.owner_agreed_at.isoformat()
+                if contract.owner_agreed_at
+                else None
+            ),
+            "agent_agreed": bool(contract.agent_agreed_at),
+            "agent_agreed_at": (
+                contract.agent_agreed_at.isoformat()
+                if contract.agent_agreed_at
+                else None
+            ),
+        }
+
+        self.save(update_fields=["clauses_snapshot", "agreement_status", "updated_at"])
 
 
 class ContractComment(BaseModel):
@@ -505,3 +698,367 @@ class ContractFile(BaseModel):
 
     def __str__(self) -> str:  # pragma: no cover - human readable
         return f"File for {self.contract.title}"
+
+
+class ContractAuditLog(BaseModel):
+    """Immutable audit trail of contract lifecycle actions.
+
+    Captures every significant contract operation (create, modify, agree, sign)
+    along with the actor, timestamp, IP address, and user agent for full
+    auditability. This satisfies French legal requirements for electronic
+    contract traceability.
+
+    Attributes:
+        contract: The contract this log entry concerns.
+        actor: User who performed the action (can be null for system actions).
+        action: The type of action performed.
+        action_details: JSON payload with action-specific metadata (e.g., clause IDs).
+        ip_address: IP address from which the action originated.
+        user_agent: Browser/client user agent string.
+        timestamp: When the action occurred (indexed for fast queries).
+    """
+
+    class Action(models.TextChoices):
+        # Contract lifecycle
+        CONTRACT_CREATED = "contract_created", "Contract créé"
+        CONTRACT_UPDATED = "contract_updated", "Contract mis à jour"
+        CONTRACT_DELETED = "contract_deleted", "Contract supprimé"
+
+        # Agreement actions
+        OWNER_AGREED = "owner_agreed", "Organisation a accepté"
+        OWNER_REVOKED_AGREEMENT = (
+            "owner_revoked_agreement",
+            "Organisation a révoqué l'accord",
+        )
+        AGENT_AGREED = "agent_agreed", "Agent a accepté"
+        AGENT_REVOKED_AGREEMENT = "agent_revoked_agreement", "Agent a révoqué l'accord"
+
+        # Clause management
+        CLAUSE_ADDED = "clause_added", "Clause ajoutée"
+        CLAUSE_MODIFIED = "clause_modified", "Clause modifiée"
+        CLAUSE_DELETED = "clause_deleted", "Clause supprimée"
+
+        # Revision lifecycle
+        REVISION_CREATED = "revision_created", "Révision créée"
+        REVISION_ACCEPTED = "revision_accepted", "Révision acceptée"
+        REVISION_REJECTED = "revision_rejected", "Révision rejetée"
+
+        # Version management
+        VERSION_CREATED = "version_created", "Version créée"
+
+        # Legal workflow
+        SUBMITTED_FOR_REVIEW = "submitted_for_review", "Soumis pour révision juridique"
+        LEGAL_APPROVED = "legal_approved", "Approuvé par le service juridique"
+        LEGAL_REJECTED = "legal_rejected", "Rejeté par le service juridique"
+
+        # Signature
+        SIGNATURE_INITIATED = "signature_initiated", "Signature initiée"
+        SIGNATURE_COMPLETED = "signature_completed", "Signature complétée"
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contract_audit_logs",
+        help_text="User who performed the action (null for system actions)",
+    )
+    action = models.CharField(max_length=32, choices=Action.choices)
+    action_details = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional context about the action (clause_id, old/new values, etc.)",
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ("-timestamp",)
+        indexes = [
+            models.Index(fields=["contract", "-timestamp"]),
+            models.Index(fields=["action", "-timestamp"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        actor_display = self.actor.email if self.actor else "System"
+        return f"{actor_display} - {self.get_action_display()} @ {self.timestamp}"
+
+
+class RepresentationMandate(BaseModel):
+    """Legal mandate authorizing representation for contract signature.
+
+    Ensures that agents have proper authorization to sign on behalf of athletes,
+    and collaborators have authorization to sign on behalf of organizations.
+    Required for French legal compliance.
+
+    Attributes:
+        agent: Agent profile (mutually exclusive with collaborator).
+        athlete: Athlete being represented (for agent mandates).
+        collaborator: Collaborator profile (mutually exclusive with agent).
+        organisation: Organisation being represented (for collaborator mandates).
+        document: Uploaded proof of mandate (PDF).
+        verified: Whether staff has verified the mandate authenticity.
+        verified_by: Staff member who verified the mandate.
+        verified_at: Timestamp of verification.
+        valid_from: Date from which the mandate is valid.
+        valid_until: Date until which the mandate is valid (None = indefinite).
+    """
+
+    # Agent mandate fields
+    agent = models.ForeignKey(
+        AgentProfile,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="mandates",
+        help_text="Agent authorized to represent the athlete",
+    )
+    athlete = models.ForeignKey(
+        "athletes.Athlete",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="mandates",
+        help_text="Athlete being represented",
+    )
+
+    # Collaborator mandate fields
+    collaborator = models.ForeignKey(
+        Collaborator,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="mandates",
+        help_text="Collaborator authorized to represent the organisation",
+    )
+    organisation = models.ForeignKey(
+        Organisation,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="mandates",
+        help_text="Organisation being represented",
+    )
+
+    # Mandate proof and verification
+    document = models.FileField(
+        upload_to="mandates/%Y/%m/",
+        help_text="Document de mandat (PDF, image, etc.)",
+    )
+    verified = models.BooleanField(
+        default=False,
+        help_text="Mandat vérifié par le staff",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_mandates",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    # Validity period
+    valid_from = models.DateField(help_text="Date de début de validité")
+    valid_until = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date de fin de validité (None = indéfini)",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["agent", "verified"]),
+            models.Index(fields=["collaborator", "verified"]),
+            models.Index(fields=["valid_from", "valid_until"]),
+        ]
+        constraints = [
+            # Ensure either agent+athlete OR collaborator+organisation (XOR)
+            models.CheckConstraint(
+                check=(
+                    models.Q(
+                        agent__isnull=False,
+                        athlete__isnull=False,
+                        collaborator__isnull=True,
+                        organisation__isnull=True,
+                    )
+                    | models.Q(
+                        agent__isnull=True,
+                        athlete__isnull=True,
+                        collaborator__isnull=False,
+                        organisation__isnull=False,
+                    )
+                ),
+                name="mandate_xor_agent_or_collaborator",
+            ),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover - human readable
+        if self.agent:
+            agent_name = (
+                f"{self.agent.user.first_name} {self.agent.user.last_name}".strip()
+                or self.agent.user.email
+            )
+            return f"Mandate: {agent_name} for {self.athlete}"
+        collaborator_name = (
+            f"{self.collaborator.user.first_name} {self.collaborator.user.last_name}".strip()
+            or self.collaborator.user.email
+        )
+        return f"Mandate: {collaborator_name} for {self.organisation}"
+
+    def is_valid(self, check_date=None) -> bool:
+        """Check if the mandate is currently valid.
+
+        Args:
+            check_date: Date to check validity against (defaults to today).
+
+        Returns:
+            True if mandate is verified and within validity period.
+        """
+        if not self.verified:
+            return False
+
+        from django.utils import timezone
+
+        check_date = check_date or timezone.now().date()
+
+        # Check validity period
+        if check_date < self.valid_from:
+            return False
+
+        if self.valid_until and check_date > self.valid_until:
+            return False
+
+        return True
+
+
+class ContractCounterpart(BaseModel):
+    """Nature exacte d'une contrepartie de sponsoring.
+
+    Remplace tout champ de montant global sur le contrat pour distinguer
+    clairement le numéraire, les dotations matérielles et les remboursements
+    de frais — distinction essentielle pour éviter la requalification en
+    contrat de travail par l'URSSAF (circulaire DSS/5B/2003/07).
+
+    Attributes:
+        contract: Contrat auquel cette contrepartie est rattachée.
+        type: Nature juridique de la contrepartie.
+        description: Libellé précis (ex : "3 paires de pointes d'athlétisme").
+        estimated_value: Valeur marchande en euros pour déclaration et assurance.
+    """
+
+    class Type(models.TextChoices):
+        CASH = "cash", "Numéraire"
+        EQUIPMENT_DOTATION = "equipment_dotation", "Dotation de matériel"
+        EXPENSE_REIMBURSEMENT = "expense_reimbursement", "Remboursement de frais"
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="counterparts",
+    )
+    type = models.CharField(max_length=32, choices=Type.choices)
+    description = models.TextField(
+        help_text="Libellé précis de la contrepartie (ex : '3 paires de pointes', 'Frais kilométriques').",
+    )
+    estimated_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Valeur marchande estimée en euros (pour déclaration fiscale et couverture assurantielle).",
+    )
+
+    class Meta:
+        ordering = ("type", "created_at")
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.get_type_display()} – {self.estimated_value} € ({self.contract.title})"
+
+
+class PerformanceBonus(BaseModel):
+    """Prime conditionnelle liée à un résultat sportif.
+
+    Permet de structurer les primes de performance sans les noyer dans une
+    rémunération fixe, évitant ainsi la qualification en salaire variable.
+
+    Attributes:
+        contract: Contrat auquel cette prime est rattachée.
+        trigger_condition: Condition d'activation (ex : "Qualification aux CDF").
+        bonus_amount: Montant ou valeur marchande de la prime en euros.
+        is_achieved: True si la condition a été atteinte et la prime versée.
+    """
+
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="performance_bonuses",
+    )
+    trigger_condition = models.TextField(
+        help_text="Condition précise d'activation (ex : 'Top 8 aux Championnats de France').",
+    )
+    bonus_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Valeur de la prime en euros.",
+    )
+    is_achieved = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Prime : {self.trigger_condition[:60]} ({self.contract.title})"
+
+
+class ImageRightsScope(BaseModel):
+    """Périmètre strict de la cession du droit à l'image de l'athlète.
+
+    En droit français la cession du droit à l'image doit être délimitée
+    avec précision dans le temps, l'espace et les supports (CA Paris, 2 févr.
+    2010). Un modèle OneToOne force la rédaction explicite de ce périmètre
+    pour chaque contrat.
+
+    Attributes:
+        contract: Contrat auquel ce périmètre est rattaché (1-1).
+        territory: Zone géographique d'exploitation (ex : "France", "Monde").
+        duration_months: Durée d'exploitation après la fin du contrat, en mois.
+        allowed_media: Supports autorisés (ex : "Réseaux sociaux, Print, PLV").
+        excludes_club_gear: True si l'athlète ne peut pas apparaître en tenue
+            de club (fréquent en sport amateur fédéral où le règlement de la
+            fédération prime sur les accords individuels).
+    """
+
+    contract = models.OneToOneField(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name="image_rights_scope",
+    )
+    territory = models.CharField(
+        max_length=255,
+        help_text="Zone géographique d'exploitation (ex : 'France métropolitaine', 'Monde entier').",
+    )
+    duration_months = models.PositiveIntegerField(
+        help_text="Durée maximale d'exploitation des visuels après la fin du contrat, en mois.",
+    )
+    allowed_media = models.TextField(
+        help_text="Supports autorisés listés explicitement (ex : 'Réseaux sociaux, Print, TV, PLV').",
+    )
+    excludes_club_gear = models.BooleanField(
+        default=False,
+        help_text=(
+            "L'athlète ne peut pas apparaître en tenue de club pour ce sponsor "
+            "(protection vis-à-vis du règlement fédéral)."
+        ),
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Droit à l'image – {self.contract.title}"

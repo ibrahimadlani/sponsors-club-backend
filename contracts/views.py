@@ -15,6 +15,7 @@ from users.models import AgentProfile
 from .models import (
     ClauseTemplate,
     Contract,
+    ContractAuditLog,
     ContractClause,
     ContractComment,
     ContractFile,
@@ -22,6 +23,7 @@ from .models import (
     ContractRevision,
     ContractSigning,
     ContractVersion,
+    RepresentationMandate,
 )
 from .serializers import (
     ClauseTemplateSerializer,
@@ -42,7 +44,9 @@ from .serializers import (
     ContractSigningSerializer,
     ContractSigningWebhookSerializer,
     ContractVersionSerializer,
+    PlaceholderValueSerializer,
 )
+from .services import get_client_ip, log_contract_action
 
 
 class ClauseTemplateViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -191,6 +195,21 @@ class ContractViewSet(
         # Version ``1`` captures the automatically generated clause baseline.
         contract.bump_version(created_by=request.user, notes="Initial version")
         contract.refresh_from_db()
+
+        # Audit log: contract creation
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.CONTRACT_CREATED,
+            actor=request.user,
+            action_details={
+                "organisation_id": str(contract.organisation_id),
+                "agent_id": str(contract.agent_id),
+                "title": contract.title,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractSerializer(contract, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -267,6 +286,21 @@ class ContractViewSet(
         )
         serializer.is_valid(raise_exception=True)
         clause = serializer.save()
+
+        # Audit log: clause added
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.CLAUSE_ADDED,
+            actor=request.user,
+            action_details={
+                "clause_id": str(clause.id),
+                "clause_title": clause.title,
+                "is_mandatory": clause.is_mandatory,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractClauseSerializer(clause)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -290,17 +324,106 @@ class ContractViewSet(
         if not self._can_edit_clauses(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
 
+        # Store old content for audit trail
+        old_title = clause.title
+        old_content = clause.content
+
         serializer = ContractClauseUpdateSerializer(
             instance=clause, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
         clause = serializer.save()
+
+        # Audit log: clause modified
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.CLAUSE_MODIFIED,
+            actor=request.user,
+            action_details={
+                "clause_id": str(clause.id),
+                "clause_title": clause.title,
+                "old_title": old_title,
+                "old_content": old_content,
+                "new_title": clause.title,
+                "new_content": clause.content,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
+        output = ContractClauseSerializer(clause)
+        return Response(output.data)
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="clauses/(?P<clause_id>[^/.]+)/placeholders",
+    )
+    def update_placeholders(self, request, clause_id=None, *args, **kwargs):
+        """Update placeholder values for a specific clause.
+
+        Phase 2: Allows both owner and agent to fill in placeholder values
+        during contract negotiation. Locked placeholders cannot be modified.
+        Any placeholder update automatically revokes existing agreements to
+        ensure parties re-agree to the updated terms.
+
+        Args:
+            request: Incoming HTTP request with placeholder_values JSON.
+            clause_id: Identifier of the clause whose placeholders to update.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized clause with updated placeholders or error.
+        """
+
+        contract = self.get_object()
+        clause = self._get_clause(contract, clause_id)
+
+        # Both owner and agent can update placeholders during negotiation
+        if not self._can_edit_clauses(request.user, contract):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Store old values for audit trail
+        old_placeholder_values = (
+            clause.placeholder_values.copy() if clause.placeholder_values else {}
+        )
+
+        serializer = PlaceholderValueSerializer(
+            instance=clause,
+            data=request.data,
+            partial=True,
+            context={"clause": clause},
+        )
+        serializer.is_valid(raise_exception=True)
+        clause = serializer.save()
+
+        # Audit log: placeholder values updated
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.CLAUSE_MODIFIED,
+            actor=request.user,
+            action_details={
+                "clause_id": str(clause.id),
+                "clause_title": clause.title,
+                "field_changed": "placeholder_values",
+                "old_values": old_placeholder_values,
+                "new_values": clause.placeholder_values,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractClauseSerializer(clause)
         return Response(output.data)
 
     @update_clause.mapping.delete
     def delete_clause(self, request, clause_id=None, *args, **kwargs):
         """Remove a non-mandatory clause from the contract.
+
+        When a clause is deleted, any existing owner/agent agreements are
+        automatically revoked. This ensures both parties must re-agree to
+        the updated contract terms before proceeding to signature.
 
         Args:
             request: Incoming HTTP request.
@@ -321,7 +444,39 @@ class ContractViewSet(
         if not self._can_edit_clauses(request.user, contract):
             return Response(status=status.HTTP_403_FORBIDDEN)
 
+        # CRITICAL: Revoke any existing agreements when a clause is deleted
+        # Both parties must re-agree to the updated contract terms
+        had_owner_agreement = contract.owner_agreed_at is not None
+        had_agent_agreement = contract.agent_agreed_at is not None
+
+        if had_owner_agreement or had_agent_agreement:
+            contract.owner_agreed_at = None
+            contract.agent_agreed_at = None
+            contract.save(
+                update_fields=["owner_agreed_at", "agent_agreed_at", "updated_at"]
+            )
+
+        # Store clause info before deletion for audit trail
+        clause_title = clause.title
+        clause_content = clause.content
+        clause_id_str = str(clause.id)
+
         clause.delete()
+
+        # Audit log: clause deleted
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.CLAUSE_DELETED,
+            actor=request.user,
+            action_details={
+                "clause_id": clause_id_str,
+                "clause_title": clause_title,
+                "clause_content": clause_content,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="revisions")
@@ -354,6 +509,21 @@ class ContractViewSet(
         if clause_ids:
             clauses = contract.clauses.filter(id__in=clause_ids)
             revision.clauses_changed.add(*clauses)
+
+        # Audit log: revision created
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.REVISION_CREATED,
+            actor=request.user,
+            action_details={
+                "revision_id": str(revision.id),
+                "comment": revision.comment,
+                "clause_ids": [str(cid) for cid in clause_ids],
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractRevisionSerializer(revision)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -415,7 +585,76 @@ class ContractViewSet(
             source_revision=revision,
             notes=revision.comment or "",
         )
+
+        # Audit log: revision accepted
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.REVISION_ACCEPTED,
+            actor=request.user,
+            action_details={
+                "revision_id": str(revision.id),
+                "proposed_by": revision.proposed_by.email,
+                "comment": revision.comment,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         contract.refresh_from_db()
+        serializer = ContractRevisionSerializer(revision)
+        return Response(serializer.data)
+
+    @accept_revision.mapping.delete
+    def reject_revision(self, request, revision_id=None, *args, **kwargs):
+        """Mark a revision as rejected without bumping the contract version.
+
+        When a revision is rejected, it remains in the revision history but
+        cannot be accepted later. This provides a clear audit trail of
+        rejected proposals during negotiation.
+
+        Args:
+            request: Incoming HTTP request.
+            revision_id: Identifier of the revision to reject.
+            *args: Positional arguments forwarded by DRF.
+            **kwargs: Keyword arguments forwarded by DRF.
+
+        Returns:
+            Response: Serialized revision after rejection.
+        """
+
+        contract = self.get_object()
+        if not self._is_collaborator(request.user, contract.organisation_id):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            revision = contract.revisions.get(id=revision_id)
+        except ContractRevision.DoesNotExist as exc:
+            raise Http404 from exc
+
+        # Cannot reject an already accepted or rejected revision
+        if revision.accepted is not None:
+            return Response(
+                {"detail": "Revision has already been reviewed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        revision.accepted = False
+        revision.save(update_fields=["accepted", "updated_at"])
+
+        # Audit log: revision rejected
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.REVISION_REJECTED,
+            actor=request.user,
+            action_details={
+                "revision_id": str(revision.id),
+                "proposed_by": revision.proposed_by.email,
+                "comment": revision.comment,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         serializer = ContractRevisionSerializer(revision)
         return Response(serializer.data)
 
@@ -454,6 +693,24 @@ class ContractViewSet(
             )
 
         contract.record_agreement(owner=is_owner, agent=is_agent)
+
+        # Audit log: agreement recorded
+        if is_owner:
+            log_contract_action(
+                contract=contract,
+                action=ContractAuditLog.Action.OWNER_AGREED,
+                actor=request.user,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        elif is_agent:
+            log_contract_action(
+                contract=contract,
+                action=ContractAuditLog.Action.AGENT_AGREED,
+                actor=request.user,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
 
         contract.refresh_from_db()
         serializer = ContractSerializer(contract, context=self.get_serializer_context())
@@ -505,6 +762,20 @@ class ContractViewSet(
         )
         contract.status = Contract.Status.LEGAL_REVIEW
         contract.save(update_fields=["status", "updated_at"])
+
+        # Audit log: submitted for legal review
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.SUBMITTED_FOR_REVIEW,
+            actor=request.user,
+            action_details={
+                "review_id": str(review.id),
+                "notes": review.notes,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractLegalReviewSerializer(review)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -554,12 +825,29 @@ class ContractViewSet(
         contract.status = Contract.Status.SIGNING
         contract.save(update_fields=["status", "updated_at"])
 
+        # Audit log: legal review approved
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.LEGAL_APPROVED,
+            actor=request.user,
+            action_details={
+                "review_id": str(review.id),
+                "verification_notes": review.verification_notes,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+
         output = ContractLegalReviewSerializer(review)
         return Response(output.data)
 
     @action(detail=True, methods=["post"], url_path="signing/init")
     def init_signing(self, request, *args, **kwargs):
         """Create or update the signing envelope information.
+
+        Phase 2: Before signature initiation, validates that both parties have
+        valid representation mandates. This ensures legal authorization for
+        contract execution.
 
         Args:
             request: Incoming HTTP request.
@@ -578,6 +866,17 @@ class ContractViewSet(
         if contract.status != Contract.Status.SIGNING:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        # Phase 2: Validate representation mandates before signature
+        if not self._has_valid_mandate(contract):
+            missing = self._get_missing_mandates(contract)
+            return Response(
+                {
+                    "detail": "Valid representation mandate required for signing.",
+                    "missing_mandates": missing,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = ContractSigningInitSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -590,6 +889,19 @@ class ContractViewSet(
                 "last_payload": {},
                 "completed_at": None,
             },
+        )
+
+        # Audit log: signature initiated
+        log_contract_action(
+            contract=contract,
+            action=ContractAuditLog.Action.SIGNATURE_INITIATED,
+            actor=request.user,
+            action_details={
+                "signing_id": str(signing.id),
+                "envelope_id": signing.envelope_id,
+            },
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
 
         output = ContractSigningSerializer(signing)
@@ -900,6 +1212,10 @@ class ContractViewSet(
     def _can_edit_clauses(self, user, contract):
         """Return whether the user can create or update clauses.
 
+        Both collaborators (organisation side) and agents (athlete side) can
+        edit clauses during DRAFT and NEGOTIATION phases. This enables true
+        bi-directional negotiation.
+
         Args:
             user: Authenticated user to inspect.
             contract: Contract subject to editing.
@@ -910,7 +1226,14 @@ class ContractViewSet(
 
         if contract.status not in {Contract.Status.DRAFT, Contract.Status.NEGOTIATION}:
             return False
-        return self._is_collaborator(user, contract.organisation_id)
+
+        # Organisation collaborators can edit
+        if self._is_collaborator(user, contract.organisation_id):
+            return True
+
+        # Agents representing the athlete can also edit
+        agent_profile = getattr(user, "agent_profile", None)
+        return bool(agent_profile and agent_profile == contract.agent)
 
     def _can_propose_revision(self, user, contract):
         """Return whether the user can propose a contract revision.
@@ -965,6 +1288,127 @@ class ContractViewSet(
             return contract.versions.get(id=version_id)
         except ContractVersion.DoesNotExist as exc:
             raise Http404 from exc
+
+    def _has_valid_mandate(self, contract):
+        """Check if both parties have valid representation mandates.
+
+        Phase 2: Validates that the agent has a verified mandate for the athlete
+        and a collaborator has a verified mandate for the organisation.
+
+        Args:
+            contract: Contract instance to validate.
+
+        Returns:
+            bool: ``True`` if both mandates are valid, ``False`` otherwise.
+        """
+
+        today = timezone.now().date()
+
+        # Check agent mandate - agent should have at least one verified mandate
+        agent_mandate_exists = (
+            RepresentationMandate.objects.filter(
+                agent=contract.agent,
+                verified=True,
+                valid_from__lte=today,
+            )
+            .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
+            .exists()
+        )
+
+        # Check collaborator mandate for organisation
+        # Find the owner collaborator for this organisation
+        owner_collaborator = Collaborator.objects.filter(
+            organisation=contract.organisation,
+            role=Collaborator.Role.OWNER,
+        ).first()
+
+        collaborator_mandate_exists = False
+        if owner_collaborator:
+            collaborator_mandate_exists = (
+                RepresentationMandate.objects.filter(
+                    collaborator=owner_collaborator,
+                    organisation=contract.organisation,
+                    verified=True,
+                    valid_from__lte=today,
+                )
+                .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
+                .exists()
+            )
+
+        return agent_mandate_exists and collaborator_mandate_exists
+
+    def _get_missing_mandates(self, contract):
+        """Return a list of missing or invalid mandates.
+
+        Phase 2: Provides detailed feedback about which mandates are missing
+        to help users complete the requirements for signature.
+
+        Args:
+            contract: Contract instance to check.
+
+        Returns:
+            list: List of missing mandate descriptions.
+        """
+
+        today = timezone.now().date()
+        missing = []
+
+        # Check agent mandate
+        agent_mandate_exists = (
+            RepresentationMandate.objects.filter(
+                agent=contract.agent,
+                verified=True,
+                valid_from__lte=today,
+            )
+            .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
+            .exists()
+        )
+
+        if not agent_mandate_exists:
+            missing.append(
+                {
+                    "party": "agent",
+                    "agent_id": str(contract.agent.id),
+                    "reason": "No valid verified mandate found for agent",
+                }
+            )
+
+        # Check collaborator mandate
+        owner_collaborator = Collaborator.objects.filter(
+            organisation=contract.organisation,
+            role=Collaborator.Role.OWNER,
+        ).first()
+
+        if owner_collaborator:
+            collaborator_mandate_exists = (
+                RepresentationMandate.objects.filter(
+                    collaborator=owner_collaborator,
+                    organisation=contract.organisation,
+                    verified=True,
+                    valid_from__lte=today,
+                )
+                .filter(Q(valid_until__isnull=True) | Q(valid_until__gte=today))
+                .exists()
+            )
+
+            if not collaborator_mandate_exists:
+                missing.append(
+                    {
+                        "party": "organisation",
+                        "organisation_id": str(contract.organisation_id),
+                        "reason": "No valid verified mandate found for organisation owner",
+                    }
+                )
+        else:
+            missing.append(
+                {
+                    "party": "organisation",
+                    "organisation_id": str(contract.organisation_id),
+                    "reason": "No owner collaborator found for organisation",
+                }
+            )
+
+        return missing
 
     def _is_valid_transition(self, current_status, new_status):
         """Validate status transitions for the contract lifecycle.

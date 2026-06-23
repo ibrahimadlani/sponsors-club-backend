@@ -15,7 +15,13 @@ from payments import views
 from payments.models import Subscription, SubscriptionPlan
 
 
-def create_plan(*, code: str | None = None, price: Decimal | None = None, features: dict | None = None, **overrides) -> SubscriptionPlan:
+def create_plan(
+    *,
+    code: str | None = None,
+    price: Decimal | None = None,
+    features: dict | None = None,
+    **overrides,
+) -> SubscriptionPlan:
     """Create a subscription plan tailored for tests."""
 
     if code is None:
@@ -122,8 +128,12 @@ def test_checkout_session_creates_stripe_session_with_metadata(
     settings.STRIPE_PUBLIC_KEY = "pk_test_value"
     plan = create_plan()
 
-    monkeypatch.setattr("payments.views.ensure_plan_price_id", lambda _plan: "price_123")
-    monkeypatch.setattr("payments.views._require_stripe_secret_key", lambda: "sk_test_value")
+    monkeypatch.setattr(
+        "payments.views.ensure_plan_price_id", lambda _plan: "price_123"
+    )
+    monkeypatch.setattr(
+        "payments.views._require_stripe_secret_key", lambda: "sk_test_value"
+    )
 
     captured: dict[str, dict] = {}
 
@@ -162,7 +172,9 @@ def test_checkout_session_creates_stripe_session_with_metadata(
 @pytest.mark.django_db
 def test_my_subscription_view_returns_agent_subscription(api_client, agent_user):
     plan = create_plan()
-    organisation_plan = create_plan(features={"tier": "organisation", "organisation_subscription_management": True})
+    organisation_plan = create_plan(
+        features={"tier": "organisation", "organisation_subscription_management": True}
+    )
     organisation = Organisation.objects.create(name="Org", owner=agent_user)
     Collaborator.objects.create(
         user=agent_user,
@@ -252,7 +264,9 @@ def test_my_subscription_delete_cancels_subscription(api_client, agent_user):
 
 
 @pytest.mark.django_db
-def test_my_subscription_delete_returns_not_found_when_no_subscription(api_client, agent_user):
+def test_my_subscription_delete_returns_not_found_when_no_subscription(
+    api_client, agent_user
+):
     api_client.force_authenticate(agent_user)
     response = api_client.delete(reverse("payments-subscription-me"))
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -260,7 +274,9 @@ def test_my_subscription_delete_returns_not_found_when_no_subscription(api_clien
 
 @pytest.mark.django_db
 def test_webhook_rejects_events_without_type(api_client):
-    response = api_client.post(reverse("payments-stripe-webhook"), {"data": {}}, format="json")
+    response = api_client.post(
+        reverse("payments-stripe-webhook"), {"data": {}}, format="json"
+    )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["detail"] == "Event type missing."
 
@@ -331,7 +347,9 @@ def test_sync_subscription_from_payload_returns_none_when_plan_missing():
 
 @pytest.mark.django_db
 def test_sync_subscription_from_payload_creates_org_subscription():
-    plan = create_plan(features={"tier": "organisation", "organisation_subscription_management": True})
+    plan = create_plan(
+        features={"tier": "organisation", "organisation_subscription_management": True}
+    )
     organisation = Organisation.objects.create(name="Webhook Org")
     now = int(datetime.now(tz=datetime_timezone.utc).timestamp())
     subscription = views.sync_subscription_from_payload(
@@ -388,4 +406,3 @@ def test_sync_subscription_from_payload_updates_existing_subscription(agent_user
     assert subscription.plan_id == updated_plan.id
     assert subscription.status == Subscription.Status.PAST_DUE
     assert subscription.stripe_customer_id == "cus_updated"
-

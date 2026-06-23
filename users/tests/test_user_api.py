@@ -165,9 +165,7 @@ def test_roles_endpoint_includes_collaborations(
     assert response.status_code == 200
     assert response.data["is_agent"] is False
     assert len(response.data["collaborations"]) == 1
-    assert response.data["collaboration"] == str(
-        organisations_setup["organisation"].id
-    )
+    assert response.data["collaboration"] == str(organisations_setup["organisation"].id)
 
 
 @pytest.mark.django_db

@@ -52,7 +52,9 @@ class JWTAuthMiddleware:
             validated = self.jwt_auth.get_validated_token(token)
             user = self.jwt_auth.get_user(validated)
             return user if user.is_authenticated else AnonymousUser()
-        except Exception:  # pragma: no cover - invalid token simply yields anonymous access
+        except (
+            Exception
+        ):  # pragma: no cover - invalid token simply yields anonymous access
             return None
 
 

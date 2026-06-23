@@ -12,7 +12,11 @@ from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.pagination import PageNumberPagination
 
 from organisations.models import Collaborator, Organisation, OrganisationInvite
-from organisations.permissions import IsAuthenticatedCollaborator, IsOrganisationOwner
+from organisations.permissions import (
+    IsAuthenticatedCollaborator,
+    IsOrganisationCreator,
+    IsOrganisationOwner,
+)
 from organisations.serializers import (
     CollaboratorCreateSerializer,
     CollaboratorSerializer,
@@ -34,6 +38,25 @@ def owner_client(owner_user):
     """Return an API client authenticated as the organisation owner."""
     client = APIClient()
     client.force_authenticate(user=owner_user)
+    return client
+
+
+@pytest.fixture
+def staff_user(user_model):
+    return user_model.objects.create_user(
+        email="staff@test.com",
+        password="pass1234",
+        first_name="Staff",
+        last_name="User",
+        is_staff=True,
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+
+
+@pytest.fixture
+def staff_client(staff_user):
+    client = APIClient()
+    client.force_authenticate(user=staff_user)
     return client
 
 
@@ -163,6 +186,26 @@ def test_organisation_create_serializer_rejects_agent(factory, user_model):
     )
     request = factory.post("/api/organisations/")
     request.user = user
+    serializer = OrganisationCreateSerializer(
+        data={
+            "name": "Blocked Org",
+            "type": Organisation.Type.BRAND,
+            "industry": "Tech",
+        },
+        context={"request": request},
+    )
+    assert serializer.is_valid(), serializer.errors
+    with pytest.raises(serializers.ValidationError):
+        serializer.save()
+
+
+@pytest.mark.django_db
+def test_organisation_create_serializer_rejects_existing_collaborator(
+    factory, organisations_setup
+):
+    """Serializer validation fails for collaborators already in an organisation."""
+    request = factory.post("/api/organisations/")
+    request.user = organisations_setup["owner"]
     serializer = OrganisationCreateSerializer(
         data={
             "name": "Blocked Org",
@@ -354,10 +397,31 @@ def test_is_organisation_owner_permission(
 
 
 @pytest.mark.django_db
-def test_organisation_list_and_filter(owner_client, organisation):
-    """List endpoint supports filtering by organisation attributes."""
+def test_is_organisation_creator_permission(
+    factory, owner_user, collaborator_user, agent_user, staff_user
+):
+    """Permission grants access to staff or collaborators without an organisation."""
+    permission = IsOrganisationCreator()
+    request = factory.get("/")
+
+    request.user = collaborator_user
+    assert permission.has_permission(request, None)
+
+    request.user = owner_user
+    assert not permission.has_permission(request, None)
+
+    request.user = agent_user
+    assert not permission.has_permission(request, None)
+
+    request.user = staff_user
+    assert permission.has_permission(request, None)
+
+
+@pytest.mark.django_db
+def test_organisation_list_and_filter(staff_client, organisation):
+    """List endpoint supports filtering by organisation attributes for staff."""
     list_url = reverse("organisation-list")
-    response = owner_client.get(list_url)
+    response = staff_client.get(list_url)
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data) >= 1
 
@@ -368,24 +432,27 @@ def test_organisation_list_and_filter(owner_client, organisation):
         industry="Sportswear",
         address_country="FR",
     )
-    filtered = owner_client.get(list_url, {"industry": "Sportswear"})
+    filtered = staff_client.get(list_url, {"industry": "Sportswear"})
     assert filtered.status_code == status.HTTP_200_OK
     assert len(filtered.data) == 1
     assert filtered.data[0]["name"] == "Filtered Org"
 
 
 @pytest.mark.django_db
-def test_organisation_list_forbidden_for_agent(agent_user):
-    """Agents are not allowed to list organisations."""
+def test_organisation_list_forbidden_for_non_staff(owner_client, agent_user):
+    """Non-staff users are not allowed to list organisations."""
+    list_url = reverse("organisation-list")
+    response = owner_client.get(list_url)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
     client = APIClient()
     client.force_authenticate(user=agent_user)
-    list_url = reverse("organisation-list")
     response = client.get(list_url)
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
-def test_organisation_list_pagination(owner_client, organisation):
+def test_organisation_list_pagination(staff_client, organisation):
     """List endpoint applies pagination when configured on the viewset."""
 
     class SingleItemPagination(PageNumberPagination):
@@ -403,7 +470,7 @@ def test_organisation_list_pagination(owner_client, organisation):
     with patch(
         "organisations.views.OrganisationViewSet.pagination_class", SingleItemPagination
     ):
-        response = owner_client.get(list_url)
+        response = staff_client.get(list_url)
 
     assert response.status_code == status.HTTP_200_OK
     assert "results" in response.data
@@ -417,6 +484,24 @@ def test_organisation_retrieve(owner_client, organisation):
     response = owner_client.get(detail_url)
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == organisation.name
+
+
+@pytest.mark.django_db
+def test_organisation_retrieve_forbidden_for_agent(agent_user, organisation):
+    """Agents cannot retrieve organisation details."""
+    client = APIClient()
+    client.force_authenticate(user=agent_user)
+    detail_url = reverse("organisation-detail", kwargs={"pk": organisation.id})
+    response = client.get(detail_url)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_organisation_retrieve_allowed_for_staff(staff_client, organisation):
+    """Staff can retrieve organisation details."""
+    detail_url = reverse("organisation-detail", kwargs={"pk": organisation.id})
+    response = staff_client.get(detail_url)
+    assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
@@ -440,6 +525,15 @@ def test_organisation_create_forbidden_for_agent(user_model):
     response = client.post(list_url, payload, format="json")
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert not Organisation.objects.filter(name=payload["name"]).exists()
+
+
+@pytest.mark.django_db
+def test_organisation_create_forbidden_for_existing_collaborator(owner_client):
+    """Collaborators already in an organisation cannot create another one."""
+    list_url = reverse("organisation-list")
+    payload = {"name": "Second Org", "industry": "Media", "address_country": "FR"}
+    response = owner_client.post(list_url, payload, format="json")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -691,13 +785,17 @@ def test_invite_creation_and_listing(owner_client, organisations_setup):
 
 
 @pytest.mark.django_db
-def test_join_organisation_via_invite(api_client, organisations_setup, collaborator_user):
+def test_join_organisation_via_invite(
+    api_client, organisations_setup, collaborator_user
+):
     organisation = organisations_setup["organisation"]
     owner = organisations_setup["owner"]
     owner_client = APIClient()
     owner_client.force_authenticate(user=owner)
     invite_url = reverse("organisation-invites", kwargs={"pk": organisation.id})
-    invite_response = owner_client.post(invite_url, {"expires_in_hours": 1}, format="json")
+    invite_response = owner_client.post(
+        invite_url, {"expires_in_hours": 1}, format="json"
+    )
     assert invite_response.status_code == status.HTTP_201_CREATED
     code = invite_response.data["code"]
 
@@ -734,7 +832,9 @@ def test_update_job_title_as_member(collaborator_client, member_collaborator):
         "organisation-update-job-title",
         kwargs={"pk": organisation.id, "collaborator_id": member_collaborator.id},
     )
-    response = collaborator_client.patch(url, {"job_title": "Self Updated"}, format="json")
+    response = collaborator_client.patch(
+        url, {"job_title": "Self Updated"}, format="json"
+    )
     assert response.status_code == status.HTTP_200_OK
     member_collaborator.refresh_from_db()
     assert member_collaborator.job_title == "Self Updated"
@@ -756,7 +856,9 @@ def test_transfer_ownership(owner_client, organisation, member_collaborator):
 
 
 @pytest.mark.django_db
-def test_remove_collaborator_requires_feature(monkeypatch, owner_client, organisation, member_collaborator):
+def test_remove_collaborator_requires_feature(
+    monkeypatch, owner_client, organisation, member_collaborator
+):
     url = reverse(
         "organisation-remove-collaborator",
         kwargs={"collaborator_id": member_collaborator.id},
@@ -771,7 +873,9 @@ def test_remove_collaborator_requires_feature(monkeypatch, owner_client, organis
 
 
 @pytest.mark.django_db
-def test_invite_creation_without_owner_returns_400(user_model, organisations_setup, monkeypatch):
+def test_invite_creation_without_owner_returns_400(
+    user_model, organisations_setup, monkeypatch
+):
     organisation = organisations_setup["organisation"]
     organisation.collaborators.all().delete()
     staff_user = user_model.objects.create_user(
@@ -798,7 +902,9 @@ def test_invite_serializer_generates_unique_code(monkeypatch, organisations_setu
 
     def fake_code():
         call_count["value"] += 1
-        return "DUPLICATE" if call_count["value"] < 2 else f"UNIQUE{call_count['value']}"
+        return (
+            "DUPLICATE" if call_count["value"] < 2 else f"UNIQUE{call_count['value']}"
+        )
 
     monkeypatch.setattr(
         "organisations.models.OrganisationInvite.generate_code",
@@ -827,5 +933,7 @@ def test_organisation_slug_deduplicates(user_model):
         account_type=user_model.AccountType.COLLABORATOR,
     )
     Organisation.objects.create(owner=owner, name="ACME!", type=Organisation.Type.BRAND)
-    org2 = Organisation.objects.create(owner=owner, name="ACME?", type=Organisation.Type.BRAND)
+    org2 = Organisation.objects.create(
+        owner=owner, name="ACME?", type=Organisation.Type.BRAND
+    )
     assert org2.slug.startswith("acme") and org2.slug != "acme"

@@ -4,11 +4,11 @@ from django.db import migrations, models
 
 
 def copy_self_represented_flag(apps, schema_editor):
-    AgentProfile = apps.get_model('users', 'AgentProfile')
-    Athlete = apps.get_model('athletes', 'Athlete')
+    AgentProfile = apps.get_model("users", "AgentProfile")
+    Athlete = apps.get_model("athletes", "Athlete")
     agent_ids = (
         Athlete.objects.filter(is_self_represented=True)
-        .values_list('agent_id', flat=True)
+        .values_list("agent_id", flat=True)
         .distinct()
     )
     if agent_ids:
@@ -16,16 +16,15 @@ def copy_self_represented_flag(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0007_user_phone_country_code_alter_user_phone_number_and_more'),
-        ('athletes', '0003_sport_emoji'),
+        ("users", "0007_user_phone_country_code_alter_user_phone_number_and_more"),
+        ("athletes", "0003_sport_emoji"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='agentprofile',
-            name='is_self_represented',
+            model_name="agentprofile",
+            name="is_self_represented",
             field=models.BooleanField(default=False),
         ),
         migrations.RunPython(copy_self_represented_flag, migrations.RunPython.noop),

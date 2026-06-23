@@ -8,8 +8,7 @@ from athletes.models import Athlete, Sport, SportDiscipline
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def account(agent_user):
+def account(agent_user, db):
     sport = Sport.objects.create(
         name="Freestyle", emoji="🛹", category=Sport.Category.INDIVIDUAL
     )

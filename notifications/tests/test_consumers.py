@@ -111,9 +111,7 @@ def test_connect_authenticated_user_joins_group_and_accepts():
     _run(consumer.connect())
 
     assert consumer.group_name == "user_42"
-    assert consumer.channel_layer.add_calls == [
-        ("user_42", consumer.channel_name)
-    ]
+    assert consumer.channel_layer.add_calls == [("user_42", consumer.channel_name)]
     consumer.accept.assert_awaited_once()
     consumer.close.assert_not_awaited()
 
@@ -156,9 +154,7 @@ def test_notification_created_sends_structured_payload():
     _instrument_consumer(consumer)
 
     _run(
-        consumer.notification_created(
-            {"payload": {"id": "notif-1", "detail": "hello"}}
-        )
+        consumer.notification_created({"payload": {"id": "notif-1", "detail": "hello"}})
     )
 
     consumer.send_json.assert_awaited_once()
@@ -174,11 +170,7 @@ def test_notification_updated_sends_structured_payload():
     consumer = NotificationConsumer()
     _instrument_consumer(consumer)
 
-    _run(
-        consumer.notification_updated(
-            {"payload": {"id": "notif-2", "read": True}}
-        )
-    )
+    _run(consumer.notification_updated({"payload": {"id": "notif-2", "read": True}}))
 
     consumer.send_json.assert_awaited_once()
     assert consumer.send_json.await_args.args == (

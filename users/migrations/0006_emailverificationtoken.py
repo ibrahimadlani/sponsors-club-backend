@@ -7,7 +7,6 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("users", "0005_remove_user_id_remove_user_username_and_more"),
     ]

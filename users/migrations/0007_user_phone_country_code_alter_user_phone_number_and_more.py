@@ -4,31 +4,41 @@ from django.db import migrations, models
 
 
 def normalize_phone_fields(apps, schema_editor):
-    user_model = apps.get_model('users', 'User')
-    user_model.objects.filter(phone_country_code='').update(phone_country_code=None)
-    user_model.objects.filter(phone_number='').update(phone_number=None)
+    user_model = apps.get_model("users", "User")
+    user_model.objects.filter(phone_country_code="").update(phone_country_code=None)
+    user_model.objects.filter(phone_number="").update(phone_number=None)
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0006_emailverificationtoken'),
+        ("users", "0006_emailverificationtoken"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='phone_country_code',
-            field=models.CharField(blank=True, max_length=8, null=True, verbose_name='phone country code'),
+            model_name="user",
+            name="phone_country_code",
+            field=models.CharField(
+                blank=True, max_length=8, null=True, verbose_name="phone country code"
+            ),
         ),
         migrations.AlterField(
-            model_name='user',
-            name='phone_number',
-            field=models.CharField(blank=True, max_length=32, null=True, verbose_name='phone number'),
+            model_name="user",
+            name="phone_number",
+            field=models.CharField(
+                blank=True, max_length=32, null=True, verbose_name="phone number"
+            ),
         ),
         migrations.RunPython(normalize_phone_fields, migrations.RunPython.noop),
         migrations.AddConstraint(
-            model_name='user',
-            constraint=models.UniqueConstraint(condition=models.Q(('phone_country_code__isnull', False), ('phone_number__isnull', False)), fields=('phone_country_code', 'phone_number'), name='unique_user_phone_cc_number'),
+            model_name="user",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    ("phone_country_code__isnull", False),
+                    ("phone_number__isnull", False),
+                ),
+                fields=("phone_country_code", "phone_number"),
+                name="unique_user_phone_cc_number",
+            ),
         ),
     ]

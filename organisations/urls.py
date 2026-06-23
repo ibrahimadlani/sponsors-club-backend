@@ -9,5 +9,7 @@ router = DefaultRouter()
 router.register(r"organisations", OrganisationViewSet, basename="organisation")
 
 urlpatterns = [
-    path("organisations/join/", OrganisationJoinView.as_view(), name="organisation-join"),
+    path(
+        "organisations/join/", OrganisationJoinView.as_view(), name="organisation-join"
+    ),
 ] + router.urls

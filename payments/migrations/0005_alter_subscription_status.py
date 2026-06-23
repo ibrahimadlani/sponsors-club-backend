@@ -4,15 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('payments', '0004_update_stripe_products'),
+        ("payments", "0004_update_stripe_products"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='subscription',
-            name='status',
-            field=models.CharField(choices=[('active', 'Active'), ('past_due', 'Past Due'), ('canceled', 'Canceled'), ('incomplete', 'Incomplete'), ('trialing', 'Trialing'), ('incomplete_expired', 'Incomplete Expired'), ('unpaid', 'Unpaid')], default='active', max_length=20),
+            model_name="subscription",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("active", "Active"),
+                    ("past_due", "Past Due"),
+                    ("canceled", "Canceled"),
+                    ("incomplete", "Incomplete"),
+                    ("trialing", "Trialing"),
+                    ("incomplete_expired", "Incomplete Expired"),
+                    ("unpaid", "Unpaid"),
+                ],
+                default="active",
+                max_length=20,
+            ),
         ),
     ]

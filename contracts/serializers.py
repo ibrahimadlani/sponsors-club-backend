@@ -5,7 +5,7 @@ admin actions. Inline comments highlight the decisions that ensure the public
 API remains predictable for both collaborators and agents.
 """
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -13,16 +13,21 @@ from rest_framework.exceptions import PermissionDenied
 from organisations.models import Collaborator, Organisation
 from users.models import AgentProfile, User
 
+from athletes.models import Athlete
+
 from .models import (
     ClauseTemplate,
     Contract,
     ContractClause,
     ContractComment,
+    ContractCounterpart,
     ContractFile,
     ContractLegalReview,
     ContractRevision,
     ContractSigning,
     ContractVersion,
+    ImageRightsScope,
+    PerformanceBonus,
 )
 
 
@@ -224,6 +229,58 @@ class ContractCommentSerializer(serializers.ModelSerializer):
         return str(clause.id) if clause else None
 
 
+class ContractCounterpartSerializer(serializers.ModelSerializer):
+    """Sérialise une contrepartie de sponsoring avec son libellé lisible."""
+
+    type_label = serializers.CharField(source="get_type_display", read_only=True)
+
+    class Meta:
+        model = ContractCounterpart
+        fields = (
+            "id",
+            "type",
+            "type_label",
+            "description",
+            "estimated_value",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "type_label", "created_at", "updated_at")
+
+
+class PerformanceBonusSerializer(serializers.ModelSerializer):
+    """Sérialise une prime de performance sportive."""
+
+    class Meta:
+        model = PerformanceBonus
+        fields = (
+            "id",
+            "trigger_condition",
+            "bonus_amount",
+            "is_achieved",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
+
+
+class ImageRightsScopeSerializer(serializers.ModelSerializer):
+    """Sérialise le périmètre de cession du droit à l'image."""
+
+    class Meta:
+        model = ImageRightsScope
+        fields = (
+            "id",
+            "territory",
+            "duration_months",
+            "allowed_media",
+            "excludes_club_gear",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
+
+
 class ContractSerializer(serializers.ModelSerializer):
     """Return the full contract representation consumed by the UI."""
 
@@ -236,6 +293,9 @@ class ContractSerializer(serializers.ModelSerializer):
     legal_review = serializers.SerializerMethodField()
     signing = serializers.SerializerMethodField()
     versions = ContractVersionSerializer(many=True, read_only=True)
+    counterparts = ContractCounterpartSerializer(many=True, read_only=True)
+    performance_bonuses = PerformanceBonusSerializer(many=True, read_only=True)
+    image_rights_scope = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -252,9 +312,18 @@ class ContractSerializer(serializers.ModelSerializer):
             "owner_agreed_at",
             "agent_agreed_at",
             "current_version_number",
+            # Capacité juridique
+            "is_athlete_minor",
+            "legal_guardian_name",
+            "legal_guardian_email",
+            "legal_guardian_agreed_at",
+            "requires_escrow_deposit",
             "created_at",
             "updated_at",
             "clauses",
+            "counterparts",
+            "performance_bonuses",
+            "image_rights_scope",
             "signed_file",
             "legal_review",
             "signing",
@@ -316,25 +385,61 @@ class ContractSerializer(serializers.ModelSerializer):
 
         return ContractSigningSerializer(signing).data
 
+    def get_image_rights_scope(self, obj):
+        """Return the image rights scope when defined.
+
+        Args:
+            obj: Contract instance being serialized.
+
+        Returns:
+            dict | None: Serialized ImageRightsScope or ``None``.
+        """
+
+        try:
+            scope = obj.image_rights_scope
+        except ImageRightsScope.DoesNotExist:
+            return None
+
+        return ImageRightsScopeSerializer(scope).data
+
 
 class ContractCreateSerializer(serializers.ModelSerializer):
     """Validate the minimal payload required to open a contract."""
 
     organisation_id = serializers.UUIDField(write_only=True)
     agent_id = serializers.UUIDField(write_only=True)
+    athlete_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = Contract
         fields = (
             "organisation_id",
             "agent_id",
+            "athlete_id",
             "title",
             "effective_date",
             "expiration_date",
+            "is_athlete_minor",
+            "legal_guardian_name",
+            "legal_guardian_email",
+            "requires_escrow_deposit",
         )
+        extra_kwargs = {
+            "is_athlete_minor": {"required": False},
+            "legal_guardian_name": {"required": False},
+            "legal_guardian_email": {"required": False},
+            "requires_escrow_deposit": {"required": False},
+        }
 
     def validate(self, attrs):
-        """Ensure the requester can bind the contract parties.
+        """Ensure the requester can bind the contract parties and enforce minority rules.
+
+        Minority detection priority:
+        1. If ``athlete_id`` is provided, compute from the athlete's birth_date.
+        2. Otherwise, honour the explicit ``is_athlete_minor`` flag.
+
+        When the athlete is identified as a minor, ``legal_guardian_name`` and
+        ``legal_guardian_email`` are required (Art. L221-1 Code civil).
 
         Args:
             attrs: Incoming data validated by DRF.
@@ -343,14 +448,16 @@ class ContractCreateSerializer(serializers.ModelSerializer):
             dict: Mutated attributes with resolved foreign keys.
 
         Raises:
-            serializers.ValidationError: When the organisation or agent is
-                missing or the user lacks permissions.
+            serializers.ValidationError: On invalid IDs, missing permissions,
+                or incomplete guardian info for a minor.
         """
+        from datetime import date
 
         request = self.context["request"]
         user = request.user
         organisation_id = attrs["organisation_id"]
         agent_id = attrs["agent_id"]
+        athlete_id = attrs.pop("athlete_id", None)
 
         try:
             organisation = Organisation.objects.get(id=organisation_id)
@@ -364,12 +471,43 @@ class ContractCreateSerializer(serializers.ModelSerializer):
         except AgentProfile.DoesNotExist as exc:
             raise serializers.ValidationError({"agent_id": "Agent not found."}) from exc
 
+        if athlete_id is not None:
+            try:
+                athlete = Athlete.objects.get(id=athlete_id)
+            except Athlete.DoesNotExist as exc:
+                raise serializers.ValidationError(
+                    {"athlete_id": "Athlete not found."}
+                ) from exc
+            attrs["athlete"] = athlete
+
+            # Auto-compute minority from birth_date (Art. 488 Code civil)
+            birth = athlete.birth_date
+            try:
+                majority_date = date(birth.year + 18, birth.month, birth.day)
+            except ValueError:
+                majority_date = date(birth.year + 18, 3, 1)
+            attrs["is_athlete_minor"] = date.today() < majority_date
+
         collaborator = Collaborator.objects.filter(
             organisation=organisation,
             user=user,
         ).first()
         if collaborator is None:
             raise PermissionDenied("User must be a collaborator of the organisation.")
+
+        # Guardian info mandatory when athlete is minor
+        if attrs.get("is_athlete_minor"):
+            errors = {}
+            if not attrs.get("legal_guardian_name"):
+                errors["legal_guardian_name"] = (
+                    "Obligatoire pour un athlète mineur (Art. L221-1 Code civil)."
+                )
+            if not attrs.get("legal_guardian_email"):
+                errors["legal_guardian_email"] = (
+                    "Obligatoire pour un athlète mineur (Art. L221-1 Code civil)."
+                )
+            if errors:
+                raise serializers.ValidationError(errors)
 
         attrs["organisation"] = organisation
         attrs["agent"] = agent
@@ -466,6 +604,10 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Persist the clause under the contract provided in context.
 
+        When a new clause is added, any existing owner/agent agreements are
+        automatically revoked. This ensures both parties must re-agree to
+        the updated contract terms before proceeding to signature.
+
         Args:
             validated_data: Sanitised clause payload.
 
@@ -475,6 +617,19 @@ class ContractClauseCreateSerializer(serializers.ModelSerializer):
 
         contract: Contract = self.context["contract"]
         template = validated_data.pop("template", None)
+
+        # CRITICAL: Revoke any existing agreements when a clause is added
+        # Both parties must re-agree to the updated contract terms
+        had_owner_agreement = contract.owner_agreed_at is not None
+        had_agent_agreement = contract.agent_agreed_at is not None
+
+        if had_owner_agreement or had_agent_agreement:
+            contract.owner_agreed_at = None
+            contract.agent_agreed_at = None
+            contract.save(
+                update_fields=["owner_agreed_at", "agent_agreed_at", "updated_at"]
+            )
+
         return ContractClause.objects.create(
             contract=contract,
             template=template,
@@ -523,6 +678,10 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """Apply updates while keeping template flags in sync.
 
+        When a clause is modified, any existing owner/agent agreements are
+        automatically revoked. This ensures both parties must re-agree to
+        the new contract terms before proceeding to signature.
+
         Args:
             instance: Clause instance to mutate.
             validated_data: Sanitised clause payload.
@@ -556,13 +715,158 @@ class ContractClauseUpdateSerializer(serializers.ModelSerializer):
             instance.is_modified = True
 
         instance.save()
+
+        # CRITICAL: Revoke any existing agreements when clause is modified
+        # Both parties must re-agree to the updated contract terms
+        contract = instance.contract
+        had_owner_agreement = contract.owner_agreed_at is not None
+        had_agent_agreement = contract.agent_agreed_at is not None
+
+        if had_owner_agreement or had_agent_agreement:
+            contract.owner_agreed_at = None
+            contract.agent_agreed_at = None
+            contract.save(
+                update_fields=["owner_agreed_at", "agent_agreed_at", "updated_at"]
+            )
+
+        return instance
+
+
+class PlaceholderValueSerializer(serializers.Serializer):
+    """Validate and update placeholder values for a contract clause.
+
+    Phase 2: Allows parties to fill in template placeholders while respecting
+    locked placeholders that cannot be modified by certain parties.
+    """
+
+    placeholder_values = serializers.JSONField(required=True)
+
+    def validate_placeholder_values(self, value):
+        """Validate placeholder updates against template and locks.
+
+        Args:
+            value: Dictionary of placeholder key-value pairs to update.
+
+        Returns:
+            Validated placeholder values dictionary.
+
+        Raises:
+            serializers.ValidationError: If placeholders are invalid or locked.
+        """
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("placeholder_values must be a dictionary")
+
+        clause = self.context.get("clause")
+        if not clause:
+            raise serializers.ValidationError("Clause context is required")
+
+        # Get valid placeholder keys from template
+        template_placeholders = []
+        if clause.template and clause.template.placeholders:
+            # Handle both list of strings and list of dicts
+            if isinstance(clause.template.placeholders, list):
+                if clause.template.placeholders and isinstance(
+                    clause.template.placeholders[0], dict
+                ):
+                    template_placeholders = [
+                        p.get("key")
+                        for p in clause.template.placeholders
+                        if p.get("key")
+                    ]
+                else:
+                    template_placeholders = clause.template.placeholders
+
+        # Validate each placeholder key
+        for key in value.keys():
+            # Check if placeholder exists in template (if template is used)
+            if template_placeholders and key not in template_placeholders:
+                raise serializers.ValidationError(
+                    {key: f"Placeholder '{key}' not found in clause template"}
+                )
+
+            # Check if placeholder is locked
+            if not clause.can_modify_placeholder(key):
+                raise serializers.ValidationError(
+                    {key: f"Placeholder '{key}' is locked and cannot be modified"}
+                )
+
+        # Validate placeholder values are not empty
+        for key, val in value.items():
+            if val is None or (isinstance(val, str) and not val.strip()):
+                raise serializers.ValidationError(
+                    {key: f"Placeholder '{key}' cannot have an empty value"}
+                )
+
+        return value
+
+    def update(self, instance, validated_data):
+        """Update clause placeholder values and revoke agreements if needed.
+
+        Args:
+            instance: ContractClause instance to update.
+            validated_data: Validated placeholder values.
+
+        Returns:
+            Updated ContractClause instance.
+        """
+        new_values = validated_data["placeholder_values"]
+
+        # Merge with existing values (don't replace, update)
+        current_values = instance.placeholder_values or {}
+        current_values.update(new_values)
+        instance.placeholder_values = current_values
+        instance.save(update_fields=["placeholder_values", "updated_at"])
+
+        # CRITICAL: Revoke agreements when placeholders change
+        # Both parties must re-agree to the updated contract terms
+        contract = instance.contract
+        had_owner_agreement = contract.owner_agreed_at is not None
+        had_agent_agreement = contract.agent_agreed_at is not None
+
+        if had_owner_agreement or had_agent_agreement:
+            contract.owner_agreed_at = None
+            contract.agent_agreed_at = None
+            contract.save(
+                update_fields=["owner_agreed_at", "agent_agreed_at", "updated_at"]
+            )
+
         return instance
 
 
 class ContractStatusSerializer(serializers.Serializer):
-    """Validate requested status transitions for a contract."""
+    """Validate requested status transitions for a contract.
+
+    When the target status is ``SIGNING``, enforces that all legal prerequisites
+    for a minor athlete are met before allowing the transition.  The contract
+    instance must be injected via ``context["contract"]`` by the calling view.
+    """
 
     status = serializers.ChoiceField(choices=Contract.Status.choices)
+
+    def validate(self, attrs):
+        contract: "Optional[Contract]" = self.context.get("contract")
+        if contract is None:
+            return attrs
+
+        if (
+            attrs["status"] == Contract.Status.SIGNING
+            and contract.compute_minor_status()
+        ):
+            errors = {}
+            if not contract.legal_guardian_name:
+                errors["legal_guardian_name"] = (
+                    "Obligatoire pour un athlète mineur avant la mise en signature "
+                    "(Art. L221-1 Code civil)."
+                )
+            if not contract.legal_guardian_email:
+                errors["legal_guardian_email"] = (
+                    "Obligatoire pour un athlète mineur avant la mise en signature "
+                    "(Art. L221-1 Code civil)."
+                )
+            if errors:
+                raise serializers.ValidationError(errors)
+
+        return attrs
 
 
 class ContractRevisionSerializer(serializers.ModelSerializer):

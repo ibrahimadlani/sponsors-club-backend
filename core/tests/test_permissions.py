@@ -121,10 +121,7 @@ def test_mapping_has_feature():
         permissions._mapping_has_feature({"tier": "limited"}, "tier", ("full",))
         is False
     )
-    assert (
-        permissions._mapping_has_feature({"tier": "full"}, "tier", ("full",))
-        is True
-    )
+    assert permissions._mapping_has_feature({"tier": "full"}, "tier", ("full",)) is True
 
 
 def test_subscription_has_feature_handles_columns():
@@ -145,7 +142,9 @@ def test_subscription_has_feature_handles_columns():
         is True
     )
 
-    empty_plan = SimpleNamespace(features=None, max_athletes=None, max_collaborators=None)
+    empty_plan = SimpleNamespace(
+        features=None, max_athletes=None, max_collaborators=None
+    )
     empty_subscription = SimpleNamespace(plan=empty_plan)
     assert (
         permissions._subscription_has_feature(empty_subscription, "contract_tools")
@@ -168,12 +167,8 @@ def test_agent_has_feature_uses_fallback(user_model):
         password="pass1234",
         account_type=user_model.AccountType.AGENT,
     )
-    assert (
-        permissions.agent_has_feature(user, "agent_subscription_management") is True
-    )
-    assert (
-        permissions.agent_has_feature(user, "contract_tools", ("enabled",)) is False
-    )
+    assert permissions.agent_has_feature(user, "agent_subscription_management") is True
+    assert permissions.agent_has_feature(user, "contract_tools", ("enabled",)) is False
 
 
 def test_collaborator_has_feature_with_subscription(organisations_setup):
@@ -198,9 +193,7 @@ def test_collaborator_has_feature_uses_fallback(user_model):
         job_title="Manager",
     )
 
-    assert (
-        permissions.collaborator_has_feature(user, "collaborator_invites") is True
-    )
+    assert permissions.collaborator_has_feature(user, "collaborator_invites") is True
     assert (
         permissions.collaborator_has_feature(user, "contract_tools", ("enabled",))
         is False
@@ -342,7 +335,9 @@ def test_user_feature_requirement_requires_authentication(user_model):
         email="support@example.com",
         password="pass1234",
     )
-    requirement, granted = permissions.user_feature_requirement(user, "messaging_initiate")
+    requirement, granted = permissions.user_feature_requirement(
+        user, "messaging_initiate"
+    )
     assert requirement is FEATURE_MATRIX["agent"]["messaging_initiate"]
     assert granted is False
 
@@ -386,9 +381,7 @@ def test_requirement_denied_payload():
         upgrade_url="https://example.com/upgrade",
         recommended_plans=("Pro", "Enterprise"),
     )
-    payload = permissions.requirement_denied_payload(
-        requirement, "Default message"
-    )
+    payload = permissions.requirement_denied_payload(requirement, "Default message")
     assert payload["detail"] == "Upgrade required"
     assert payload["required_feature"] == "contract_tools"
     assert payload["recommended_plans"] == ["Pro", "Enterprise"]

@@ -98,7 +98,9 @@ def reconcile_is_mandatory_column(apps, schema_editor):
     with connection.cursor() as cursor:
         existing_columns = {
             column.name
-            for column in connection.introspection.get_table_description(cursor, table_name)
+            for column in connection.introspection.get_table_description(
+                cursor, table_name
+            )
         }
 
     if "mandatory" not in existing_columns:
@@ -117,9 +119,7 @@ def reconcile_is_mandatory_column(apps, schema_editor):
     schema_editor.execute(
         f"UPDATE {quoted_table} SET {quoted_is_mandatory} = {quoted_mandatory}"
     )
-    schema_editor.execute(
-        f"ALTER TABLE {quoted_table} DROP COLUMN {quoted_mandatory}"
-    )
+    schema_editor.execute(f"ALTER TABLE {quoted_table} DROP COLUMN {quoted_mandatory}")
 
 
 def reverse_reconcile_is_mandatory_column(apps, schema_editor):
@@ -132,7 +132,9 @@ def reverse_reconcile_is_mandatory_column(apps, schema_editor):
     with connection.cursor() as cursor:
         existing_columns = {
             column.name
-            for column in connection.introspection.get_table_description(cursor, table_name)
+            for column in connection.introspection.get_table_description(
+                cursor, table_name
+            )
         }
 
     if "is_mandatory" not in existing_columns:

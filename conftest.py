@@ -229,6 +229,7 @@ if importlib.util.find_spec("pytest_django") is None:  # pragma: no cover - stub
 
         return _Blocker()
 
+
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.core.management import call_command  # noqa: E402
 from django.utils import timezone  # noqa: E402

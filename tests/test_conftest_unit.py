@@ -377,7 +377,10 @@ def test_owner_user_fixture_aliases_owner(monkeypatch: pytest.MonkeyPatch) -> No
     owner = SimpleNamespace(name="owner")
     organisations_setup = {"owner": owner}
 
-    assert _call_fixture(module.owner_user, organisations_setup=organisations_setup) is owner
+    assert (
+        _call_fixture(module.owner_user, organisations_setup=organisations_setup)
+        is owner
+    )
 
 
 def test_agent_subscription_fixture_uses_plan(monkeypatch: pytest.MonkeyPatch) -> None:

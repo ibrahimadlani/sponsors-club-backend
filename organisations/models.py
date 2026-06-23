@@ -37,7 +37,7 @@ class Organisation(BaseModel):
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     # Owner now references the owner collaborator record
     owner = models.ForeignKey(
-        'organisations.Collaborator',
+        "organisations.Collaborator",
         on_delete=models.SET_NULL,
         related_name="owned_organisations",
         null=True,
@@ -165,9 +165,17 @@ class Collaborator(BaseModel):
 
     def clean(self):
         # Prevent a user from being linked to multiple organisations at once
-        if self.user_id and Collaborator.objects.filter(user_id=self.user_id).exclude(pk=self.pk).exists():
+        if (
+            self.user_id
+            and Collaborator.objects.filter(user_id=self.user_id)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
             from django.core.exceptions import ValidationError
-            raise ValidationError({"user": "Cet utilisateur est déjà rattaché à une organisation."})
+
+            raise ValidationError(
+                {"user": "Cet utilisateur est déjà rattaché à une organisation."}
+            )
 
     def __str__(self):
         return f"{self.user} - {self.organisation.name} ({self.role})"
@@ -185,6 +193,22 @@ class Collaborator(BaseModel):
             Organisation.objects.filter(id=self.organisation_id).delete()
             return
         return super().delete(using=using, keep_parents=keep_parents)
+
+
+class OrganisationInviteQuerySet(models.QuerySet):
+    """Custom queryset for filtering invitations by status."""
+
+    def active(self):
+        """Return invitations that are active (not expired, not used)."""
+        return self.filter(is_used=False, expires_at__gt=timezone.now())
+
+    def expired(self):
+        """Return invitations that have expired but not been used."""
+        return self.filter(is_used=False, expires_at__lte=timezone.now())
+
+    def used(self):
+        """Return invitations that have been used."""
+        return self.filter(is_used=True)
 
 
 class OrganisationInvite(BaseModel):
@@ -215,11 +239,23 @@ class OrganisationInvite(BaseModel):
         related_name="consumed_invites",
     )
 
+    objects = OrganisationInviteQuerySet.as_manager()
+
     class Meta:
         indexes = [
             models.Index(fields=("organisation", "is_used", "expires_at")),
             models.Index(fields=("code",)),
         ]
+
+    @property
+    def status(self):
+        """Return the current status of the invitation: active, expired, or used."""
+        if self.is_used:
+            return "used"
+        elif timezone.now() > self.expires_at:
+            return "expired"
+        else:
+            return "active"
 
     def mark_used(self, user):
         """Flag the invitation as consumed by the provided user."""

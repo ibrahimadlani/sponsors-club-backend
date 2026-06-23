@@ -1,11 +1,12 @@
 """Integration tests for the athletes API endpoints."""
 
-from datetime import date
+from datetime import date, datetime, time
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.test import APIClient, APIRequestFactory
 
@@ -32,6 +33,12 @@ def sample_image_file(name: str) -> SimpleUploadedFile:
     """Return a minimal in-memory PNG for image uploads in tests."""
 
     return SimpleUploadedFile(name, SMALL_PNG, content_type="image/png")
+
+
+def aware_datetime(value: date) -> datetime:
+    """Return a timezone-aware midnight datetime for the given date."""
+
+    return timezone.make_aware(datetime.combine(value, time.min))
 
 
 @pytest.fixture
@@ -160,7 +167,7 @@ def test_athlete_serializer_create_success(agent_user, sport):
             "full_name": "Jane Doe",
             "birth_date": "1995-05-05",
             "nationality": "US",
-            "country": "United States",
+            "country": "US",
             "city": "New York",
             "bio": "Bio text",
             "social_links": {"twitter": "jane_doe"},
@@ -173,9 +180,11 @@ def test_athlete_serializer_create_success(agent_user, sport):
     assert athlete.agent == agent_user.agent_profile
     assert athlete.sport == sport
     assert athlete.full_name == "Jane Doe"
-    assert athlete.country == "United States"
+    assert athlete.country == "US"
     assert athlete.city == "New York"
-    assert list(athlete.disciplines.order_by('name').values_list('name', flat=True)) == ["Professional 5v5", "Streetball"]
+    assert list(
+        athlete.disciplines.order_by("name").values_list("name", flat=True)
+    ) == ["Professional 5v5", "Streetball"]
 
 
 @pytest.mark.django_db
@@ -189,7 +198,7 @@ def test_athlete_serializer_adds_gallery_photos(agent_user, sport):
             "full_name": "Media Athlete",
             "birth_date": "1992-03-03",
             "nationality": "FR",
-            "country": "France",
+            "country": "FR",
             "city": "Paris",
             "new_photos": [
                 sample_image_file("gallery1.png"),
@@ -271,11 +280,15 @@ def test_athlete_public_serializer(athlete):
     assert data["disciplines"] == []
     assert data["card_photos"] == []
     assert data["gallery_photos"] == []
+    assert "agent" in data
+    assert data["agent"]["id"] == str(athlete.agent.id)
+    assert data["agent"]["name"] == str(athlete.agent.user)
+    assert data["agent"]["email"] == athlete.agent.user.email
 
 
 @pytest.mark.django_db
 def test_athlete_public_serializer_card_photos(athlete):
-    athlete.country = "France"
+    athlete.country = "FR"
     athlete.city = "Paris"
     athlete.save(update_fields=["country", "city", "updated_at"])
     for index in range(4):
@@ -285,7 +298,7 @@ def test_athlete_public_serializer_card_photos(athlete):
             position=index,
         )
     data = AthletePublicSerializer(athlete).data
-    assert data["country"] == "France"
+    assert data["country"] == "FR"
     assert data["city"] == "Paris"
     assert len(data["card_photos"]) == 3
     assert all(photo_path.endswith(".png") for photo_path in data["card_photos"])
@@ -529,8 +542,8 @@ def test_agent_create_athlete_limit_enforced(agent_user, sport):
         agent=agent_user.agent_profile,
         plan=plan,
         status=Subscription.Status.ACTIVE,
-        start_at=date(2025, 1, 1),
-        current_period_end=date(2025, 12, 31),
+        start_at=aware_datetime(date(2025, 1, 1)),
+        current_period_end=aware_datetime(date(2025, 12, 31)),
     )
 
     Athlete.objects.create(
@@ -568,8 +581,8 @@ def test_agent_create_athlete_requires_plan_slot(agent_user, sport):
         agent=agent_user.agent_profile,
         plan=plan,
         status=Subscription.Status.ACTIVE,
-        start_at=date(2025, 1, 1),
-        current_period_end=date(2025, 12, 31),
+        start_at=aware_datetime(date(2025, 1, 1)),
+        current_period_end=aware_datetime(date(2025, 12, 31)),
     )
 
     client = APIClient()
@@ -588,7 +601,9 @@ def test_agent_create_athlete_requires_plan_slot(agent_user, sport):
 
 @pytest.mark.django_db
 def test_athlete_serializer_rejects_cross_sport_disciplines(agent_user, sport):
-    other_sport = Sport.objects.create(name="Swimming", emoji="🏊", category=Sport.Category.INDIVIDUAL)
+    other_sport = Sport.objects.create(
+        name="Swimming", emoji="🏊", category=Sport.Category.INDIVIDUAL
+    )
     other_discipline = SportDiscipline.objects.create(
         sport=other_sport,
         name="200m Medley",

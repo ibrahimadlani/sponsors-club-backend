@@ -64,9 +64,17 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         AGENT = "AGENT", _("Agent")
         COLLABORATOR = "COLLABORATOR", _("Collaborator")
 
+    class Gender(models.TextChoices):
+        MALE = "MALE", _("Homme")
+        FEMALE = "FEMALE", _("Femme")
+        NON_BINARY = "NON_BINARY", _("Non-binaire")
+
     email = models.EmailField(_("email address"), unique=True)
     first_name = models.CharField(_("first name"), max_length=150, blank=True)
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
+    avatar = models.ImageField(
+        _("avatar"), upload_to="user_avatars/", blank=True, null=True
+    )
     phone_country_code = models.CharField(
         _("phone country code"), max_length=8, blank=True, null=True
     )
@@ -74,6 +82,26 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         _("phone number"), max_length=32, blank=True, null=True
     )
     date_of_birth = models.DateField(_("date of birth"), blank=True, null=True)
+    country = models.CharField(
+        _("country"),
+        max_length=2,
+        blank=True,
+        help_text="ISO 3166-1 alpha-2 country code (e.g., FR, US, GB)",
+    )
+    language = models.CharField(
+        _("language"),
+        max_length=2,
+        blank=True,
+        default="fr",
+        help_text="ISO 639-1 language code (e.g., fr, en, es)",
+    )
+    gender = models.CharField(
+        _("gender"),
+        max_length=20,
+        choices=Gender.choices,
+        blank=True,
+        null=True,
+    )
     email_verified = models.BooleanField(_("email verified"), default=False)
     password_hash = models.CharField(_("password hash"), max_length=128, blank=True)
     is_active = models.BooleanField(_("active"), default=True)
@@ -141,6 +169,76 @@ class AgentProfile(BaseModel):
         """Return a human-friendly representation for API consumers."""
 
         return str(self.user)
+
+
+class RepresentativeProfile(BaseModel):
+    """Generic profile for any person surrounding an athlete (entourage).
+
+    Replaces the exclusive agent model with a flexible representation layer.
+    Any user — parent, coach, club secretary, licensed agent — can hold a
+    ``RepresentativeProfile`` and be granted a ``RepresentationMandate`` with
+    the exact permissions that match their real-world role.
+
+    KYC verification and federation licensing are tracked here so that sponsors
+    can see a trust badge ("Verified Parent", "Licensed Agent FFF") on the
+    athlete's public profile before committing to a deal.
+
+    Attributes:
+        user: The platform account attached to this representative.
+        is_kyc_verified: Whether the representative has submitted and passed
+            identity verification (government-issued ID check).
+        license_number: Optional federation license number, populated only when
+            the representative is a certified sports agent.
+        licensing_federation: Name of the federation that issued the license
+            (e.g., "Fédération Française de Football").
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="representative_profile",
+    )
+    is_kyc_verified = models.BooleanField(
+        default=False,
+        help_text="Representative has passed identity verification.",
+    )
+    license_number = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Federation license number — populated only for certified sports agents.",
+    )
+    licensing_federation = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Federation that issued the agent license (e.g., FFF, FFBB).",
+    )
+
+    def __str__(self) -> str:  # pragma: no cover
+        return str(self.user)
+
+    @property
+    def is_licensed_agent(self) -> bool:
+        """Return True when the profile carries a valid federation license number.
+
+        Returns:
+            bool: ``True`` when ``license_number`` is non-empty.
+        """
+        return bool(self.license_number)
+
+    @property
+    def trust_label(self) -> str:
+        """Return a human-readable trust badge for display on public profiles.
+
+        Returns:
+            str: Concise label combining KYC state and agent status.
+        """
+        if self.is_licensed_agent and self.is_kyc_verified:
+            return "Licensed Agent (Verified)"
+        if self.is_licensed_agent:
+            return "Licensed Agent"
+        if self.is_kyc_verified:
+            return "Verified Representative"
+        return "Representative"
 
 
 class EmailVerificationToken(BaseModel):
