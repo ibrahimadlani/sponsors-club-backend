@@ -43,17 +43,16 @@ The `organisations` app models partner organisations and their collaborator memb
 | `DELETE` | `/organisations/<id>/invites/<invite_id>/` | Revoke/delete an invitation (cannot revoke used invitations). | Organisation owner | - |
 | `POST` | `/organisations/join/` | Join via invite code (validates expiry, usage, account type). | Collaborator | 20/hour |
 
-**New features:**
-- **Status filtering** – GET `/organisations/<id>/invites/` now accepts `?status=active|expired|used` query parameter
-- **Invitation revocation** – DELETE endpoint allows owners to revoke unused invitations
-- **Enhanced response** – All invite responses now include a computed `status` field
-
-**Security improvements:**
-- Race condition prevention using database-level row locking (`select_for_update()`)
-- Rate limiting on creation (10/hour) and redemption (20/hour)
-- Case-insensitive code validation with automatic whitespace trimming
+**Invite filtering:** `GET /organisations/<id>/invites/` accepts `?status=active|expired|used`.
+**Invite revocation:** `DELETE` endpoint revokes unused invitations; used invitations cannot be revoked.
+**Security:** row locking via `select_for_update()`, rate limiting, and case-insensitive code validation with whitespace trimming.
 
 Pagination uses DRF defaults where applicable. `OrganisationViewSet` caches the organisation per request to avoid duplicate lookups.
+
+> **Note — `owner` field:** `Organisation.owner` is a FK to `Collaborator`, not to `User`.
+> Deleting the owner `Collaborator` via instance `.delete()` cascades to the entire organisation.
+> `Organisation.__init__` accepts a `User` instance for backward-compatibility in tests, but defers
+> the actual collaborator FK assignment — callers must create and link the `Collaborator` explicitly.
 
 ## Interactions with other domains
 - Collaborator entitlements depend on active subscriptions in the `payments` app.

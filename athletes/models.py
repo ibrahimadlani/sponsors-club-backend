@@ -35,9 +35,18 @@ class BaseModel(models.Model):
 
 
 class Sport(BaseModel):
-    """High-level sport taxonomy grouping multiple disciplines/events."""
+    """High-level sport taxonomy grouping multiple disciplines/events.
+
+    Attributes:
+        name: Display name of the sport (unique across the platform).
+        slug: URL-safe identifier, auto-generated from name.
+        emoji: Optional emoji for visual representation in the UI.
+        category: Whether the sport is TEAM, INDIVIDUAL, or MIXED.
+    """
 
     class Category(models.TextChoices):
+        """Participation format of the sport."""
+
         TEAM = "TEAM", "Team"
         INDIVIDUAL = "INDIVIDUAL", "Individual"
         MIXED = "MIXED", "Mixed"
@@ -68,7 +77,15 @@ class Sport(BaseModel):
 
 
 class SportDiscipline(BaseModel):
-    """Specific events or disciplines within a sport (e.g. 100m, Marathon)."""
+    """Specific events or disciplines within a sport (e.g. 100m, Marathon).
+
+    Attributes:
+        sport: Parent sport this discipline belongs to.
+        name: Human-readable discipline name (e.g., "100 mètres haies").
+        slug: URL-safe identifier, unique within the parent sport.
+        description: Optional short description of the discipline.
+        is_olympic: True when the discipline appears in the Olympic programme.
+    """
 
     sport = models.ForeignKey(
         Sport,
@@ -272,7 +289,12 @@ class Athlete(BaseModel):
 
 
 class AthleteDiscipline(BaseModel):
-    """Associative table linking athletes to sport disciplines."""
+    """Associative table linking athletes to sport disciplines.
+
+    Attributes:
+        athlete: The athlete practising this discipline.
+        discipline: The discipline within the athlete's sport.
+    """
 
     athlete = models.ForeignKey(
         "Athlete",
@@ -286,6 +308,8 @@ class AthleteDiscipline(BaseModel):
     )
 
     class Meta:
+        """Enforce uniqueness and validate discipline belongs to the athlete's sport."""
+
         unique_together = ("athlete", "discipline")
 
     def clean(self):
@@ -298,7 +322,14 @@ class AthleteDiscipline(BaseModel):
 
 
 class AthletePhoto(BaseModel):
-    """Store gallery photos associated with an athlete profile."""
+    """Store gallery photos associated with an athlete profile.
+
+    Attributes:
+        athlete: The athlete whose gallery this photo belongs to.
+        image: Uploaded image file stored in media storage.
+        caption: Optional text description shown below the photo.
+        position: Sort order within the gallery (lower = first).
+    """
 
     athlete = models.ForeignKey(
         "Athlete",
@@ -310,6 +341,8 @@ class AthletePhoto(BaseModel):
     position = models.PositiveIntegerField(default=0)
 
     class Meta:
+        """Order photos by position then creation date."""
+
         ordering = ("position", "created_at")
 
     def __str__(self):

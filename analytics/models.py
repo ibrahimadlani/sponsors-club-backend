@@ -21,9 +21,16 @@ class BaseModel(models.Model):
 
 
 class SocialPlatform(BaseModel):
-    """Social media platform supported by the analytics stack."""
+    """Social media platform supported by the analytics stack.
+
+    Attributes:
+        name: Slug identifier matching a ``Platform`` choice (e.g., "instagram").
+        base_url: Optional root URL used to build profile links.
+    """
 
     class Platform(models.TextChoices):
+        """Supported social networks for the analytics integration."""
+
         TIKTOK = "tiktok", "TikTok"
         INSTAGRAM = "instagram", "Instagram"
         FACEBOOK = "facebook", "Facebook"
@@ -33,14 +40,26 @@ class SocialPlatform(BaseModel):
     base_url = models.URLField(blank=True, null=True)
 
     class Meta:
+        """Order platforms alphabetically by name."""
+
         ordering = ("name",)
 
-    def __str__(self) -> str:  # pragma: no cover - human readable representation
+    def __str__(self) -> str:  # pragma: no cover
+        """Return the human-readable platform display name."""
         return self.get_name_display()
 
 
 class AthleteSocialAccount(BaseModel):
-    """Link between an athlete and one of their social media accounts."""
+    """Link between an athlete and one of their social media accounts.
+
+    Attributes:
+        athlete: The athlete who owns this social account.
+        platform: The social network (TikTok, Instagram, Facebook, YouTube).
+        username: Public handle or username on the platform.
+        external_id: Platform-assigned unique identifier; globally unique.
+        access_token: OAuth token used to fetch stats; may be null for manual entry.
+        is_active: False when the account is disconnected or deauthorised.
+    """
 
     athlete = models.ForeignKey(
         Athlete,
@@ -58,6 +77,8 @@ class AthleteSocialAccount(BaseModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        """Enforce one account per athlete per platform and order by name."""
+
         constraints = [
             models.UniqueConstraint(
                 fields=("athlete", "platform"),
@@ -66,7 +87,8 @@ class AthleteSocialAccount(BaseModel):
         ]
         ordering = ("athlete", "platform__name")
 
-    def __str__(self) -> str:  # pragma: no cover - human readable representation
+    def __str__(self) -> str:  # pragma: no cover
+        """Return the athlete name and platform display name."""
         return f"{self.athlete.full_name} - {self.platform.get_name_display()}"
 
 
@@ -97,7 +119,16 @@ class DailyStatsQuerySet(models.QuerySet):
 
 
 class DailyStats(BaseModel):
-    """Daily aggregated metrics for a social account."""
+    """Daily aggregated metrics for a social account.
+
+    Attributes:
+        account: The social account these stats belong to.
+        date: Calendar day for this stat snapshot; unique per account.
+        followers: Total follower count at time of capture.
+        engagement_rate: Auto-computed percentage of followers who interacted;
+            not editable directly — recalculated on every ``save()``.
+        top_post: Optional JSON payload describing the best-performing post.
+    """
 
     account = models.ForeignKey(
         AthleteSocialAccount,
@@ -119,6 +150,8 @@ class DailyStats(BaseModel):
     objects = DailyStatsQuerySet.as_manager()
 
     class Meta:
+        """Enforce uniqueness per account/day and optimise time-series queries."""
+
         constraints = [
             models.UniqueConstraint(
                 fields=("account", "date"),
@@ -130,7 +163,8 @@ class DailyStats(BaseModel):
         ]
         ordering = ("account", "-date")
 
-    def __str__(self) -> str:  # pragma: no cover - human readable representation
+    def __str__(self) -> str:  # pragma: no cover
+        """Return account identifier and date as the string representation."""
         return f"{self.account} on {self.date}"
 
     def compute_engagement_rate(self) -> float:
