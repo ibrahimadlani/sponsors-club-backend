@@ -15,6 +15,8 @@ from users.models import AgentProfile, User
 
 from athletes.models import Athlete
 
+from payments.models import PlatformFee
+
 from .models import (
     ClauseTemplate,
     Contract,
@@ -281,6 +283,43 @@ class ImageRightsScopeSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
 
+class PlatformFeeSerializer(serializers.ModelSerializer):
+    """Expose platform fee invoice details to contract parties.
+
+    Read-only: the fee is generated server-side by :meth:`Contract.generate_platform_fee`
+    and updated via Stripe webhooks. Clients should never mutate it directly.
+    """
+
+    fee_type_label = serializers.CharField(
+        source="get_fee_type_display", read_only=True
+    )
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    is_paid = serializers.BooleanField(source="status", read_only=True)
+
+    class Meta:
+        model = PlatformFee
+        fields = (
+            "id",
+            "fee_type",
+            "fee_type_label",
+            "amount_due",
+            "status",
+            "status_label",
+            "is_paid",
+            "stripe_payment_intent_id",
+            "paid_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Normalise is_paid to a bool instead of the raw status string.
+        data["is_paid"] = instance.status == PlatformFee.Status.PAID
+        return data
+
+
 class ContractSerializer(serializers.ModelSerializer):
     """Return the full contract representation consumed by the UI."""
 
@@ -296,6 +335,7 @@ class ContractSerializer(serializers.ModelSerializer):
     counterparts = ContractCounterpartSerializer(many=True, read_only=True)
     performance_bonuses = PerformanceBonusSerializer(many=True, read_only=True)
     image_rights_scope = serializers.SerializerMethodField()
+    platform_fee = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -324,6 +364,7 @@ class ContractSerializer(serializers.ModelSerializer):
             "counterparts",
             "performance_bonuses",
             "image_rights_scope",
+            "platform_fee",
             "signed_file",
             "legal_review",
             "signing",
@@ -401,6 +442,23 @@ class ContractSerializer(serializers.ModelSerializer):
             return None
 
         return ImageRightsScopeSerializer(scope).data
+
+    def get_platform_fee(self, obj):
+        """Return the marketplace invoice attached to the contract, if any.
+
+        Args:
+            obj: Contract instance being serialized.
+
+        Returns:
+            dict | None: Serialized PlatformFee or ``None`` when not yet generated.
+        """
+
+        try:
+            fee = obj.platform_fee
+        except PlatformFee.DoesNotExist:
+            return None
+
+        return PlatformFeeSerializer(fee).data
 
 
 class ContractCreateSerializer(serializers.ModelSerializer):

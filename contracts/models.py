@@ -7,9 +7,10 @@ on workflow rules without duplicating persistence concerns.
 """
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from organisations.models import Collaborator, Organisation
@@ -288,6 +289,70 @@ class Contract(BaseModel):
                 )
             if errors:
                 raise DjangoValidationError(errors)
+
+    @transaction.atomic
+    def generate_platform_fee(self):
+        """Compute and persist the marketplace fee for this contract.
+
+        Analyses :class:`ContractCounterpart` records to determine whether the
+        deal involves cash (commission model) or only material counterparts
+        (fixed-fee model):
+
+        - At least one ``CASH`` counterpart → 10 % of total cash value, with a
+          €10.00 floor (``FeeType.CASH_COMMISSION``).
+        - Only non-cash counterparts → flat €49.00 fee
+          (``FeeType.MATERIAL_FIXED_FEE``).
+
+        Calling this method on a contract that already has a ``PlatformFee``
+        updates the amount if counterparts changed (idempotent via
+        ``update_or_create``).  The status is only reset to PENDING when the
+        fee hasn't been paid yet, so a mid-negotiation counterpart change cannot
+        undo a completed payment.
+
+        Returns:
+            PlatformFee: The created or refreshed fee record.
+        """
+        from payments.models import PlatformFee
+
+        counterparts = list(self.counterparts.all())
+        cash_total: Decimal = sum(
+            (
+                c.estimated_value
+                for c in counterparts
+                if c.type == ContractCounterpart.Type.CASH
+            ),
+            Decimal("0.00"),
+        )
+
+        if cash_total > Decimal("0.00"):
+            fee_type = PlatformFee.FeeType.CASH_COMMISSION
+            amount_due = max(
+                PlatformFee.CASH_COMMISSION_MINIMUM,
+                (cash_total * PlatformFee.CASH_COMMISSION_RATE).quantize(
+                    Decimal("0.01")
+                ),
+            )
+        else:
+            fee_type = PlatformFee.FeeType.MATERIAL_FIXED_FEE
+            amount_due = PlatformFee.MATERIAL_FIXED_AMOUNT
+
+        # Only reset to PENDING if the fee hasn't already been collected.
+        existing = PlatformFee.objects.filter(contract=self).first()
+        safe_status = (
+            existing.status
+            if existing and existing.status == PlatformFee.Status.PAID
+            else PlatformFee.Status.PENDING
+        )
+
+        fee, _ = PlatformFee.objects.update_or_create(
+            contract=self,
+            defaults={
+                "fee_type": fee_type,
+                "amount_due": amount_due,
+                "status": safe_status,
+            },
+        )
+        return fee
 
     def bump_version(
         self,
@@ -754,6 +819,10 @@ class ContractAuditLog(BaseModel):
         # Signature
         SIGNATURE_INITIATED = "signature_initiated", "Signature initiée"
         SIGNATURE_COMPLETED = "signature_completed", "Signature complétée"
+
+        # Marketplace billing
+        PLATFORM_FEE_GENERATED = "platform_fee_generated", "Invoice générée"
+        PLATFORM_FEE_PAID = "platform_fee_paid", "Invoice réglée"
 
     contract = models.ForeignKey(
         Contract,

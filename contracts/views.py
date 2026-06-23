@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from organisations.models import Collaborator
+from payments.models import PlatformFee
 from users.models import AgentProfile
 
 from .models import (
@@ -96,6 +97,7 @@ class ContractViewSet(
             "initiated_by__user",
             "legal_review",
             "signing",
+            "platform_fee",
         ).prefetch_related(
             "clauses__template",
             "revisions__clauses_changed",
@@ -713,6 +715,25 @@ class ContractViewSet(
             )
 
         contract.refresh_from_db()
+
+        # Auto-transition to AGREEMENT and generate platform fee invoice when
+        # both parties have recorded their consent.
+        if (
+            contract.has_full_agreement()
+            and contract.status == Contract.Status.NEGOTIATION
+        ):
+            contract.status = Contract.Status.AGREEMENT
+            contract.save(update_fields=["status", "updated_at"])
+            contract.generate_platform_fee()
+            log_contract_action(
+                contract=contract,
+                action=ContractAuditLog.Action.PLATFORM_FEE_GENERATED,
+                actor=request.user,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+            contract.refresh_from_db()
+
         serializer = ContractSerializer(contract, context=self.get_serializer_context())
         return Response(serializer.data)
 
@@ -865,6 +886,26 @@ class ContractViewSet(
 
         if contract.status != Contract.Status.SIGNING:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        # Paywall: platform fee must be fully paid before DocuSign envelope creation.
+        try:
+            fee = contract.platform_fee
+        except PlatformFee.DoesNotExist:
+            fee = None
+
+        if fee is None or fee.status != PlatformFee.Status.PAID:
+            amount_str = str(fee.amount_due) if fee else "N/A"
+            return Response(
+                {
+                    "detail": (
+                        f"Platform fee of €{amount_str} must be settled to unlock "
+                        "electronic signing and legal document access."
+                    ),
+                    "fee_status": fee.status if fee else None,
+                    "amount_due": amount_str,
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
 
         # Phase 2: Validate representation mandates before signature
         if not self._has_valid_mandate(contract):
@@ -1121,6 +1162,12 @@ class ContractViewSet(
 
         contract.status = new_status
         contract.save(update_fields=["status", "updated_at"])
+
+        # Generate (or refresh) the platform fee whenever the contract
+        # transitions to AGREEMENT status — idempotent, safe to call twice.
+        if new_status == Contract.Status.AGREEMENT:
+            contract.generate_platform_fee()
+
         output = ContractSerializer(contract)
         return Response(output.data)
 

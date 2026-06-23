@@ -497,6 +497,15 @@ def test_legal_verification_and_signing_flow(
     owner_client.post(agree_url, format="json")
     agent_client.post(agree_url, format="json")
 
+    # Both parties agreed → fee is auto-generated in PENDING state.
+    # Simulate Stripe webhook confirming payment before signing is allowed.
+    from payments.models import PlatformFee
+
+    created_contract.refresh_from_db()
+    PlatformFee.objects.filter(contract=created_contract).update(
+        status=PlatformFee.Status.PAID
+    )
+
     review_url = reverse("contract-create-legal-review", args=[created_contract.id])
     owner_client.post(review_url, {"notes": "Analyse"}, format="json")
 
