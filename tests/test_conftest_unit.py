@@ -260,6 +260,7 @@ def test_agent_user_fixture_creates_profile(monkeypatch: pytest.MonkeyPatch) -> 
             return user
 
     created_profiles: list[SimpleNamespace] = []
+    created_rep_profiles: list[SimpleNamespace] = []
 
     def fake_profile_create(*, user, **kwargs):  # noqa: ANN001
         profile = SimpleNamespace(user=user, extra=kwargs)
@@ -268,10 +269,21 @@ def test_agent_user_fixture_creates_profile(monkeypatch: pytest.MonkeyPatch) -> 
         created_profiles.append(profile)
         return profile
 
+    def fake_rep_profile_create(*, user, **kwargs):  # noqa: ANN001
+        rep_profile = SimpleNamespace(user=user, extra=kwargs)
+        user.representative_profile = rep_profile
+        created_rep_profiles.append(rep_profile)
+        return rep_profile
+
     monkeypatch.setattr(
         module,
         "AgentProfile",
         SimpleNamespace(objects=SimpleNamespace(create=fake_profile_create)),
+    )
+    monkeypatch.setattr(
+        module,
+        "RepresentativeProfile",
+        SimpleNamespace(objects=SimpleNamespace(create=fake_rep_profile_create)),
     )
 
     user_model = FakeUserModel()
@@ -279,6 +291,10 @@ def test_agent_user_fixture_creates_profile(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert user_model.created and user_model.created[0] is agent
     assert created_profiles and getattr(agent, "agent_profile") is created_profiles[0]
+    assert (
+        created_rep_profiles
+        and getattr(agent, "representative_profile") is created_rep_profiles[0]
+    )
 
 
 def test_organisations_setup_fixture_returns_entities(

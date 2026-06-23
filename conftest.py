@@ -237,7 +237,7 @@ from rest_framework.test import APIClient  # noqa: E402
 
 from organisations.models import Collaborator, Organisation  # noqa: E402
 from payments.models import Subscription, SubscriptionPlan  # noqa: E402
-from users.models import AgentProfile  # noqa: E402
+from users.models import AgentProfile, RepresentativeProfile  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -265,7 +265,7 @@ def fixture_user_model():
 
 @pytest.fixture(name="agent_user")
 def fixture_agent_user(user_model):
-    """Create and return a test agent user with profile."""
+    """Create and return a test agent user with AgentProfile and RepresentativeProfile."""
 
     user = user_model.objects.create_user(
         email="agent@test.com",
@@ -275,6 +275,11 @@ def fixture_agent_user(user_model):
         account_type=user_model.AccountType.AGENT,
     )
     AgentProfile.objects.create(user=user)
+    RepresentativeProfile.objects.create(
+        user=user,
+        license_number="FFF-TEST-001",
+        licensing_federation="Fédération Française de Football",
+    )
     return user
 
 

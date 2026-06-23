@@ -8,6 +8,7 @@ followers sur les réseaux sociaux.
 
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -619,6 +620,39 @@ class RepresentationMandate(BaseModel):
         ),
     )
 
+    # Legal proof fields (proof_document + verification required for LICENSED_AGENT)
+    proof_document = models.FileField(
+        upload_to="mandates/%Y/%m/",
+        blank=True,
+        null=True,
+        help_text=(
+            "Document de procuration (PDF). Obligatoire pour les agents sportifs "
+            "licenciés ; optionnel pour les autres rôles (parents, coachs...)."
+        ),
+    )
+    verified = models.BooleanField(
+        default=False,
+        help_text="Mandat vérifié par le staff de la plateforme.",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_athlete_mandates",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    valid_from = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date de début de validité (défaut : date de création).",
+    )
+    valid_until = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date de fin de validité (None = indéfini).",
+    )
+
     class Meta:
         ordering = ("role", "created_at")
         # Each representative may hold exactly one mandate per athlete.
@@ -708,3 +742,36 @@ class RepresentationMandate(BaseModel):
         """Run full validation before persisting the mandate."""
         self.full_clean()
         super().save(*args, **kwargs)
+
+    def is_valid(self, check_date=None) -> bool:
+        """Return whether this mandate currently grants active signing authority.
+
+        LICENSED_AGENT mandates additionally require a staff-verified
+        ``proof_document`` (Art. L222-5 Code du sport).  Other roles (parents,
+        coaches, etc.) are considered valid when the mandate is simply active
+        and within its validity window.
+
+        Args:
+            check_date: Date to evaluate against (defaults to today).
+
+        Returns:
+            True when all applicable conditions are met.
+        """
+        if not self.is_active:
+            return False
+
+        if self.role == self.Role.LICENSED_AGENT:
+            if not self.proof_document or not self.verified:
+                return False
+
+        from datetime import date as _date
+
+        today = check_date or _date.today()
+
+        if self.valid_from and today < self.valid_from:
+            return False
+
+        if self.valid_until and today > self.valid_until:
+            return False
+
+        return True
