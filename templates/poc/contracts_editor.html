@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Contrat • Éditeur de clauses • SponsorsClub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+        }
+        main {
+            width: min(1240px, 100%);
+            background: #f8fafc;
+            border-radius: 28px;
+            box-shadow: 0 36px 96px rgba(15, 23, 42, 0.4);
+            display: grid;
+            gap: 28px;
+            padding: 40px;
+        }
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            margin: 0;
+            font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+            color: #111827;
+        }
+        header .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(14, 165, 233, 0.16);
+            color: #0369a1;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+        section {
+            background: white;
+            border-radius: 24px;
+            padding: 28px;
+            display: grid;
+            gap: 20px;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #0f172a;
+        }
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+        .grid.two {
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+        label {
+            display: grid;
+            gap: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid #cbd5f5;
+            background: #f9fbff;
+            font: inherit;
+            color: inherit;
+        }
+        textarea { resize: vertical; min-height: 120px; }
+        .clauses { display: grid; gap: 16px; }
+        .clause {
+            border-radius: 18px;
+            padding: 20px;
+            background: #eef2ff;
+            border: 1px solid rgba(79, 70, 229, 0.18);
+            display: grid;
+            gap: 16px;
+        }
+        .clause.modified {
+            background: #fff7ed;
+            border-color: rgba(249, 115, 22, 0.35);
+        }
+        .clause header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .clause header h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: #1e1b4b;
+        }
+        .badge {
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(79, 70, 229, 0.15);
+            color: #4338ca;
+        }
+        .badge.optional { background: rgba(16, 185, 129, 0.12); color: #047857; }
+        .badge.modified { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        .button.secondary { background: rgba(15, 23, 42, 0.08); color: #1e293b; }
+        .button.ghost {
+            background: transparent;
+            color: #1d4ed8;
+            border: 1px solid rgba(37, 99, 235, 0.35);
+        }
+        .button.danger { background: #dc2626; }
+        .button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 32px rgba(37, 99, 235, 0.28);
+        }
+        .button.ghost:hover {
+            background: rgba(37, 99, 235, 0.1);
+            color: #1e3a8a;
+            transform: none;
+            box-shadow: none;
+        }
+        .status-text {
+            font-size: 0.85rem;
+            color: #475569;
+        }
+        .status-text.error { color: #b91c1c; }
+        .status-text.success { color: #15803d; }
+        .empty {
+            padding: 24px;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.95rem;
+            border-radius: 16px;
+            background: #f1f5f9;
+            border: 1px dashed rgba(148, 163, 184, 0.6);
+        }
+        footer {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        footer a {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        @media (max-width: 760px) {
+            body { padding: 20px; }
+            main { padding: 28px; }
+            section { padding: 22px; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <h1 id="contractTitle">Contrat en chargement…</h1>
+            <div class="meta" id="contractMeta"></div>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="button ghost" id="loginButton">Changer de compte</button>
+            <span class="pill" id="contractStatus">Statut inconnu</span>
+        </div>
+    </header>
+
+    <section>
+        <div class="status-text" id="pageStatus">Chargement des données du contrat…</div>
+        <div class="actions">
+            <a class="button secondary" id="backToOverview" href="/poc/contracts/">← Retour à la vue d'ensemble</a>
+            <a class="button secondary" id="goToReview" href="#">Passer à la validation</a>
+        </div>
+    </section>
+
+    <section>
+        <h2>Clauses du contrat</h2>
+        <div id="clausesContainer" class="clauses"></div>
+        <div class="empty" id="clausesEmpty" style="display:none;">Aucune clause disponible. Ajoutez une clause optionnelle pour démarrer.</div>
+    </section>
+
+    <section>
+        <h2>Ajouter une clause optionnelle</h2>
+        <form class="grid two" id="addClauseForm">
+            <label>
+                Modèle de clause
+                <select id="addTemplateSelect"></select>
+            </label>
+            <label>
+                Titre personnalisé
+                <input type="text" id="addTitleInput" placeholder="Titre spécifique (facultatif)">
+            </label>
+            <label style="grid-column: 1 / -1;">
+                Contenu
+                <textarea id="addContentInput" placeholder="Personnalisez le contenu ou laissez vide pour utiliser le modèle."></textarea>
+            </label>
+            <div style="grid-column: 1 / -1; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <button type="submit" class="button">Ajouter la clause</button>
+                <span class="status-text" id="addClauseStatus"></span>
+            </div>
+        </form>
+    </section>
+
+    <footer>
+        <a href="/poc/contracts/review/" id="reviewLink">👀 Prévisualiser la validation</a>
+        <a href="/poc/contracts/">📊 Voir tous les contrats</a>
+    </footer>
+</main>
+<script>
+(function() {
+    const ACCESS_KEY = 'scbAccessToken';
+    const REFRESH_KEY = 'scbRefreshToken';
+    const params = new URLSearchParams(window.location.search);
+    const contractId = params.get('contractId');
+
+    const contractTitle = document.getElementById('contractTitle');
+    const contractMeta = document.getElementById('contractMeta');
+    const contractStatus = document.getElementById('contractStatus');
+    const pageStatus = document.getElementById('pageStatus');
+    const clausesContainer = document.getElementById('clausesContainer');
+    const clausesEmpty = document.getElementById('clausesEmpty');
+    const addClauseForm = document.getElementById('addClauseForm');
+    const addTemplateSelect = document.getElementById('addTemplateSelect');
+    const addTitleInput = document.getElementById('addTitleInput');
+    const addContentInput = document.getElementById('addContentInput');
+    const addClauseStatus = document.getElementById('addClauseStatus');
+    const goToReview = document.getElementById('goToReview');
+    const reviewLink = document.getElementById('reviewLink');
+    const loginButton = document.getElementById('loginButton');
+
+    const state = {
+        contract: null,
+        templates: [],
+    };
+
+    function redirectToLogin() {
+        window.localStorage.removeItem(ACCESS_KEY);
+        window.localStorage.removeItem(REFRESH_KEY);
+        window.location.href = '/poc/login/';
+    }
+
+    if (loginButton) {
+        loginButton.addEventListener('click', redirectToLogin);
+    }
+
+    function readCookie(name) {
+        const cookies = document.cookie ? document.cookie.split(';') : [];
+        for (const chunk of cookies) {
+            const [key, value] = chunk.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
+    }
+
+    function isSafeMethod(method) {
+        return ['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+    }
+
+    async function apiRequest({ url, method = 'GET', data = null }) {
+        const headers = { 'Accept': 'application/json' };
+        const options = {
+            method,
+            headers,
+            credentials: 'same-origin',
+        };
+
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (!isSafeMethod(method)) {
+            const csrfToken = readCookie('csrftoken');
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        }
+
+        const token = window.localStorage.getItem(ACCESS_KEY);
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (error) {
+                payload = text;
+            }
+        }
+
+        return { ok: response.ok, status: response.status, data: payload };
+    }
+
+    function setStatus(element, message, variant) {
+        if (!element) {
+            return;
+        }
+        element.textContent = message || '';
+        element.classList.remove('error', 'success');
+        if (variant) {
+            element.classList.add(variant);
+        }
+    }
+
+    function populateTemplates() {
+        if (!addTemplateSelect) {
+            return;
+        }
+        addTemplateSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Choisir un modèle (optionnel)';
+        placeholder.selected = true;
+        placeholder.disabled = false;
+        addTemplateSelect.appendChild(placeholder);
+
+        for (const template of state.templates) {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = `${template.title} • ${template.category_label}`;
+            if (template.is_mandatory) {
+                option.disabled = true;
+                option.textContent += ' (obligatoire déjà inclus)';
+            }
+            addTemplateSelect.appendChild(option);
+        }
+    }
+
+    function renderMeta() {
+        if (!state.contract) {
+            return;
+        }
+        contractTitle.textContent = state.contract.title;
+        contractStatus.textContent = state.contract.status_label;
+        contractStatus.style.background = state.contract.status === 'draft' ? 'rgba(14,165,233,0.16)' : state.contract.status === 'negotiation' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(16,185,129,0.2)';
+        contractStatus.style.color = state.contract.status === 'negotiation' ? '#c2410c' : '#0369a1';
+
+        const parts = [];
+        if (state.contract.organisation) {
+            parts.push(`Organisation • ${state.contract.organisation.name}`);
+        }
+        if (state.contract.agent) {
+            parts.push(`Agent • ${state.contract.agent.name}`);
+        }
+        if (state.contract.updated_at) {
+            const date = new Date(state.contract.updated_at);
+            parts.push(`Mis à jour le ${date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}`);
+        }
+        contractMeta.textContent = parts.join(' · ');
+
+        if (goToReview) {
+            goToReview.href = `/poc/contracts/review/?contractId=${state.contract.id}`;
+        }
+        if (reviewLink) {
+            reviewLink.href = `/poc/contracts/review/?contractId=${state.contract.id}`;
+        }
+    }
+
+    function templateOptions(selectedId) {
+        const fragment = document.createDocumentFragment();
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = 'Conserver la version actuelle';
+        fragment.appendChild(blank);
+        for (const template of state.templates) {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = `${template.title} • ${template.category_label}`;
+            if (template.id === selectedId) {
+                option.selected = true;
+            }
+            fragment.appendChild(option);
+        }
+        return fragment;
+    }
+
+    function renderClauses() {
+        if (!clausesContainer) {
+            return;
+        }
+        clausesContainer.innerHTML = '';
+        const clauses = state.contract ? state.contract.clauses : [];
+        if (!clauses || !clauses.length) {
+            clausesEmpty.style.display = 'block';
+            return;
+        }
+        clausesEmpty.style.display = 'none';
+
+        for (const clause of clauses) {
+            const card = document.createElement('div');
+            card.className = `clause${clause.is_modified ? ' modified' : ''}`;
+
+            const header = document.createElement('header');
+            const heading = document.createElement('h3');
+            heading.textContent = clause.title;
+            header.appendChild(heading);
+
+            const badgeRow = document.createElement('div');
+            badgeRow.style.display = 'flex';
+            badgeRow.style.gap = '8px';
+            badgeRow.style.flexWrap = 'wrap';
+
+            const typeBadge = document.createElement('span');
+            typeBadge.className = 'badge';
+            if (clause.is_mandatory) {
+                typeBadge.textContent = 'Obligatoire';
+            } else {
+                typeBadge.textContent = 'Optionnelle';
+                typeBadge.classList.add('optional');
+            }
+            badgeRow.appendChild(typeBadge);
+
+            if (clause.is_modified) {
+                const modified = document.createElement('span');
+                modified.className = 'badge modified';
+                modified.textContent = 'Modifiée';
+                badgeRow.appendChild(modified);
+            }
+            header.appendChild(badgeRow);
+            card.appendChild(header);
+
+            const form = document.createElement('form');
+            form.className = 'grid';
+            form.dataset.clauseId = clause.id;
+
+            const titleLabel = document.createElement('label');
+            titleLabel.textContent = 'Titre';
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.value = clause.title;
+            titleLabel.appendChild(titleInput);
+
+            const contentLabel = document.createElement('label');
+            contentLabel.textContent = 'Contenu';
+            const contentInput = document.createElement('textarea');
+            contentInput.value = clause.content;
+            contentLabel.appendChild(contentInput);
+
+            const templateLabel = document.createElement('label');
+            templateLabel.textContent = 'Appliquer un modèle';
+            const templateSelect = document.createElement('select');
+            templateSelect.appendChild(templateOptions(clause.template_id));
+            templateLabel.appendChild(templateSelect);
+
+            form.appendChild(titleLabel);
+            form.appendChild(contentLabel);
+            form.appendChild(templateLabel);
+
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+            const saveButton = document.createElement('button');
+            saveButton.type = 'submit';
+            saveButton.className = 'button';
+            saveButton.textContent = 'Enregistrer les modifications';
+            actions.appendChild(saveButton);
+
+            if (!clause.is_mandatory) {
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'button danger';
+                deleteButton.textContent = 'Supprimer';
+                deleteButton.addEventListener('click', async () => {
+                    await deleteClause(clause.id, actionsStatus);
+                });
+                actions.appendChild(deleteButton);
+            }
+
+            const actionsStatus = document.createElement('span');
+            actionsStatus.className = 'status-text';
+            actions.appendChild(actionsStatus);
+
+            form.appendChild(actions);
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const payload = {};
+                if (titleInput.value !== clause.title) {
+                    payload.title = titleInput.value;
+                }
+                if (contentInput.value !== clause.content) {
+                    payload.content = contentInput.value;
+                }
+                if (templateSelect.value) {
+                    payload.template_id = templateSelect.value;
+                }
+                setStatus(actionsStatus, 'Enregistrement…');
+                if (!Object.keys(payload).length) {
+                    setStatus(actionsStatus, 'Aucune modification détectée.');
+                    return;
+                }
+                const response = await apiRequest({
+                    url: `/api/contracts/${state.contract.id}/clauses/${clause.id}/`,
+                    method: 'PATCH',
+                    data: payload,
+                });
+                if (response.ok) {
+                    setStatus(actionsStatus, 'Clause mise à jour.', 'success');
+                    await refreshContract();
+                } else {
+                    setStatus(actionsStatus, `Erreur (${response.status})`, 'error');
+                }
+            });
+
+            card.appendChild(form);
+            clausesContainer.appendChild(card);
+        }
+    }
+
+    async function deleteClause(clauseId, statusElement) {
+        if (!state.contract) {
+            return;
+        }
+        setStatus(statusElement, 'Suppression…');
+        const response = await apiRequest({
+            url: `/api/contracts/${state.contract.id}/clauses/${clauseId}/`,
+            method: 'DELETE',
+        });
+        if (response.status === 204) {
+            setStatus(statusElement, 'Clause supprimée.', 'success');
+            await refreshContract();
+        } else {
+            setStatus(statusElement, `Impossible de supprimer (${response.status}).`, 'error');
+        }
+    }
+
+    async function refreshContract() {
+        if (!contractId) {
+            return;
+        }
+        setStatus(pageStatus, 'Actualisation du contrat…');
+        const response = await apiRequest({ url: `/api/contracts/${contractId}/` });
+        if (response.ok) {
+            state.contract = response.data;
+            renderMeta();
+            renderClauses();
+            setStatus(pageStatus, 'Contrat synchronisé.', 'success');
+        } else {
+            setStatus(pageStatus, 'Impossible de charger le contrat.', 'error');
+        }
+    }
+
+    async function loadTemplates() {
+        const response = await apiRequest({ url: '/api/clause-templates/' });
+        if (response.ok) {
+            state.templates = response.data;
+            populateTemplates();
+        }
+    }
+
+    if (!contractId) {
+        setStatus(pageStatus, "Aucun contrat sélectionné. Ouvrez l'éditeur depuis la vue d'ensemble.", 'error');
+        contractTitle.textContent = 'Contrat introuvable';
+        contractStatus.textContent = '—';
+        if (goToReview) {
+            goToReview.style.display = 'none';
+        }
+        return;
+    }
+
+    if (goToReview) {
+        goToReview.href = `/poc/contracts/review/?contractId=${contractId}`;
+    }
+    if (reviewLink) {
+        reviewLink.href = `/poc/contracts/review/?contractId=${contractId}`;
+    }
+
+    if (addClauseForm) {
+        addClauseForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const payload = {};
+            if (addTemplateSelect.value) {
+                payload.template_id = addTemplateSelect.value;
+            }
+            if (addTitleInput.value) {
+                payload.title = addTitleInput.value;
+            }
+            if (addContentInput.value) {
+                payload.content = addContentInput.value;
+            }
+            if (!payload.template_id && (!payload.title || !payload.content)) {
+                setStatus(addClauseStatus, 'Choisissez un modèle ou remplissez titre + contenu.', 'error');
+                return;
+            }
+            setStatus(addClauseStatus, 'Ajout de la clause…');
+            const response = await apiRequest({
+                url: `/api/contracts/${contractId}/clauses/`,
+                method: 'POST',
+                data: payload,
+            });
+            if (response.ok) {
+                setStatus(addClauseStatus, 'Clause ajoutée !', 'success');
+                addTitleInput.value = '';
+                addContentInput.value = '';
+                addTemplateSelect.value = '';
+                await refreshContract();
+            } else {
+                setStatus(addClauseStatus, `Erreur (${response.status})`, 'error');
+            }
+        });
+    }
+
+    loadTemplates();
+    refreshContract();
+})();
+</script>
+</body>
+</html>

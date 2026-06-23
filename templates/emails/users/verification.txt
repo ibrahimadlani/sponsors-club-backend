@@ -1,0 +1,18 @@
+Hello {{ user.first_name|default:user.email }},
+
+Thank you for creating your Sponsors Club account. Please confirm your email
+address to unlock messaging, notifications, and contract workflows.
+
+{% if verification_url %}Confirm your email by visiting:
+{{ verification_url }}
+{% endif %}
+If you prefer, you can also verify your account via the API by issuing a POST
+request to /api/users/verify-email/ with the following payload:
+{
+  "uid": "{{ user.id }}",
+  "token": "{{ token }}"
+}
+
+If you did not create this account you can safely ignore this email.
+
+The Sponsors Club team

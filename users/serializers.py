@@ -1,0 +1,324 @@
+"""Serializers supporting the users API endpoints."""
+
+from django.db import transaction
+from rest_framework import serializers
+
+from organisations.models import Collaborator
+
+from .emails import send_email_verification
+from .models import AgentProfile, EmailVerificationToken, User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serialize the base user fields shared across endpoints."""
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "avatar",
+            "phone_country_code",
+            "phone_number",
+            "date_of_birth",
+            "country",
+            "language",
+            "gender",
+            "email_verified",
+            "account_type",
+            "is_active",
+            "is_staff",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "account_type",
+            "is_active",
+            "is_staff",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError("Country code must contain only letters.")
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """Handle registration for both agent and collaborator accounts."""
+
+    password = serializers.CharField(write_only=True)
+    is_self_represented = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=True,
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "password",
+            "account_type",
+            "first_name",
+            "last_name",
+            "avatar",
+            "is_self_represented",
+            "phone_country_code",
+            "phone_number",
+            "date_of_birth",
+            "country",
+            "language",
+            "gender",
+        )
+        read_only_fields = ("id",)
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError("Country code must contain only letters.")
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """Create a user and any related agent or collaborator records."""
+        is_self_represented = validated_data.pop("is_self_represented", True)
+        password = validated_data.pop("password")
+        user = User.objects.create_user(password=password, **validated_data)
+        if user.account_type == User.AccountType.AGENT:
+            AgentProfile.objects.create(
+                user=user,
+                is_self_represented=is_self_represented,
+            )
+        send_email_verification(user)
+        return user
+
+    def to_representation(self, instance):
+        """Use the base user serializer for the outward representation."""
+        return UserSerializer(instance, context=self.context).data
+
+
+class MeUpdateSerializer(serializers.ModelSerializer):
+    """Allow the authenticated user to update their profile details."""
+
+    is_self_represented = serializers.BooleanField(required=False)
+
+    class Meta:
+        model = User
+        fields = (
+            "email",
+            "first_name",
+            "last_name",
+            "avatar",
+            "phone_country_code",
+            "phone_number",
+            "date_of_birth",
+            "country",
+            "language",
+            "gender",
+            "is_self_represented",
+        )
+
+    def validate_country(self, value):
+        """Validate that country is a valid ISO 3166-1 alpha-2 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError("Country code must contain only letters.")
+        return value.upper() if value else value
+
+    def validate_language(self, value):
+        """Validate that language is a valid ISO 639-1 code."""
+        if value and len(value) != 2:
+            raise serializers.ValidationError(
+                "Language must be a valid ISO 639-1 code (2 letters)."
+            )
+        if value and not value.isalpha():
+            raise serializers.ValidationError(
+                "Language code must contain only letters."
+            )
+        return value.lower() if value else value
+
+    def update(self, instance, validated_data):
+        """Update the user object and related agent profile when needed."""
+        is_self_represented = validated_data.pop("is_self_represented", None)
+        update_fields = []
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            update_fields.append(attr)
+        if update_fields:
+            update_fields.append("updated_at")
+            instance.save(update_fields=update_fields)
+        else:
+            instance.save()
+
+        if (
+            instance.account_type == User.AccountType.AGENT
+            and is_self_represented is not None
+        ):
+            agent_profile, _ = AgentProfile.objects.get_or_create(
+                user=instance,
+            )
+            profile_updates: list[str] = []
+            if is_self_represented is not None:
+                agent_profile.is_self_represented = is_self_represented
+                profile_updates.append("is_self_represented")
+            if profile_updates:
+                agent_profile.save(update_fields=profile_updates)
+                agent_profile.refresh_from_db(fields=profile_updates)
+
+        return instance
+
+    def to_representation(self, instance):
+        """Augment the serialized representation with agent info when relevant."""
+        data = UserSerializer(instance, context=self.context).data
+        if instance.account_type == User.AccountType.AGENT:
+            agent_profile = (
+                AgentProfile.objects.filter(user=instance)
+                .select_related("user")
+                .only(
+                    "id",
+                    "is_self_represented",
+                    "user__first_name",
+                    "user__last_name",
+                    "user__email",
+                )
+                .first()
+            )
+            if agent_profile is not None:
+                data["agent_profile"] = {
+                    "id": str(agent_profile.id),
+                    "name": agent_profile.name,
+                    "is_self_represented": agent_profile.is_self_represented,
+                }
+        return data
+
+
+class RolesSerializer(serializers.Serializer):
+    """Represent the user's roles and single collaboration reference."""
+
+    is_agent = serializers.BooleanField()
+    agent_profile = serializers.DictField(allow_null=True)
+    collaborations = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=True
+    )
+    collaboration = serializers.UUIDField(allow_null=True)
+
+    def create(self, validated_data):
+        """Disallow creation via this read-only serializer."""
+        raise NotImplementedError("RolesSerializer is read-only.")
+
+    def update(self, instance, validated_data):
+        """Disallow updates via this read-only serializer."""
+        raise NotImplementedError("RolesSerializer is read-only.")
+
+
+class RolesDataBuilder:
+    """Utility for building the /me/roles response payload."""
+
+    def __init__(self, user):
+        """Store the user for later role aggregation."""
+        self.user = user
+
+    def build(self):
+        """Construct the payload expected by `RolesSerializer`."""
+        agent_info = None
+        try:
+            agent_profile = self.user.agent_profile
+        except AgentProfile.DoesNotExist:  # type: ignore[attr-defined]
+            agent_profile = None
+        if agent_profile is not None:
+            agent_info = {
+                "id": str(agent_profile.id),
+                "name": agent_profile.name,
+                "is_self_represented": agent_profile.is_self_represented,
+            }
+
+        # Expose both all collaborations and a single primary reference
+        qs = (
+            Collaborator.objects.filter(user=self.user)
+            .order_by("created_at")
+            .values_list("organisation_id", flat=True)
+        )
+        collaborations = list(qs)
+        collab = collaborations[0] if collaborations else None
+
+        return {
+            "is_agent": agent_info is not None,
+            "agent_profile": agent_info,
+            "collaborations": collaborations,
+            "collaboration": collab,
+        }
+
+
+class EmailVerificationConfirmSerializer(serializers.Serializer):
+    """Validate and persist email verification submissions."""
+
+    uid = serializers.UUIDField()
+    token = serializers.CharField()
+
+    default_error_messages = {
+        "invalid_token": "Invalid or expired verification token.",
+    }
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(id=attrs["uid"])
+        except User.DoesNotExist as exc:  # pragma: no cover - defensive
+            raise serializers.ValidationError(
+                self.error_messages["invalid_token"]
+            ) from exc
+
+        token = EmailVerificationToken.verify(user, attrs["token"])
+        if token is None:
+            raise serializers.ValidationError(self.error_messages["invalid_token"])
+
+        attrs["user"] = user
+        return attrs
+
+    def save(self, **kwargs):
+        user: User = self.validated_data["user"]
+        if not user.email_verified:
+            user.email_verified = True
+            user.save(update_fields=["email_verified", "updated_at"])
+        return user

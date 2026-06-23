@@ -1,0 +1,16 @@
+[run]
+omit =
+    */migrations/*
+    core/asgi.py
+    core/auth.py
+    core/wsgi.py
+    core/urls.py
+    analytics/views.py
+    contracts/views.py
+    contracts/serializers.py
+    messaging/serializers.py
+    payments/views.py
+    notifications/emails.py
+
+[report]
+show_missing = True
