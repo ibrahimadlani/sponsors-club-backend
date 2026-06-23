@@ -19,6 +19,22 @@ class IsCollaboratorAccount(permissions.BasePermission):
         )
 
 
+class IsOrganisationCreator(permissions.BasePermission):
+    """Allow access to staff or collaborators without an organisation."""
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_staff:
+            return True
+        if (
+            getattr(request.user, "account_type", None)
+            != request.user.AccountType.COLLABORATOR
+        ):
+            return False
+        return not Collaborator.objects.filter(user=request.user).exists()
+
+
 class IsAuthenticatedCollaborator(permissions.BasePermission):
     """Allow access if the user is a collaborator of the organisation."""
 
@@ -27,6 +43,8 @@ class IsAuthenticatedCollaborator(permissions.BasePermission):
         organisation = getattr(view, "organisation", None)
         if not request.user or not request.user.is_authenticated:
             # Let IsAuthenticated handle authentication failures.
+            return True
+        if request.user.is_staff:
             return True
         if organisation is None:
             return False

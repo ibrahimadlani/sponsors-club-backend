@@ -37,7 +37,7 @@ class Organisation(BaseModel):
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     # Owner now references the owner collaborator record
     owner = models.ForeignKey(
-        'organisations.Collaborator',
+        "organisations.Collaborator",
         on_delete=models.SET_NULL,
         related_name="owned_organisations",
         null=True,
@@ -165,9 +165,17 @@ class Collaborator(BaseModel):
 
     def clean(self):
         # Prevent a user from being linked to multiple organisations at once
-        if self.user_id and Collaborator.objects.filter(user_id=self.user_id).exclude(pk=self.pk).exists():
+        if (
+            self.user_id
+            and Collaborator.objects.filter(user_id=self.user_id)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
             from django.core.exceptions import ValidationError
-            raise ValidationError({"user": "Cet utilisateur est déjà rattaché à une organisation."})
+
+            raise ValidationError(
+                {"user": "Cet utilisateur est déjà rattaché à une organisation."}
+            )
 
     def __str__(self):
         return f"{self.user} - {self.organisation.name} ({self.role})"

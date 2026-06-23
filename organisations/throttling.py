@@ -9,9 +9,19 @@ class InviteCreateThrottle(UserRateThrottle):
     rate = "10/hour"
     scope = "invite_create"
 
+    def wait(self):
+        if not hasattr(self, "history"):
+            return None
+        return super().wait()
+
 
 class InviteJoinThrottle(UserRateThrottle):
     """Throttle invitation usage to prevent brute force attacks."""
 
     rate = "20/hour"
     scope = "invite_join"
+
+    def wait(self):
+        if not hasattr(self, "history"):
+            return None
+        return super().wait()

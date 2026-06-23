@@ -4,14 +4,15 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organisations', '0007_collaborator_unique_collaborator_user_global'),
+        ("organisations", "0007_collaborator_unique_collaborator_user_global"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='collaborator',
-            index=models.Index(fields=['user', 'created_at'], name='collab_user_created_idx'),
+            model_name="collaborator",
+            index=models.Index(
+                fields=["user", "created_at"], name="collab_user_created_idx"
+            ),
         ),
     ]

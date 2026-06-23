@@ -4,9 +4,8 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organisations', '0006_remove_organisation_budget_max_and_more'),
+        ("organisations", "0006_remove_organisation_budget_max_and_more"),
     ]
 
     # No-op: do not enforce a global unique user constraint for collaborators.

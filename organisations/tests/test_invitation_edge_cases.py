@@ -10,7 +10,18 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from organisations.models import Collaborator, Organisation, OrganisationInvite
-from users.models import User
+
+
+@pytest.fixture
+def collaborator_user(user_model):
+    """Create a collaborator user for invitation tests."""
+    return user_model.objects.create_user(
+        email="collab@test.com",
+        password="pass1234",
+        first_name="Test",
+        last_name="Collaborator",
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
 
 
 @pytest.fixture
@@ -28,13 +39,53 @@ def another_collaborator_user(user_model):
 @pytest.fixture
 def agent_user(user_model):
     """Create an agent user to test account type restrictions."""
-    return user_model.objects.create_user(
+    from users.models import AgentProfile
+
+    user = user_model.objects.create_user(
         email="agent@test.com",
         password="pass1234",
         first_name="Agent",
         last_name="User",
         account_type=user_model.AccountType.AGENT,
     )
+    # Create agent profile for the user
+    AgentProfile.objects.create(user=user)
+    return user
+
+
+@pytest.fixture
+def owner_client(owner_user):
+    """Create authenticated API client for organisation owner."""
+    client = APIClient()
+    client.force_authenticate(user=owner_user)
+    return client
+
+
+@pytest.fixture
+def member_collaborator(user_model, organisations_setup):
+    """Create a MEMBER collaborator in the test organisation."""
+    member_user = user_model.objects.create_user(
+        email="member@test.com",
+        password="pass1234",
+        first_name="Member",
+        last_name="User",
+        account_type=user_model.AccountType.COLLABORATOR,
+    )
+    collaborator = Collaborator.objects.create(
+        user=member_user,
+        organisation=organisations_setup["organisation"],
+        role=Collaborator.Role.MEMBER,
+        job_title="Member",
+    )
+    return collaborator
+
+
+@pytest.fixture
+def collaborator_client(member_collaborator):
+    """Create authenticated API client for member collaborator."""
+    client = APIClient()
+    client.force_authenticate(user=member_collaborator.user)
+    return client
 
 
 @pytest.mark.django_db
@@ -50,7 +101,7 @@ class TestInvitationExpiration:
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
         # Create an expired invitation
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="EXPIRED1",
@@ -64,7 +115,11 @@ class TestInvitationExpiration:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "code" in response.data
-        assert "expired" in response.data["code"][0].lower()
+        assert (
+            "expired" in str(response.data["code"]).lower()
+            if isinstance(response.data["code"], str)
+            else response.data["code"][0].lower()
+        )
 
     def test_expired_invitation_shows_correct_status(self, organisations_setup):
         """Test that expired invitations have correct status property."""
@@ -123,7 +178,7 @@ class TestInvitationReuse:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="USED1234",
@@ -148,7 +203,11 @@ class TestInvitationReuse:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "code" in response.data
-        assert "already been used" in response.data["code"][0].lower()
+        assert (
+            "already been used" in str(response.data["code"]).lower()
+            if isinstance(response.data["code"], str)
+            else response.data["code"][0].lower()
+        )
 
     def test_used_invitation_shows_correct_status(
         self, collaborator_user, organisations_setup
@@ -188,7 +247,11 @@ class TestInvitationCodeValidation:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "code" in response.data
-        assert "invalid" in response.data["code"][0].lower()
+        assert (
+            "invalid" in str(response.data["code"]).lower()
+            if isinstance(response.data["code"], str)
+            else response.data["code"][0].lower()
+        )
 
     def test_code_case_insensitivity(self, collaborator_user, organisations_setup):
         """Test that codes are case-insensitive."""
@@ -248,7 +311,7 @@ class TestAccountTypeRestrictions:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="AGENT123",
@@ -265,7 +328,11 @@ class TestAccountTypeRestrictions:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "code" in response.data
-        assert "collaborator" in response.data["code"][0].lower()
+        # Error is a string, not a list
+        error_msg = response.data["code"]
+        if isinstance(error_msg, list):
+            error_msg = error_msg[0]
+        assert "collaborator" in str(error_msg).lower()
 
     def test_user_already_in_org_cannot_join_another(
         self, collaborator_user, organisations_setup, user_model
@@ -296,7 +363,7 @@ class TestAccountTypeRestrictions:
         organisation2.owner = owner_collab2
         organisation2.save()
 
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation2,
             created_by=owner_collab2,
             code="SECOND01",
@@ -313,7 +380,11 @@ class TestAccountTypeRestrictions:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "code" in response.data
-        assert "already belongs" in response.data["code"][0].lower()
+        assert (
+            "already belongs" in str(response.data["code"]).lower()
+            if isinstance(response.data["code"], str)
+            else response.data["code"][0].lower()
+        )
 
 
 @pytest.mark.django_db
@@ -341,7 +412,9 @@ class TestInvitationRevocation:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not OrganisationInvite.objects.filter(id=invite.id).exists()
 
-    def test_cannot_revoke_used_invite(self, owner_client, organisations_setup, collaborator_user):
+    def test_cannot_revoke_used_invite(
+        self, owner_client, organisations_setup, collaborator_user
+    ):
         """Test that already used invitations cannot be revoked."""
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
@@ -365,7 +438,9 @@ class TestInvitationRevocation:
         assert "already been used" in response.data["detail"].lower()
         assert OrganisationInvite.objects.filter(id=invite.id).exists()
 
-    def test_member_cannot_revoke_invite(self, collaborator_client, organisations_setup, member_collaborator):
+    def test_member_cannot_revoke_invite(
+        self, collaborator_client, organisations_setup, member_collaborator
+    ):
         """Test that non-owner collaborators cannot revoke invitations."""
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
@@ -385,13 +460,18 @@ class TestInvitationRevocation:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_revoke_nonexistent_invite_returns_404(self, owner_client, organisations_setup):
+    def test_revoke_nonexistent_invite_returns_404(
+        self, owner_client, organisations_setup
+    ):
         """Test that revoking a non-existent invitation returns 404."""
         organisation = organisations_setup["organisation"]
 
         url = reverse(
             "organisation-revoke-invite",
-            kwargs={"pk": organisation.id, "invite_id": "00000000-0000-0000-0000-000000000000"},
+            kwargs={
+                "pk": organisation.id,
+                "invite_id": "00000000-0000-0000-0000-000000000000",
+            },
         )
         response = owner_client.delete(url)
 
@@ -408,14 +488,14 @@ class TestInvitationFiltering:
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
         # Create different status invites
-        active = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="ACTIVE01",
             expires_at=timezone.now() + timedelta(hours=24),
         )
 
-        expired = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="EXPIRED1",
@@ -435,14 +515,14 @@ class TestInvitationFiltering:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        active = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="ACTIVE02",
             expires_at=timezone.now() + timedelta(hours=24),
         )
 
-        expired = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="EXPIRED2",
@@ -464,7 +544,7 @@ class TestInvitationFiltering:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        active = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="ACTIVE03",
@@ -499,7 +579,7 @@ class TestRaceConditions:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="RACE1234",
@@ -524,7 +604,10 @@ class TestRaceConditions:
             join_url, {"code": "RACE1234", "job_title": "Designer"}, format="json"
         )
         assert response2.status_code == status.HTTP_400_BAD_REQUEST
-        assert "already been used" in response2.data["code"][0].lower()
+        code_error = response2.data["code"]
+        if isinstance(code_error, list):
+            code_error = code_error[0]
+        assert "already been used" in str(code_error).lower()
 
 
 @pytest.mark.django_db
@@ -556,7 +639,7 @@ class TestInvitationThrottling:
         organisation = organisations_setup["organisation"]
         owner = organisation.collaborators.filter(role=Collaborator.Role.OWNER).first()
 
-        invite = OrganisationInvite.objects.create(
+        OrganisationInvite.objects.create(
             organisation=organisation,
             created_by=owner,
             code="THROTTLE",

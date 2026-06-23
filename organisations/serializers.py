@@ -48,7 +48,14 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "owner_id",
             "owner_user_id",
         )
-        read_only_fields = ("id", "slug", "created_at", "updated_at", "owner_id", "owner_user_id")
+        read_only_fields = (
+            "id",
+            "slug",
+            "created_at",
+            "updated_at",
+            "owner_id",
+            "owner_user_id",
+        )
 
     def get_owner_id(self, obj: Organisation):
         # Return collaborator id (current FK) or fallback discovery
@@ -250,7 +257,9 @@ class OrganisationInviteSerializer(serializers.ModelSerializer):
 class OrganisationInviteCreateSerializer(serializers.Serializer):
     """Generate a one-time invitation code for an organisation."""
 
-    expires_in_hours = serializers.IntegerField(min_value=1, max_value=168, required=False)
+    expires_in_hours = serializers.IntegerField(
+        min_value=1, max_value=168, required=False
+    )
 
     def create(self, validated_data):
         organisation: Organisation = self.context["organisation"]
@@ -292,22 +301,27 @@ class OrganisationJoinSerializer(serializers.Serializer):
 
         # Lock the invite row to prevent race conditions
         try:
-            invite = OrganisationInvite.objects.select_for_update().select_related(
-                "organisation"
-            ).get(code=code)
+            invite = (
+                OrganisationInvite.objects.select_for_update()
+                .select_related("organisation")
+                .get(code=code)
+            )
         except OrganisationInvite.DoesNotExist as exc:
-            raise serializers.ValidationError({"code": "Invalid invitation code."}) from exc
+            raise serializers.ValidationError(
+                {"code": "Invalid invitation code."}
+            ) from exc
 
         # Validate within the transaction after locking
         if invite.is_used:
-            raise serializers.ValidationError({"code": "Invitation has already been used."})
+            raise serializers.ValidationError(
+                {"code": "Invitation has already been used."}
+            )
         if invite.expires_at < timezone.now():
             raise serializers.ValidationError({"code": "Invitation has expired."})
 
         # Validate user account type
         if (
-            getattr(user, "account_type", None)
-            != user.AccountType.COLLABORATOR
+            getattr(user, "account_type", None) != user.AccountType.COLLABORATOR
             and not user.is_staff
         ):
             raise serializers.ValidationError(
@@ -349,7 +363,9 @@ class OwnershipTransferSerializer(serializers.Serializer):
             collaborator = organisation.collaborators.get(id=collaborator_id)
         except Collaborator.DoesNotExist as exc:
             raise serializers.ValidationError(
-                {"collaborator_id": "Collaborator does not belong to this organisation."}
+                {
+                    "collaborator_id": "Collaborator does not belong to this organisation."
+                }
             ) from exc
         if collaborator.role == Collaborator.Role.OWNER:
             raise serializers.ValidationError(

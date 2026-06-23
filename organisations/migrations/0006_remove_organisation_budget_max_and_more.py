@@ -8,13 +8,15 @@ import uuid
 
 
 def populate_slug(apps, schema_editor):
-    Organisation = apps.get_model('organisations', 'Organisation')
+    Organisation = apps.get_model("organisations", "Organisation")
 
     for organisation in Organisation.objects.all():
         base_slug = slugify(organisation.name) or uuid.uuid4().hex[:8]
         slug = base_slug
         counter = 1
-        while Organisation.objects.filter(slug=slug).exclude(pk=organisation.pk).exists():
+        while (
+            Organisation.objects.filter(slug=slug).exclude(pk=organisation.pk).exists()
+        ):
             counter += 1
             slug = f"{base_slug}-{counter}"
         organisation.slug = slug
@@ -22,138 +24,190 @@ def populate_slug(apps, schema_editor):
             organisation.social_links = {}
         if organisation.sponsoring_focus is None:
             organisation.sponsoring_focus = []
-        organisation.save(update_fields=["slug", "social_links", "sponsoring_focus", "updated_at"])
+        organisation.save(
+            update_fields=["slug", "social_links", "sponsoring_focus", "updated_at"]
+        )
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('organisations', '0005_organisation_owner'),
+        ("organisations", "0005_organisation_owner"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='organisation',
-            name='budget_max',
+            model_name="organisation",
+            name="budget_max",
         ),
         migrations.RemoveField(
-            model_name='organisation',
-            name='budget_min',
+            model_name="organisation",
+            name="budget_min",
         ),
         migrations.RemoveField(
-            model_name='organisation',
-            name='country',
+            model_name="organisation",
+            name="country",
         ),
         migrations.RemoveField(
-            model_name='organisation',
-            name='sector',
+            model_name="organisation",
+            name="sector",
         ),
         migrations.RemoveField(
-            model_name='organisation',
-            name='size',
+            model_name="organisation",
+            name="size",
         ),
         migrations.RemoveField(
-            model_name='organisation',
-            name='website',
+            model_name="organisation",
+            name="website",
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='address_city',
+            model_name="organisation",
+            name="address_city",
             field=models.CharField(blank=True, max_length=255),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='address_country',
+            model_name="organisation",
+            name="address_country",
             field=models.CharField(blank=True, max_length=100),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='address_postal_code',
+            model_name="organisation",
+            name="address_postal_code",
             field=models.CharField(blank=True, max_length=20),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='banner_image',
-            field=models.ImageField(blank=True, null=True, upload_to='organisation_banners/'),
+            model_name="organisation",
+            name="banner_image",
+            field=models.ImageField(
+                blank=True, null=True, upload_to="organisation_banners/"
+            ),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='budget_range',
+            model_name="organisation",
+            name="budget_range",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='email_contact',
+            model_name="organisation",
+            name="email_contact",
             field=models.EmailField(blank=True, max_length=254),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='employees_count',
+            model_name="organisation",
+            name="employees_count",
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='founded_year',
+            model_name="organisation",
+            name="founded_year",
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='industry',
+            model_name="organisation",
+            name="industry",
             field=models.CharField(blank=True, max_length=255),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='phone_contact',
+            model_name="organisation",
+            name="phone_contact",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='slug',
+            model_name="organisation",
+            name="slug",
             field=models.SlugField(blank=True, max_length=255, null=True),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='social_links',
+            model_name="organisation",
+            name="social_links",
             field=models.JSONField(blank=True, default=dict),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='sponsoring_focus',
+            model_name="organisation",
+            name="sponsoring_focus",
             field=models.JSONField(blank=True, default=list),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='type',
-            field=models.CharField(choices=[('BRAND', 'Brand'), ('SME', 'Small or medium enterprise'), ('STARTUP', 'Startup'), ('ASSOCIATION', 'Association'), ('INDIVIDUAL', 'Individual'), ('AGENCY', 'Agency'), ('OTHER', 'Other')], default='BRAND', max_length=20),
+            model_name="organisation",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("BRAND", "Brand"),
+                    ("SME", "Small or medium enterprise"),
+                    ("STARTUP", "Startup"),
+                    ("ASSOCIATION", "Association"),
+                    ("INDIVIDUAL", "Individual"),
+                    ("AGENCY", "Agency"),
+                    ("OTHER", "Other"),
+                ],
+                default="BRAND",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='organisation',
-            name='website_url',
+            model_name="organisation",
+            name="website_url",
             field=models.URLField(blank=True),
         ),
         migrations.RunPython(populate_slug, migrations.RunPython.noop),
         migrations.AlterField(
-            model_name='organisation',
-            name='slug',
+            model_name="organisation",
+            name="slug",
             field=models.SlugField(blank=True, max_length=255, unique=True),
         ),
         migrations.CreateModel(
-            name='OrganisationInvite',
+            name="OrganisationInvite",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('code', models.CharField(max_length=16, unique=True)),
-                ('expires_at', models.DateTimeField()),
-                ('is_used', models.BooleanField(default=False)),
-                ('used_at', models.DateTimeField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='created_invites', to='organisations.collaborator')),
-                ('organisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='invites', to='organisations.organisation')),
-                ('used_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='consumed_invites', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("code", models.CharField(max_length=16, unique=True)),
+                ("expires_at", models.DateTimeField()),
+                ("is_used", models.BooleanField(default=False)),
+                ("used_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="created_invites",
+                        to="organisations.collaborator",
+                    ),
+                ),
+                (
+                    "organisation",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="invites",
+                        to="organisations.organisation",
+                    ),
+                ),
+                (
+                    "used_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="consumed_invites",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'indexes': [models.Index(fields=['organisation', 'is_used', 'expires_at'], name='organisatio_organis_386e68_idx'), models.Index(fields=['code'], name='organisatio_code_601496_idx')],
+                "indexes": [
+                    models.Index(
+                        fields=["organisation", "is_used", "expires_at"],
+                        name="organisatio_organis_386e68_idx",
+                    ),
+                    models.Index(fields=["code"], name="organisatio_code_601496_idx"),
+                ],
             },
         ),
     ]
