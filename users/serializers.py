@@ -49,9 +49,7 @@ class UserSerializer(serializers.ModelSerializer):
                 "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
             )
         if value and not value.isalpha():
-            raise serializers.ValidationError(
-                "Country code must contain only letters."
-            )
+            raise serializers.ValidationError("Country code must contain only letters.")
         return value.upper() if value else value
 
     def validate_language(self, value):
@@ -76,6 +74,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=False,
         default=True,
     )
+
     class Meta:
         model = User
         fields = (
@@ -103,9 +102,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
             )
         if value and not value.isalpha():
-            raise serializers.ValidationError(
-                "Country code must contain only letters."
-            )
+            raise serializers.ValidationError("Country code must contain only letters.")
         return value.upper() if value else value
 
     def validate_language(self, value):
@@ -167,9 +164,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
                 "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
             )
         if value and not value.isalpha():
-            raise serializers.ValidationError(
-                "Country code must contain only letters."
-            )
+            raise serializers.ValidationError("Country code must contain only letters.")
         return value.upper() if value else value
 
     def validate_language(self, value):
@@ -244,7 +239,9 @@ class RolesSerializer(serializers.Serializer):
 
     is_agent = serializers.BooleanField()
     agent_profile = serializers.DictField(allow_null=True)
-    collaborations = serializers.ListField(child=serializers.UUIDField(), allow_empty=True)
+    collaborations = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=True
+    )
     collaboration = serializers.UUIDField(allow_null=True)
 
     def create(self, validated_data):

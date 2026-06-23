@@ -22,7 +22,11 @@ urlpatterns = [
     path("", include(router.urls)),
     path("me/athletes/", MyAthletesView.as_view(), name="my-athletes"),
     path("sports/", SportListView.as_view(), name="sports-list"),
-    path("sports/<uuid:sport_id>/disciplines/", SportDisciplinesView.as_view(), name="sport-disciplines"),
+    path(
+        "sports/<uuid:sport_id>/disciplines/",
+        SportDisciplinesView.as_view(),
+        name="sport-disciplines",
+    ),
     path(
         "athletes/slug/<slug:slug>/",
         AthleteBySlugView.as_view(),

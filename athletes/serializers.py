@@ -2,6 +2,8 @@
 
 # Serializers centralise validation so views and signals can remain slim.
 
+from typing import Optional
+
 from django.db.models import Max
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -14,7 +16,15 @@ from core.permissions import (
 )
 from users.models import AgentProfile
 
-from .models import Athlete, AthletePhoto, Sport, SportDiscipline
+from .models import (
+    Athlete,
+    AthletePhoto,
+    Sport,
+    SportDiscipline,
+    SportingAchievement,
+    SponsorshipAsset,
+    UpcomingEvent,
+)
 
 
 class SportDisciplineSerializer(serializers.ModelSerializer):
@@ -57,6 +67,128 @@ class AthletePhotoSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at")
 
 
+class SportingAchievementSerializer(serializers.ModelSerializer):
+    """Sérialise un résultat sportif avec son statut de vérification.
+
+    Seuls les résultats ``VERIFIED`` sont exposés sur les endpoints publics ;
+    l'intégralité est disponible pour les agents authentifiés.
+    """
+
+    level_label = serializers.CharField(source="get_level_display", read_only=True)
+    verification_status_label = serializers.CharField(
+        source="get_verification_status_display", read_only=True
+    )
+
+    class Meta:
+        model = SportingAchievement
+        fields = (
+            "id",
+            "title",
+            "date",
+            "level",
+            "level_label",
+            "ranking",
+            "proof_url",
+            "verification_status",
+            "verification_status_label",
+            "created_at",
+        )
+        read_only_fields = (
+            "id",
+            "level_label",
+            "verification_status_label",
+            "created_at",
+        )
+
+
+class UpcomingEventSerializer(serializers.ModelSerializer):
+    """Sérialise un événement à venir et expose la visibilité physique de l'athlète."""
+
+    class Meta:
+        model = UpcomingEvent
+        fields = (
+            "id",
+            "event_name",
+            "start_date",
+            "end_date",
+            "location",
+            "estimated_physical_audience",
+            "target_demographic",
+            "is_broadcasted",
+            "created_at",
+        )
+        read_only_fields = ("id", "created_at")
+
+    def validate(self, attrs):
+        """Ensure end_date is not before start_date.
+
+        Args:
+            attrs (dict): Validated field values.
+
+        Returns:
+            dict: Unchanged attributes when the constraint is met.
+
+        Raises:
+            serializers.ValidationError: When ``end_date`` precedes ``start_date``.
+        """
+        if attrs.get("end_date") and attrs.get("start_date"):
+            if attrs["end_date"] < attrs["start_date"]:
+                raise serializers.ValidationError(
+                    {
+                        "end_date": "La date de fin ne peut pas précéder la date de début."
+                    }
+                )
+        return attrs
+
+
+class SponsorshipAssetSerializer(serializers.ModelSerializer):
+    """Sérialise un espace publicitaire (inventaire) de l'athlète."""
+
+    asset_type_label = serializers.CharField(
+        source="get_asset_type_display", read_only=True
+    )
+
+    class Meta:
+        model = SponsorshipAsset
+        fields = (
+            "id",
+            "asset_type",
+            "asset_type_label",
+            "name",
+            "description",
+            "estimated_value_min",
+            "estimated_value_max",
+            "is_available",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "asset_type_label", "created_at", "updated_at")
+
+    def validate(self, attrs):
+        """Ensure value_max is not less than value_min.
+
+        Args:
+            attrs (dict): Validated field values.
+
+        Returns:
+            dict: Unchanged attributes when the constraint is met.
+
+        Raises:
+            serializers.ValidationError: When max < min.
+        """
+        v_min = attrs.get("estimated_value_min")
+        v_max = attrs.get("estimated_value_max")
+        if v_min is not None and v_max is not None and v_max < v_min:
+            raise serializers.ValidationError(
+                {
+                    "estimated_value_max": (
+                        "La valeur maximale doit être supérieure ou égale à la valeur minimale."
+                    )
+                }
+            )
+        return attrs
+
+
 class AgentPublicSerializer(serializers.Serializer):
     """Expose public agent information for athlete profiles."""
 
@@ -67,13 +199,22 @@ class AgentPublicSerializer(serializers.Serializer):
 
 
 class AthletePublicSerializer(serializers.ModelSerializer):
-    """Expose a limited athlete payload for public endpoints."""
+    """Expose a limited athlete payload for public endpoints.
+
+    Inclut le palmarès vérifié, les événements à venir et l'inventaire des
+    espaces de sponsoring en plus des informations de profil de base.
+    """
 
     sport = SportSerializer(read_only=True)
     disciplines = SportDisciplineSerializer(many=True, read_only=True)
     agent = AgentPublicSerializer(read_only=True)
     card_photos = serializers.SerializerMethodField()
     gallery_photos = AthletePhotoSerializer(source="photos", many=True, read_only=True)
+    verified_achievements = serializers.SerializerMethodField()
+    upcoming_events = serializers.SerializerMethodField()
+    available_assets = serializers.SerializerMethodField()
+    total_physical_reach = serializers.SerializerMethodField()
+    sponsorship_tier = serializers.SerializerMethodField()
 
     class Meta:
         model = Athlete
@@ -86,12 +227,17 @@ class AthletePublicSerializer(serializers.ModelSerializer):
             "sport",
             "disciplines",
             "nationality",
+            "club_name",
+            "federation_name",
             "agent",
-            "followers_count_cached",
-            "engagement_rate_cached",
             "avatar",
             "card_photos",
             "gallery_photos",
+            "verified_achievements",
+            "upcoming_events",
+            "available_assets",
+            "total_physical_reach",
+            "sponsorship_tier",
         )
         read_only_fields = fields
 
@@ -106,6 +252,92 @@ class AthletePublicSerializer(serializers.ModelSerializer):
             if photo.image
         ]
 
+    def get_verified_achievements(self, athlete: Athlete) -> list[dict]:
+        """Return only staff-verified achievements for public display.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            list[dict]: Serialized achievements with verification_status=VERIFIED.
+        """
+        cache = getattr(athlete, "_prefetched_objects_cache", {})
+        if "achievements" in cache:
+            verified = [
+                a
+                for a in cache["achievements"]
+                if a.verification_status
+                == SportingAchievement.VerificationStatus.VERIFIED
+            ]
+        else:
+            verified = list(
+                athlete.achievements.filter(
+                    verification_status=SportingAchievement.VerificationStatus.VERIFIED
+                )
+            )
+        return SportingAchievementSerializer(verified, many=True).data
+
+    def get_upcoming_events(self, athlete: Athlete) -> list[dict]:
+        """Return future events sorted by start_date ascending.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            list[dict]: Serialized UpcomingEvent records from today onwards.
+        """
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        cache = getattr(athlete, "_prefetched_objects_cache", {})
+        if "upcoming_events" in cache:
+            events = sorted(
+                [e for e in cache["upcoming_events"] if e.start_date >= today],
+                key=lambda e: e.start_date,
+            )
+        else:
+            events = list(athlete.upcoming_events.filter(start_date__gte=today))
+        return UpcomingEventSerializer(events, many=True).data
+
+    def get_available_assets(self, athlete: Athlete) -> list[dict]:
+        """Return only available sponsorship assets.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            list[dict]: Serialized SponsorshipAsset records where is_available=True.
+        """
+        cache = getattr(athlete, "_prefetched_objects_cache", {})
+        if "sponsorship_assets" in cache:
+            assets = [a for a in cache["sponsorship_assets"] if a.is_available]
+        else:
+            assets = list(athlete.sponsorship_assets.filter(is_available=True))
+        return SponsorshipAssetSerializer(assets, many=True).data
+
+    def get_total_physical_reach(self, athlete: Athlete) -> int:
+        """Return the total_physical_reach property value.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            int: Summed physical audience across all future events.
+        """
+        return athlete.total_physical_reach
+
+    def get_sponsorship_tier(self, athlete: Athlete) -> str:
+        """Return the sponsorship_tier property value.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            str: One of ``"Élite Nationale"``, ``"Espoir Régional"``,
+            ``"Héros Local"``.
+        """
+        return athlete.sponsorship_tier
+
     @staticmethod
     def _photo_url_or_name(photo: AthletePhoto) -> str:
         """Return a safe path or URL for the provided photo."""
@@ -117,10 +349,15 @@ class AthletePublicSerializer(serializers.ModelSerializer):
 
 
 class AthleteCardSerializer(AthletePublicSerializer):
-    """Lightweight representation for athlete listings with key metrics."""
+    """Lightweight representation for athlete discovery cards.
 
-    followers_total = serializers.SerializerMethodField()
-    engagement_rate = serializers.SerializerMethodField()
+    Pivote des métriques sociales (followers) vers les métriques business :
+    tier de sponsoring, visibilité physique totale, prochain événement et
+    nombre d'espaces disponibles à l'achat.
+    """
+
+    next_event = serializers.SerializerMethodField()
+    available_asset_count = serializers.SerializerMethodField()
 
     class Meta(AthletePublicSerializer.Meta):
         fields = (
@@ -129,30 +366,64 @@ class AthleteCardSerializer(AthletePublicSerializer):
             "full_name",
             "country",
             "city",
+            "club_name",
             "sport",
             "disciplines",
             "avatar",
             "card_photos",
-            "gallery_photos",
-            "followers_total",
-            "engagement_rate",
+            "sponsorship_tier",
+            "total_physical_reach",
+            "next_event",
+            "available_asset_count",
         )
         read_only_fields = fields
 
-    def get_followers_total(self, athlete: Athlete) -> int:
-        return athlete.followers_count_cached
+    def get_next_event(self, athlete: Athlete) -> Optional[dict]:
+        """Return the earliest upcoming event, or None.
 
-    def get_engagement_rate(self, athlete: Athlete) -> float:
-        if athlete.engagement_rate_cached is None:
-            return 0.0
-        return float(athlete.engagement_rate_cached)
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            dict | None: Serialized UpcomingEvent or ``None`` when no future
+            events are scheduled.
+        """
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        cache = getattr(athlete, "_prefetched_objects_cache", {})
+        if "upcoming_events" in cache:
+            future = sorted(
+                [e for e in cache["upcoming_events"] if e.start_date >= today],
+                key=lambda e: e.start_date,
+            )
+            event = future[0] if future else None
+        else:
+            event = athlete.upcoming_events.filter(start_date__gte=today).first()
+        return UpcomingEventSerializer(event).data if event else None
+
+    def get_available_asset_count(self, athlete: Athlete) -> int:
+        """Return the number of sponsorship assets currently available.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            int: Count of SponsorshipAsset records where is_available=True.
+        """
+        cache = getattr(athlete, "_prefetched_objects_cache", {})
+        if "sponsorship_assets" in cache:
+            return sum(1 for a in cache["sponsorship_assets"] if a.is_available)
+        return athlete.sponsorship_assets.filter(is_available=True).count()
 
 
 class AthleteSerializer(serializers.ModelSerializer):
     """Full serializer used for authenticated athlete management.
 
     The serializer embeds plan-based constraints and ensures ownership rules
-    are respected when creating or updating athletes.
+    are respected when creating or updating athletes.  Includes institutional
+    identity fields (club, federation, license) and read-only computed
+    business metrics.
     """
 
     sport = SportSerializer(read_only=True)
@@ -169,13 +440,17 @@ class AthleteSerializer(serializers.ModelSerializer):
         required=False,
     )
     photos = AthletePhotoSerializer(many=True, read_only=True)
-    # FileField keeps uploads lightweight so tests don't depend on Pillow.
     new_photos = serializers.ListField(
         child=serializers.FileField(allow_empty_file=False),
         write_only=True,
         required=False,
     )
     card_photos = serializers.SerializerMethodField()
+    achievements = SportingAchievementSerializer(many=True, read_only=True)
+    upcoming_events = UpcomingEventSerializer(many=True, read_only=True)
+    sponsorship_assets = SponsorshipAssetSerializer(many=True, read_only=True)
+    total_physical_reach = serializers.SerializerMethodField()
+    sponsorship_tier = serializers.SerializerMethodField()
 
     class Meta:
         model = Athlete
@@ -192,6 +467,10 @@ class AthleteSerializer(serializers.ModelSerializer):
             "city",
             "bio",
             "social_links",
+            # Identité institutionnelle
+            "club_name",
+            "federation_name",
+            "license_number",
             "disciplines",
             "discipline_ids",
             "followers_count_cached",
@@ -202,6 +481,12 @@ class AthleteSerializer(serializers.ModelSerializer):
             "photos",
             "new_photos",
             "card_photos",
+            # Business metrics (lecture seule)
+            "achievements",
+            "upcoming_events",
+            "sponsorship_assets",
+            "total_physical_reach",
+            "sponsorship_tier",
         )
         read_only_fields = (
             "id",
@@ -214,6 +499,11 @@ class AthleteSerializer(serializers.ModelSerializer):
             "disciplines",
             "photos",
             "card_photos",
+            "achievements",
+            "upcoming_events",
+            "sponsorship_assets",
+            "total_physical_reach",
+            "sponsorship_tier",
         )
 
     def validate(self, attrs):
@@ -245,7 +535,9 @@ class AthleteSerializer(serializers.ModelSerializer):
         discipline_ids = attrs.get("discipline_ids")
         if discipline_ids and sport is None:
             raise serializers.ValidationError(
-                {"discipline_ids": "Sport must be specified when selecting disciplines."}
+                {
+                    "discipline_ids": "Sport must be specified when selecting disciplines."
+                }
             )
         if discipline_ids and sport:
             invalid = [d for d in discipline_ids if d.sport_id != sport.id]
@@ -276,9 +568,7 @@ class AthleteSerializer(serializers.ModelSerializer):
                 "Country must be a valid ISO 3166-1 alpha-2 code (2 letters)."
             )
         if value and not value.isalpha():
-            raise serializers.ValidationError(
-                "Country code must contain only letters."
-            )
+            raise serializers.ValidationError("Country code must contain only letters.")
         return value.upper() if value else value
 
     def create(self, validated_data):
@@ -360,6 +650,28 @@ class AthleteSerializer(serializers.ModelSerializer):
             for photo in list(queryset)[:3]
             if photo.image
         ]
+
+    def get_total_physical_reach(self, athlete: Athlete) -> int:
+        """Delegate to the model property.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            int: Summed physical audience of future events.
+        """
+        return athlete.total_physical_reach
+
+    def get_sponsorship_tier(self, athlete: Athlete) -> str:
+        """Delegate to the model property.
+
+        Args:
+            athlete (Athlete): Athlete instance being serialized.
+
+        Returns:
+            str: Commercial tier label.
+        """
+        return athlete.sponsorship_tier
 
     def _attach_photos(self, athlete: Athlete, photo_files: list) -> None:
         """Persist uploaded gallery photos while maintaining ordering."""

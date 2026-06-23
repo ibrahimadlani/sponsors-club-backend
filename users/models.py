@@ -171,6 +171,76 @@ class AgentProfile(BaseModel):
         return str(self.user)
 
 
+class RepresentativeProfile(BaseModel):
+    """Generic profile for any person surrounding an athlete (entourage).
+
+    Replaces the exclusive agent model with a flexible representation layer.
+    Any user — parent, coach, club secretary, licensed agent — can hold a
+    ``RepresentativeProfile`` and be granted a ``RepresentationMandate`` with
+    the exact permissions that match their real-world role.
+
+    KYC verification and federation licensing are tracked here so that sponsors
+    can see a trust badge ("Verified Parent", "Licensed Agent FFF") on the
+    athlete's public profile before committing to a deal.
+
+    Attributes:
+        user: The platform account attached to this representative.
+        is_kyc_verified: Whether the representative has submitted and passed
+            identity verification (government-issued ID check).
+        license_number: Optional federation license number, populated only when
+            the representative is a certified sports agent.
+        licensing_federation: Name of the federation that issued the license
+            (e.g., "Fédération Française de Football").
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="representative_profile",
+    )
+    is_kyc_verified = models.BooleanField(
+        default=False,
+        help_text="Representative has passed identity verification.",
+    )
+    license_number = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Federation license number — populated only for certified sports agents.",
+    )
+    licensing_federation = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Federation that issued the agent license (e.g., FFF, FFBB).",
+    )
+
+    def __str__(self) -> str:  # pragma: no cover
+        return str(self.user)
+
+    @property
+    def is_licensed_agent(self) -> bool:
+        """Return True when the profile carries a valid federation license number.
+
+        Returns:
+            bool: ``True`` when ``license_number`` is non-empty.
+        """
+        return bool(self.license_number)
+
+    @property
+    def trust_label(self) -> str:
+        """Return a human-readable trust badge for display on public profiles.
+
+        Returns:
+            str: Concise label combining KYC state and agent status.
+        """
+        if self.is_licensed_agent and self.is_kyc_verified:
+            return "Licensed Agent (Verified)"
+        if self.is_licensed_agent:
+            return "Licensed Agent"
+        if self.is_kyc_verified:
+            return "Verified Representative"
+        return "Representative"
+
+
 class EmailVerificationToken(BaseModel):
     """Token issued to confirm a user's email address."""
 

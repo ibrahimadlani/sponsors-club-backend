@@ -182,7 +182,9 @@ def test_athlete_serializer_create_success(agent_user, sport):
     assert athlete.full_name == "Jane Doe"
     assert athlete.country == "US"
     assert athlete.city == "New York"
-    assert list(athlete.disciplines.order_by('name').values_list('name', flat=True)) == ["Professional 5v5", "Streetball"]
+    assert list(
+        athlete.disciplines.order_by("name").values_list("name", flat=True)
+    ) == ["Professional 5v5", "Streetball"]
 
 
 @pytest.mark.django_db
@@ -599,7 +601,9 @@ def test_agent_create_athlete_requires_plan_slot(agent_user, sport):
 
 @pytest.mark.django_db
 def test_athlete_serializer_rejects_cross_sport_disciplines(agent_user, sport):
-    other_sport = Sport.objects.create(name="Swimming", emoji="🏊", category=Sport.Category.INDIVIDUAL)
+    other_sport = Sport.objects.create(
+        name="Swimming", emoji="🏊", category=Sport.Category.INDIVIDUAL
+    )
     other_discipline = SportDiscipline.objects.create(
         sport=other_sport,
         name="200m Medley",
