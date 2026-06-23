@@ -21,6 +21,7 @@ from contracts.models import (
     RepresentationMandate,
 )
 from athletes.models import Athlete
+from payments.models import PlatformFee
 
 User = get_user_model()
 
@@ -294,6 +295,12 @@ class TestSignatureWithMandateValidation:
             title="Contract without Agent Mandate",
             status=Contract.Status.SIGNING,
         )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
+        )
 
         # Create only collaborator mandate (agent mandate missing)
         RepresentationMandate.objects.create(
@@ -337,6 +344,12 @@ class TestSignatureWithMandateValidation:
             title="Contract without Collaborator Mandate",
             status=Contract.Status.SIGNING,
         )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
+        )
 
         # Create only agent mandate (collaborator mandate missing)
         RepresentationMandate.objects.create(
@@ -378,6 +391,12 @@ class TestSignatureWithMandateValidation:
             title="Contract with Valid Mandates",
             status=Contract.Status.SIGNING,
         )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
+        )
 
         api_client.force_authenticate(user=owner_user)
 
@@ -407,6 +426,12 @@ class TestSignatureWithMandateValidation:
             initiated_by=collaborator,
             title="Contract with Expired Mandate",
             status=Contract.Status.SIGNING,
+        )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
         )
 
         # Create expired agent mandate
@@ -457,6 +482,12 @@ class TestSignatureWithMandateValidation:
             title="Contract with Unverified Mandate",
             status=Contract.Status.SIGNING,
         )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
+        )
 
         # Create unverified agent mandate
         RepresentationMandate.objects.create(
@@ -503,6 +534,12 @@ class TestMandateMissingDetails:
             initiated_by=collaborator,
             title="Contract for Missing Mandate Details",
             status=Contract.Status.SIGNING,
+        )
+        PlatformFee.objects.create(
+            contract=contract,
+            fee_type=PlatformFee.FeeType.MATERIAL_FIXED_FEE,
+            amount_due="49.00",
+            status=PlatformFee.Status.PAID,
         )
 
         api_client.force_authenticate(user=owner_user)

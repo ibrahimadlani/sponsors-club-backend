@@ -27,7 +27,7 @@ from core.permissions import (
     requirement_denied_payload,
 )
 
-from .models import Subscription, SubscriptionPlan
+from .models import PlatformFee, Subscription, SubscriptionPlan
 from .serializers import (
     StripeCheckoutSessionSerializer,
     SubscriptionCreateSerializer,
@@ -840,5 +840,143 @@ class StripeWebhookView(APIView):
             sync_subscription_from_payload(data_object)
         else:
             logger.info("Received unhandled Stripe event %s", event_type)
+
+        return Response({"detail": "Processed."}, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# Marketplace / PlatformFee views
+# ---------------------------------------------------------------------------
+
+
+class PlatformFeeDetailView(APIView):
+    """Retrieve the marketplace invoice attached to a contract.
+
+    This endpoint is used by the front-end to poll fee status and display the
+    payment CTA.  Only the parties involved in the contract (agent or
+    organisation collaborator) can access this resource.
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, contract_id: str):
+        """Return the PlatformFee linked to the given contract.
+
+        Args:
+            request: Authenticated HTTP request.
+            contract_id: UUID of the contract whose fee should be returned.
+
+        Returns:
+            Response: Serialized PlatformFee with HTTP 200, or 404 when absent.
+        """
+        from contracts.models import Contract
+        from contracts.serializers import PlatformFeeSerializer
+
+        try:
+            contract = Contract.objects.select_related("platform_fee").get(
+                id=contract_id
+            )
+        except Contract.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # Restrict to parties in the contract
+        user = request.user
+        is_collaborator = Collaborator.objects.filter(
+            user=user, organisation=contract.organisation
+        ).exists()
+        agent_profile = getattr(user, "agent_profile", None)
+        is_agent = bool(agent_profile and agent_profile == contract.agent)
+
+        if not (user.is_staff or is_collaborator or is_agent):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            fee = contract.platform_fee
+        except PlatformFee.DoesNotExist:
+            return Response(
+                {"detail": "No platform fee generated yet for this contract."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from contracts.serializers import PlatformFeeSerializer  # noqa: F811
+
+        return Response(PlatformFeeSerializer(fee).data)
+
+
+class MarketplaceStripeWebhookView(APIView):
+    """Handle Stripe webhook events specific to the marketplace payment flow.
+
+    Listens for ``payment_intent.succeeded`` events and marks the associated
+    :class:`PlatformFee` as PAID, unlocking the DocuSign signing flow.
+    """
+
+    permission_classes = (permissions.AllowAny,)
+    _WEBHOOK_SETTING = "STRIPE_MARKETPLACE_WEBHOOK_SECRET"
+
+    def post(self, request):
+        """Process an incoming Stripe marketplace webhook.
+
+        Args:
+            request: Raw HTTP request containing the Stripe event payload.
+
+        Returns:
+            Response: 200 on success, 400 on signature failure, 200 for
+            unhandled events (so Stripe does not retry them).
+        """
+        webhook_secret: Optional[str] = getattr(settings, self._WEBHOOK_SETTING, None)
+        payload = request.body
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
+
+        try:
+            if webhook_secret:
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, webhook_secret
+                )
+            else:
+                event = stripe.Event.construct_from(request.data, stripe.api_key)
+        except (ValueError, SignatureVerificationError) as exc:
+            logger.warning("Marketplace webhook signature check failed: %s", exc)
+            return Response(
+                {"detail": "Invalid Stripe signature."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        event_type: str = event["type"]
+        data_object: Dict[str, Any] = event["data"]["object"]
+
+        if event_type == "payment_intent.succeeded":
+            payment_intent_id: str = data_object.get("id", "")
+            metadata: Dict[str, str] = data_object.get("metadata", {})
+            contract_id: str = metadata.get("contract_id", "")
+
+            if not contract_id:
+                logger.warning(
+                    "payment_intent.succeeded received without contract_id metadata: %s",
+                    payment_intent_id,
+                )
+                return Response({"detail": "Processed."}, status=status.HTTP_200_OK)
+
+            try:
+                fee = PlatformFee.objects.select_related("contract").get(
+                    contract_id=contract_id
+                )
+            except PlatformFee.DoesNotExist:
+                logger.warning(
+                    "No PlatformFee found for contract_id=%s from Stripe event %s",
+                    contract_id,
+                    payment_intent_id,
+                )
+                return Response({"detail": "Processed."}, status=status.HTTP_200_OK)
+
+            if fee.status != PlatformFee.Status.PAID:
+                fee.mark_paid(stripe_payment_intent_id=payment_intent_id)
+                logger.info(
+                    "PlatformFee %s marked PAID via Stripe PaymentIntent %s",
+                    fee.id,
+                    payment_intent_id,
+                )
+
+        else:
+            logger.debug("Marketplace webhook: unhandled event %s", event_type)
 
         return Response({"detail": "Processed."}, status=status.HTTP_200_OK)

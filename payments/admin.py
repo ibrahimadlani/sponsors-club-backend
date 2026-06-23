@@ -7,7 +7,7 @@
 from django.contrib import admin
 
 from .constants import PLAN_CORE_FIELDS
-from .models import Subscription, SubscriptionPlan
+from .models import AthletePaymentAccount, PlatformFee, Subscription, SubscriptionPlan
 
 
 @admin.register(SubscriptionPlan)
@@ -60,3 +60,32 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "stripe_customer_id",
         "stripe_subscription_id",
     )
+
+
+@admin.register(AthletePaymentAccount)
+class AthletePaymentAccountAdmin(admin.ModelAdmin):
+    """Admin for Stripe Connect accounts linked to athletes."""
+
+    list_display = (
+        "athlete",
+        "stripe_account_id",
+        "is_onboarded",
+        "charges_enabled",
+        "payouts_enabled",
+    )
+    list_filter = ("is_onboarded", "charges_enabled", "payouts_enabled")
+    search_fields = ("athlete__full_name", "stripe_account_id")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(PlatformFee)
+class PlatformFeeAdmin(admin.ModelAdmin):
+    """Admin for marketplace invoices generated upon contract agreement."""
+
+    list_display = ("contract", "fee_type", "amount_due", "status", "paid_at")
+    list_filter = ("fee_type", "status")
+    search_fields = ("contract__title", "stripe_payment_intent_id")
+    readonly_fields = ("created_at", "updated_at", "paid_at")
+
+    def has_add_permission(self, request):
+        return False

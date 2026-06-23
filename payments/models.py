@@ -1,14 +1,19 @@
-"""Database models for subscription plans and entitlements."""
+"""Database models for subscription plans, entitlements, and marketplace fees.
 
-# The payments models store commercial plans and the subscriptions linking them
-# to organisations or agents. The inline comments explain the business rules so
-# future maintainers can reason about constraints quickly.
+The module covers two eras of the commercial model:
+- Legacy SaaS subscriptions (SubscriptionPlan / Subscription) kept for
+  billing history and backward-compatibility with existing Stripe webhooks.
+- Transactional Marketplace models (AthletePaymentAccount / PlatformFee)
+  that drive the new "success fee" revenue stream tied to contract signing.
+"""
 
 import uuid
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from organisations.models import Organisation
 from users.models import AgentProfile
@@ -193,3 +198,119 @@ class Subscription(BaseModel):
         scope = self.organisation or self.agent
         plan_code = getattr(self.plan, "code", "")
         return f"Subscription for {scope} ({plan_code})"
+
+
+# ---------------------------------------------------------------------------
+# Transactional Marketplace models
+# ---------------------------------------------------------------------------
+
+
+class AthletePaymentAccount(BaseModel):
+    """Stripe Connect Express account for an athlete's payout routing.
+
+    Created once the athlete completes the Stripe onboarding flow.  Until
+    ``is_onboarded`` is True, the platform cannot route earnings to them.
+
+    Attributes:
+        athlete: One-to-one link to the athlete profile.
+        stripe_account_id: Stripe Connect account identifier (``acct_…``).
+        is_onboarded: True once the onboarding form has been completed.
+        charges_enabled: Mirror of Stripe's ``charges_enabled`` flag.
+        payouts_enabled: Mirror of Stripe's ``payouts_enabled`` flag.
+    """
+
+    athlete = models.OneToOneField(
+        "athletes.Athlete",
+        on_delete=models.CASCADE,
+        related_name="payment_account",
+    )
+    stripe_account_id = models.CharField(max_length=255, unique=True)
+    is_onboarded = models.BooleanField(default=False)
+    charges_enabled = models.BooleanField(default=False)
+    payouts_enabled = models.BooleanField(default=False)
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Stripe Connect: {self.athlete} ({self.stripe_account_id})"
+
+
+class PlatformFee(BaseModel):
+    """Invoice generated automatically when a contract reaches AGREEMENT status.
+
+    The platform charges a success fee whose amount depends on the nature of
+    the contract counterparts:
+    - At least one CASH counterpart → 10 % commission on total cash value
+      with a €10 minimum.
+    - Non-cash counterparts only → fixed fee of €49.
+
+    The ``status`` field acts as the paywall: DocuSign envelope creation is
+    blocked until ``status == PAID``.  Payment confirmation arrives via the
+    ``payment_intent.succeeded`` Stripe webhook which flips the status.
+
+    Attributes:
+        contract: The contract that triggered this fee (one-to-one).
+        fee_type: Pricing rule used to compute the amount.
+        amount_due: Exact amount owed in EUR, set at invoice generation.
+        status: Lifecycle state tracked from PENDING through PAID.
+        stripe_payment_intent_id: Stripe PaymentIntent reference for reconciliation.
+        paid_at: Timestamp recorded when the Stripe webhook confirms payment.
+    """
+
+    CASH_COMMISSION_RATE: Decimal = Decimal("0.10")
+    CASH_COMMISSION_MINIMUM: Decimal = Decimal("10.00")
+    MATERIAL_FIXED_AMOUNT: Decimal = Decimal("49.00")
+
+    class FeeType(models.TextChoices):
+        CASH_COMMISSION = "cash_commission", "Cash commission (10 %)"
+        MATERIAL_FIXED_FEE = "material_fixed_fee", "Fixed fee – material contract (€49)"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending payment"
+        PAID = "paid", "Paid"
+        DISPUTED = "disputed", "Disputed"
+        WAIVED = "waived", "Waived by staff"
+
+    contract = models.OneToOneField(
+        "contracts.Contract",
+        on_delete=models.CASCADE,
+        related_name="platform_fee",
+    )
+    fee_type = models.CharField(max_length=32, choices=FeeType.choices)
+    amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"], name="platform_fee_status_idx"),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return (
+            f"PlatformFee {self.fee_type} – €{self.amount_due}"
+            f" [{self.get_status_display()}] ({self.contract_id})"
+        )
+
+    def mark_paid(self, stripe_payment_intent_id: str = "") -> None:
+        """Record a successful payment and flip the status to PAID.
+
+        Args:
+            stripe_payment_intent_id: Stripe PaymentIntent reference for
+                audit and reconciliation purposes.
+        """
+        self.status = self.Status.PAID
+        self.paid_at = timezone.now()
+        if stripe_payment_intent_id:
+            self.stripe_payment_intent_id = stripe_payment_intent_id
+        self.save(
+            update_fields=[
+                "status",
+                "paid_at",
+                "stripe_payment_intent_id",
+                "updated_at",
+            ]
+        )
